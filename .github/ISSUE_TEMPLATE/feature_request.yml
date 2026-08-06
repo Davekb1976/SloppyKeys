@@ -1,0 +1,32 @@
+name: Feature request
+description: Something the macro should be able to do
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Two things are always declined, so they're worth checking first: anything needing
+        more than pixels in and Windows input out (memory reads, injection, hooks, fast
+        flags), and anything that changes the 1152x756 viewport — every coordinate,
+        template, unit plan and route was captured at that size.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to get done?
+      description: The goal, not the control you're picturing. There's often a shorter way.
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: How you'd like it to work
+    validations:
+      required: true
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: What you do instead today
+      description: Including "nothing, I just don't run that mode".

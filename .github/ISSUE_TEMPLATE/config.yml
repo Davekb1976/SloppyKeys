@@ -1,0 +1,10 @@
+# No blank issues: the templates ask for log.txt, the version and the display scaling, and
+# a report without those three is a round trip before it can be read.
+blank_issues_enabled: false
+contact_links:
+  - name: Nothing clicks in game
+    url: https://www.autohotkey.com/
+    about: Install AutoHotkey v2 first — every click and keypress goes through it.
+  - name: Read the setup notes
+    url: https://github.com/Davekb1976/SloppyKeys#readme
+    about: Requirements, where your data lives, and what the macro deliberately won't do.

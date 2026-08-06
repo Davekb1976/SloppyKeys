@@ -45,6 +45,19 @@ lists SHA-256 hashes if you want to check what you downloaded.
 Then install AutoHotkey v2 if you haven't. The installer says so too, rather than letting
 you find out by every click doing nothing.
 
+### Updates
+
+**Settings > Main > Updates.** It asks GitHub once per launch whether there's a newer
+release and stays quiet unless there is. Nothing downloads until you click.
+
+If you used the installer, it can update in place: it fetches the new setup, checks it
+against the `SHA256SUMS.txt` published with the release, refuses anything that doesn't
+match, and won't touch an update while the macro is running. Portable and from-source
+copies get the release page instead — running the installer from a portable folder would
+just leave a second copy elsewhere.
+
+Turn the whole thing off with the toggle and nothing contacts GitHub.
+
 ### Your data
 
 `images\`, `configs\`, `routes.json` and `settings.json` live **beside the exe** — the app
@@ -137,14 +150,18 @@ tests/       assert scripts, no framework
 
 Content and timing are **tables, not branches**: adding a map or a delay is a row.
 
-## Contributions
+## Bugs and requests
 
-None accepted — see [CONTRIBUTING.md](CONTRIBUTING.md). Fork it and go if you want your
-own.
+[Open an issue](../../issues/new/choose) — bring `log.txt`, a screenshot, and your display
+scaling. Pull requests aren't accepted; fork it instead. Details in
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Licence
 
-See [LICENSE](LICENSE). Noncommercial: no paywalls, licence keys, telemetry or resale.
+[MIT](LICENSE). Use it, change it, ship it.
+
+It carries no paywall, licence key or telemetry, and it never will — but that's a promise
+about this build, not a restriction on yours.
 
 Bundled attribution: the `ponytail` steering guide is MIT, from
 [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail).

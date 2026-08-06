@@ -19,8 +19,11 @@ cover · **AutoHotkey v2** for all output. Python decides *what* to do and hands
 script to click/press/scroll (`core/ahk.py`). Every entry in `requirements.txt` carries a
 comment saying why that package and not the obvious alternative — read it before adding one.
 
-**Noncommercial**: no paywalls, licence keys, telemetry or resale. Keep licence and
-attribution notices intact (e.g. `ponytail.md`'s MIT source).
+**MIT** (`LICENSE`), so the licence restricts nobody — the product rules are ours to keep,
+not the licence's to enforce: no paywall, no licence key, no telemetry. The only outbound
+requests are the user's own Discord webhook (`core/webhook.py`) and the GitHub release check
+(`core/updates.py`), both host-allowlisted. Keep licence and attribution notices intact
+(e.g. `ponytail.md`'s MIT source).
 
 ## Stay outside the game — the ban surface
 

@@ -1,0 +1,77 @@
+# Every field here exists because its absence has cost a round trip. The log excerpt and
+# the scaling question in particular answer most reports on their own.
+name: Bug report
+description: Something the macro did wrong, or didn't do at all
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before you fill this in: AutoHotkey **v2** installed, display scaling at **100%**,
+        Roblox attached and not minimized. Those three are most reports.
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The pill in the titlebar, e.g. v0.1.0
+      placeholder: v0.1.0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install
+    attributes:
+      label: How did you install it?
+      options:
+        - Installer (SloppyKeys-Setup-*.exe)
+        - Portable zip
+        - From source
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scaling
+    attributes:
+      label: Display scaling
+      description: Windows Settings > System > Display > Scale. Anything but 100% breaks template matching.
+      options:
+        - "100%"
+        - "125%"
+        - "150%"
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you expected, what happened instead, and which screen it was on.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to reproduce it
+      description: Gamemode, map, act, and what you had queued. Every run or now and then?
+    validations:
+      required: true
+
+  - type: textarea
+    id: log
+    attributes:
+      label: log.txt
+      description: >
+        The last ~50 lines from log.txt, beside the exe. It timestamps every step, match
+        score and timed-out search. It holds no private-server link and no webhook URL.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot
+      description: Drag an image in. Nobody reading this can see your screen.
