@@ -601,11 +601,20 @@ templates are re-captured at 1152×756 but no full run has been watched since.
 
 ## Rules for this file
 
-- Edit sections in place. No changelog, no dated entries, no second handoff file.
-- Update it in the turn that changes reality, before reporting done.
-- An item described as broken here **is** broken. When the user moves on to another topic, close the
-  previous fix out in that turn: move it to Working, delete its Untested/Next entry, cut the story of how
-  it was found.
-- Keep only what a new agent needs to act. A dead end earns one line **only** if someone would retry it.
-  Delete measurements once they've served their purpose.
-- Don't promote anything to Working on the strength of `compileall` or a probe. Say "untested".
+**This is not a changelog. `git log` is.** See `.kiro/steering/version-control.md` — a fix, its root cause
+and the evidence for it belong in a commit message, not here.
+
+What stays here is only what a commit history cannot answer:
+
+- What works, and what is **untested in game**.
+- Measured constants that live in code and why they are load-bearing (the viewport size, `PITCH_DELTA`, the
+  OCR boxes).
+- Dead ends not to retry.
+- The module map.
+
+- Edit sections in place. No dated entries, no second handoff file.
+- An item described as broken here **is** broken. When the user moves on to another topic, close the previous
+  fix out in that turn: delete its Untested entry and any "in progress" wording.
+- Don't promote anything on the strength of `compileall` or a probe. Say "untested".
+- **611 lines today against a ~250 budget.** Every edit should leave it shorter. Cut the story of how a bug
+  was found first — that is what commit bodies are for now.
