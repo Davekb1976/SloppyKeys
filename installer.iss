@@ -2,12 +2,14 @@
 ; first, then compile this:
 ;
 ;   .venv\Scripts\python.exe build_exe.py
-;   "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe" installer.iss
+;   $v = .venv\Scripts\python.exe -c "from sloppykeys.version import VERSION; print(VERSION)"
+;   "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe" /DAppVersion=$v installer.iss
 ;
 ; That is where `winget install JRSoftware.InnoSetup` puts it without elevation — a
-; per-user install, so it is not under Program Files.
+; per-user install, so it is not under Program Files. On a GitHub runner Chocolatey puts
+; it in Program Files (x86) instead; `.github/workflows/release.yml` does all of this.
 ;
-; Output: installer_output\SloppyKeys-Setup-beta.exe
+; Output: installer_output\SloppyKeys-Setup-<version>.exe
 ;
 ; # Where the user's data lives
 ; In the install folder, beside the exe: `images\`, `configs\`, `routes.json`,
@@ -37,9 +39,13 @@
 ; AutoHotkey v2. See the note by `InitializeSetup`.
 
 #define AppName "SloppyKeys"
-; Deliberately a word, not a number — matches `ui/window.py::VERSION`. There is no release
-; cadence to track yet, and a stale version is worse than none.
-#define AppVersion "beta"
+; No default on purpose. `sloppykeys/version.py::VERSION` is the only place a version
+; number is written down, and a default here would be a second one — stale the first time
+; someone bumps the real one. Failing the compile is the cheap failure; shipping
+; `SloppyKeys-Setup-0.1.0.exe` built from 0.2.0 code is the expensive one.
+#ifndef AppVersion
+  #error Pass the version: ISCC /DAppVersion=0.1.0 installer.iss  (README > Releasing)
+#endif
 #define AppExe "SloppyKeys.exe"
 ; Where build_exe.py put the runnable folder (relative to this file).
 #define Payload "..\..\SLOPPYKEYS"

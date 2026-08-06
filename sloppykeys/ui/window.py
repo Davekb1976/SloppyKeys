@@ -144,11 +144,8 @@ from .pages.settings_page import SettingsPage
 from .pages.stats_page import StatsPage
 from .pages.units_page import UnitsPage
 from .viewport import RobloxViewport
+from ..version import VERSION
 
-# Not a version number on purpose — there is no release cadence to track yet, and a
-# stale "0.3.0" in the titlebar is worse than no number. `installer.iss`'s AppVersion
-# says the same word; keep the two in step if this ever becomes a real number.
-VERSION = "beta"
 LOG_FILE = "log.txt"
 LOG_PREV_FILE = "log.prev.txt"
 # Nothing was ever deleting log.txt. One append per line is cheap, but a long grind
@@ -374,7 +371,7 @@ class TitleBar(QWidget):
 
         brand = QLabel("SloppyKeys")
         brand.setObjectName("brand")
-        version = QLabel(VERSION)
+        version = QLabel(f"v{VERSION}")
         version.setObjectName("version")
         version.setFixedHeight(24)
         row.addWidget(brand)
