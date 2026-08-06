@@ -82,40 +82,16 @@ jobs:
               "$((Get-FileHash $_ -Algorithm SHA256).Hash.ToLower())  $(Split-Path $_ -Leaf)"
             } | Set-Content SHA256SUMS.txt -Encoding ascii
 
+      # Python, not an inline PowerShell string: the notes are markdown full of backticks
+      # and a backtick is PowerShell's escape character, so the inline version died at the
+      # first code fence with "Unexpected token". See .github/release_notes.py.
       - name: notes
         run: |
-          $v = '${{ steps.version.outputs.version }}'
-          $SUMS = 'SHA256SUMS.txt'
-          $hashes = Get-Content SHA256SUMS.txt | ForEach-Object { "  $_" }
-          $previous = git describe --tags --abbrev=0 --exclude='${{ github.ref_name }}' 2>$null
-          $changes = if ($previous) {
-            "**Changes:** https://github.com/${{ github.repository }}/compare/$previous...${{ github.ref_name }}"
-          } else { "First tagged release." }
-          @(
-            "### Requirements"
-            ""
-            "- Windows 10 or 11, x64"
-            "- [AutoHotkey v2](https://www.autohotkey.com/) — every click and keypress goes through it, so the macro can't drive the game without it"
-            "- Display scaling at 100%. At 125% the templates score as different images and matching fails."
-            ""
-            "### Install"
-            ""
-            "``SloppyKeys-Setup-$v.exe`` installs per-user to ``%LOCALAPPDATA%\Programs\SloppyKeys`` — no admin, and the folder stays writable so your captures and settings save. Your ``images``, ``configs``, ``routes.json`` and ``settings.json`` are never overwritten by an upgrade and never removed unless you say yes when uninstalling."
-            ""
-            "The portable zip is the same build with no installer: unzip anywhere writable and run ``SloppyKeys.exe``."
-            ""
-            "### Updating"
-            ""
-            "If you installed a previous version with the installer, SloppyKeys can update itself: Settings > Main > Updates. It checks once per launch, downloads only when you click, verifies the download against ``$SUMS``, and never touches an update while the macro is running."
-            ""
-            "Neither download is code-signed, so SmartScreen will warn. SHA-256:"
-            ""
-            "```"
-            $hashes
-            "```"
-            ""
-            $changes
-          ) | Set-Content notes.md -Encoding utf8
+          python .github/release_notes.py `
+            '${{ steps.version.outputs.version }}' `
+            '${{ github.ref_name }}' `
+            '${{ github.repository }}' > notes.md
+          Get-Content notes.md
 
       - name: publish
         env:

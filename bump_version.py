@@ -92,9 +92,18 @@ def main() -> None:
     if args.dry_run:
         return
 
-    write_version(new)
-    run("git", "add", "sloppykeys/version.py")
-    run("git", "commit", "-m", f"Release {new}", "-m", body)
+    # The release commit is the changelog (`version-control.md` §Releasing), so it is made
+    # even when there is no diff to carry — `--set` to the version already in the file, as
+    # the first release is, would otherwise leave the history with no Release entry at all
+    # and only a tag to show for it. `--allow-empty` is the point, not a workaround.
+    commit = ["git", "commit", "-m", f"Release {new}", "-m", body]
+    if new == VERSION:
+        print(f"version.py already says {new}; committing the changelog with no diff")
+        commit.insert(2, "--allow-empty")
+    else:
+        write_version(new)
+        run("git", "add", "sloppykeys/version.py")
+    run(*commit)
     run("git", "tag", "-a", tag, "-m", f"SloppyKeys {new}")
     run("git", "push", "origin", "main")
     run("git", "push", "origin", tag)
