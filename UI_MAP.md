@@ -1,9 +1,14 @@
 # SloppyKeys UI Map
 
-Shared vocabulary for the interface. Use these names when asking for changes and
-I'll know exactly which widget you mean. Every name below maps to real code.
+Shared vocabulary for the interface. Use these names when asking for a change and there's
+no ambiguity about which widget you mean.
 
-Window: **1380 x 886**, frameless, fixed size, always-on-top, rounded corners.
+**No sizes here on purpose.** Every number lives in `ui/theme.py` (`WINDOW_WIDTH`,
+`VIEWPORT_WIDTH`, `RAIL_WIDTH`, `STRIP_HEIGHT`, …). The previous version of this file quoted
+a 1380×886 window and an 816×638 viewport against a real 1690×1012 and 1152×756, which is
+exactly what a second copy of a measured number does. The one constant worth knowing is
+that the viewport is pinned at **1152×756** and every coordinate, template and unit plan
+was captured at that size.
 
 ---
 
@@ -11,193 +16,112 @@ Window: **1380 x 886**, frameless, fixed size, always-on-top, rounded corners.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│ TITLEBAR                                                     │
+│ TITLEBAR (a card, inset from the window edge)                │
 ├──────┬───────────────────────────────────────────────────────┤
-│      │                                                       │
-│ RAIL │                    SCREEN                             │
-│      │   (SelectorScreen | Workspace | SettingsScreen)        │
-│      │                                                       │
+│      │  ┌────────────────────────┬─────────────────────┐     │
+│ RAIL │  │       VIEWPORT         │                     │     │
+│      │  ├────────────────────────┤    RIGHT PANEL      │     │
+│ ⋮    │  │       RUN STRIP        │                     │     │
+│ CLOCK│  └────────────────────────┴─────────────────────┘     │
 └──────┴───────────────────────────────────────────────────────┘
 ```
 
-| Name | What it is | File |
+| Name | What it is | Where |
 |---|---|---|
-| **Titlebar** | Top bar, full width. Drags the window. | `ui/window.py` → `TitleBar` |
-| **Rail** | Left vertical nav card (RUN / UNITS / SETTINGS). | `ui/window.py` → `rail`, `RailButton` |
-| **Screen** | The swappable area right of the Rail. One of the three screens below. | `ui/window.py` → `self._stack` |
+| **Titlebar** | Top card, full width. Drags the window. | `ui/window.py` → `TitleBar` |
+| **Rail** | Left nav card: RUN / UNITS / SETTINGS. | `window.py` → `RAIL_ITEMS`, `RailButton` |
+| **SessionTile** | `SESSION` caption + running clock, pinned to the **foot** of the Rail. | `_build_session_tile` |
+| **Workspace** | Viewport + RunStrip on the left, RightPanel on the right. | `_build_workspace` |
 
----
+The gamemode **SelectorScreen** replaces the whole workspace, because picking a mode is a
+one-off. Everything else is a card in the RightPanel, so the Roblox view and the run strip
+stay on screen whatever you're doing.
 
-## Titlebar parts
+### Titlebar parts
 
-`Titlebar` → left to right:
-
-| Name | What it is |
-|---|---|
-| **Brand** | The white bold "SloppyKeys" text. |
-| **VersionPill** | Rounded `v0.3.0` pill. |
-| **HintPills** | The `F1 · Start` and `F3 · Reload` pills. |
-| **ModeButton** | Right side. Shows the selected gamemode (`‹ Story · change`). Hidden on the SelectorScreen. Clicking it clears the mode and returns to the SelectorScreen. |
-| **SessionClock** | `SESSION` caption + running timer, right of the ModeButton. |
-| **WindowControls** | Minimize and Close glyphs, far right. |
+Left to right: **Brand** ("SloppyKeys") · **VersionPill** (`v0.1.0`, from
+`sloppykeys/version.py`) · **HintPills** — one per hotkey (`F1 · Start`, `F2 · Stop`,
+`F3 · Reload`, `Ctrl + T · Tester`), rebuilt from the live keybinds by `_hint_texts` ·
+stretch · **GamemodePill** (the chosen mode; click to go back to the SelectorScreen) ·
+**WindowControls** (minimize, close).
 
 ---
 
 ## Screens
 
-### 1. SelectorScreen
-Shown on launch. Pick what the macro runs.
+### SelectorScreen
+`ui/pages/selector_page.py`. **ModeGrid** of **ModeCards**, one per gamemode.
 
-| Name | What it is | File |
+### Workspace
+
+| Name | What it is | Where |
 |---|---|---|
-| **SelectorHeader** | "Selectors" title + "Choose what the macro runs" subtitle. | `ui/pages/selector_page.py` |
-| **ModeGrid** | The grid of gamemode cards (3 per row). | `SelectorPage` |
-| **ModeCard** | One gamemode card: letter badge + name + subtitle, accent-colored, hover glow. | `GamemodeCard` |
+| **Viewport** | The hole Roblox shows through. Roblox is moved behind it, never reparented. | `ui/viewport.py` → `RobloxViewport` |
+| **ViewportPlaceholder** | Dashed frame + **SizePill**, while Roblox is detached. | `_paint_placeholder` |
+| **RunStrip** | The bar under the Viewport. | `ui/pages/run_page.py` → `RunPage` |
+| **RightPanel** | The stack the Rail switches: StatsPanel / UnitsPanel / SettingsPanel. | `window.py` → `RIGHT_PANELS` |
 
-### 2. Workspace
-The main working screen. Shown after picking a mode, or via the Rail's UNITS button.
+**RunStrip cards**: `PROCESS LOG` (**LogCard**, with the **StatusLine** under it) ·
+`CURRENT CONFIG` (**ConfigCard** — MapSelect, ActSelect, labelled "Difficulty" for
+Expedition) · `TASK QUEUE` (**QueueCard**) · `ACTIONS` (**ActionsCard** — Save, Import,
+Reset).
 
-```
-┌───────────────────────┬───────────────┐
-│                       │  ChipsCard    │
-│      Viewport         ├───────────────┤
-│                       │               │
-├───────────────────────┤  DetailCard   │
-│      RunStrip         │               │
-└───────────────────────┴───────────────┘
-```
+### RightPanel: RUN → StatsPanel
+`ui/pages/stats_page.py`. Groups: `CURRENT STATUS` · `WIN / LOSS` · `CHALLENGES` (the three
+daily rows and their state) · `CURRENCY`.
 
-| Name | What it is | File |
-|---|---|---|
-| **Viewport** | The Roblox area. Fixed **816 x 638** hole; Roblox is moved/resized to fit it exactly. | `ui/viewport.py` → `RobloxViewport` |
-| **ViewportPlaceholder** | Dashed frame + monitor icon + "Roblox Window" + **SizePill** (`816 x 638`). Only visible while Roblox is detached. | `RobloxViewport._paint_placeholder` |
-| **RunStrip** | The horizontal bar under the Viewport. Holds the three cards below. | `ui/pages/run_page.py` → `RunPage` |
-| **StepsPanel** | The whole right column (ChipsCard + DetailCard). | `ui/pages/units_page.py` → `UnitsPage` |
+### RightPanel: UNITS → UnitsPanel
+`ui/pages/units_page.py`. **ChipsCard** (**FilterBar**: SearchBox + `All`/`On`/`Off`
+**FilterPills**; **ChipGrid** of **StepChips**) over **DetailCard**.
 
-#### RunStrip cards (left to right)
+A **StepChip** carries `#N`, the **UpgradeBadge** (`+N`) and a **SlotLine**. The
+**DetailCard** is three fixed bands: **DetailHeader** (StepBadge + NameField), a scrolling
+**DetailBody** (`BASIC`, `TIMING`, `ACTIONS`), and the pinned **CoordsBar** (X, Y, Set).
 
-| Name | Header text | Contents |
-|---|---|---|
-| **LogCard** | `PROCESS LOG` | Scrolling log output + the **StatusLine** underneath it. |
-| **ConfigCard** | `CURRENT CONFIG` | **MapSelect** dropdown, **ActSelect** dropdown (labeled "Difficulty" for Expedition). Appears only after a Map is picked. |
-| **ActionsCard** | `ACTIONS` | **SaveButton** (gradient), **ImportButton**, **ResetButton**. |
+### RightPanel: SETTINGS → SettingsPanel
+`ui/pages/settings_page.py`. **SettingsTabBar** wraps onto a grid, `TABS_PER_ROW` across:
 
-#### StepsPanel cards (top to bottom)
-
-| Name | Contents | File |
-|---|---|---|
-| **ChipsCard** | **FilterBar** + **ChipGrid**. | `UnitsPage` |
-| **FilterBar** | **SearchBox** + the **FilterPills** (`All` / `On` / `Off`). | `UnitsPage` |
-| **ChipGrid** | Scrollable grid of all 72 **StepChips**, 3 per row. | `UnitsPage._grid` |
-| **StepChip** | One step: `#N` number, **UpgradeBadge** (`+N` pill), **SlotLine** (`Slot -`). Selected chip gets a violet outline. | `StepChip` |
-| **DetailCard** | The editor for the selected step. Three fixed bands below. | `DetailEditor` |
-
-#### DetailCard bands
-
-| Name | Position | Contents |
-|---|---|---|
-| **DetailHeader** | Pinned top | **StepBadge** (round number) + **NameField** ("Custom name..."). |
-| **DetailBody** | Scrolls | Groups: **BasicGroup** (Slot #, Priority, Upgrade Level), **TimingGroup** (Wait), **ActionsGroup** (Mouse) + the auto-on hint. |
-| **CoordsBar** | Pinned bottom | **XField**, **YField**, **SetButton**. |
-
-### 3. SettingsScreen
-Global config, split into tabs. The Viewport is hidden here.
-
-| Name | What it is | File |
-|---|---|---|
-| **SettingsHeader** | "Settings" + subtitle + **SaveSettingsButton**. | `ui/pages/settings_page.py` |
-| **SettingsTabBar** | The tab row: `Main`, `Keybinds`, `Debug`. | `SettingsPage._build_tabbar` |
-| **MainTab** | See groups below. | `_build_main_tab` |
-| **KeybindsTab** | Rebind hotkeys via **KeyCaptureButton** rows (Start/Stop, Reload, Open Macro Tester). | `_build_keybinds_tab` |
-| **DelaysTab** | **DelaySpin** rows (Join wait, Image search cooldown). Applied live to the navigator; stored in `settings.json`. | `_build_delays_tab` |
-| **DebugTab** | See groups below. | `_build_debug_tab` |
-
-**MainTab groups**
-
-| Name | Header | Contents |
-|---|---|---|
-| **ConnectionGroup** | `CONNECTION` | Private server link field + **JoinButton**. |
-| **MacroGroup** | `MACRO` | Challenges **ToggleSwitch** + **HardModeToggle** (Story only). |
-
-Keybinds are stored in `settings.json` under `keybinds` (`config/keybinds.py`),
-polled in `MainWindow._poll_hotkeys`, and shown as the titlebar **HintPills**.
-Defaults: Start/Stop = F1, Reload = F3, Open Macro Tester = Ctrl+T.
-
-**DebugTab groups**
-
-| Name | Header | Contents |
-|---|---|---|
-| **MacroTestingGroup** | `MACRO TESTING` | **OpenTesterButton** — opens the MacroTesterWindow. |
+| Tab | Holds |
+|---|---|
+| **Main** | `CONNECTION` (private-server link, Join) · `DISCORD` (webhook, Send Test) · `MACRO` (camera-once, Hard Mode, Expedition difficulty) · `UPDATES` (check-on-startup toggle, Check Now, the install/release button) |
+| **Tasks** | The task queue editor and the challenges toggle. `ui/task_editor.py` |
+| **Route** | Events route authoring, with capture and coordinate pickers. `ui/route_editor.py` |
+| **Vision** | Every template: region, per-template threshold, Test. Also the OCR boxes. `ui/image_manager.py` |
+| **Keybinds** | `HOTKEYS` — the app's hotkeys plus the in-game keys the macro sends. |
+| **Delays** | One row per `DELAY_SPEC` entry. |
+| **Position** | Per-target start-position plans. `ui/position_editor.py` |
+| **Debug** | `MACRO TESTING` — opens the MacroTesterWindow. |
 
 ### MacroTesterWindow
-Separate always-on-top window for running one macro step at a time. All testing
-tools live here, including the image tester.
-
-| Name | What it is | File |
-|---|---|---|
-| **TesterHeader** | "Macro Tester" + subtitle. | `ui/macro_tester.py` |
-| **TestList** | Scrollable, grouped list. | `MacroTesterWindow` |
-| **CoordsCard** | `COORDS` group: **PickCoordsButton** (arm, then click the Roblox area) + **CopyButton**. Reports the clicked point as Roblox client X/Y. | `_build_coords` |
-| **ImageTesterCard** | Lives under the `VISION` group: current image path + **SelectImageButton** + **TestSearchButton** + inline PASS/FAIL. Single source of image-search testing. | `_build_image_tester` |
-| **TestRow** | One check: name + description + **ResultLabel** (PASS/FAIL) + **TestButton**. | `TestRow` |
-| **TestLog** | Log of every test result + **ClearLogButton**. | `MacroTesterWindow` |
-
-Test groups (top to bottom): `COORDS`, `VISION` (image tester), `ENVIRONMENT`,
-`LOBBY MACRO`, `MATCH MACRO`.
-
-**LOBBY MACRO steps** (in `macro/lobby.py` → `LobbyNavigator`):
-- `Find Play` — locate `images/lobby/play.png` (no click).
-- `Click Play` — find + click Play.
-- `Open gamemode` — find + click the selected gamemode's card.
-- `Select stage` — scroll (wheel-down) searching for the stage image, then click.
-- `Select act` — click the selected act at its fixed coordinate.
-- `Start stage` — Hard Mode click (if on) -> confirm -> Start -> wait the join delay.
-- `Full: Play -> mode -> stage -> act -> start` — the whole chain, then starts.
-
-Uses the current gamemode (falls back to Story) and the Run page's selected Map
-(falls back to the gamemode's first map). Image search runs over the real Roblox
-client rect; clicks/scrolls go through AHK at screen coordinates.
-Add a case by appending to `MainWindow._build_tests()` — a tuple of
-`(group, name, description, fn)` where `fn` returns `(ok, message)`.
+`ui/macro_tester.py`. Always-on-top, runs one step at a time. **CoordsCard** (pick and copy
+a client-space point) · **TestRows** grouped `COORDS` / `VISION` / `ENVIRONMENT` /
+`LOBBY MACRO` / `MATCH MACRO`, each with a **ResultLabel** and a **TestButton** ·
+**TestLog**. Add a case by appending to `MainWindow._build_tests()`: a
+`(group, name, description, fn)` tuple where `fn` returns `(ok, message)`.
 
 ---
 
 ## Reusable pieces
 
-| Name | What it is | File |
+| Name | What it is | Where |
 |---|---|---|
-| **SectionBox** | The bordered, rounded container used by RunStrip cards, ChipsCard, DetailCard. | `ui/theme.py` → `QFrame#sectionBox` |
-| **GroupHeader** | Small uppercase caption + horizontal rule (e.g. `BASIC`, `ACTIONS`). | `_group()` |
-| **FieldLabel** | Tiny uppercase label above an input. | `QLabel#fieldLabel` |
-| **Pill** | Fixed-height fully-rounded label/button (VersionPill, HintPills, UpgradeBadge, SizePill). | `ui/theme.py` |
+| **SectionBox** | The bordered rounded container every card uses. | `theme.py` → `QFrame#sectionBox` |
+| **GroupHeader** | Uppercase caption + rule (`BASIC`, `UPDATES`). | each page's `_group()` |
+| **Pill** | Fully-rounded fixed-height label (VersionPill, HintPills, UpgradeBadge, SizePill). | `theme.py` |
 | **ToggleSwitch** | Animated on/off switch. | `ui/widgets.py` |
-| **HoverGlow** | Animated glow on hover/selection. | `ui/glow.py` |
-
----
-
-## Layout budget
-
-Changing one of these means changing the others. All in `ui/theme.py`.
-
-```
-WINDOW_HEIGHT (886) - TITLEBAR_HEIGHT (40) - 18px body margins = 828 available
-  Viewport widget (638 + 12 frame inset) = 650
-+ 12 spacing
-+ STRIP_HEIGHT (166)
-= 828   ← exact fit
-```
-
-So: **grow the Viewport or the RunStrip and `WINDOW_HEIGHT` must grow with it.**
-Width: `RAIL_WIDTH` (78) + Viewport (828) + `PANEL_MIN_WIDTH` (400) + margins.
+| **KeyCaptureButton** | Press-a-key rebinding button. | `ui/widgets.py` |
+| **RegionOverlay** | Translucent picker; you click through to the live window and it returns client-space numbers. | `ui/widgets.py` |
+| **HoverGlow** | Animated hover/selection glow. | `ui/glow.py` |
+| **RailIcon** | Vector-drawn rail glyph. Other glyphs come from Segoe Fluent Icons (`ui/icons.py`). | `window.py` |
 
 ---
 
 ## How to phrase a request
 
 - "Make the **UpgradeBadge** bigger" → the `+N` pill on each StepChip.
-- "The **ActionsCard** buttons are too tall" → Save/Import/Reset in the RunStrip.
-- "Move **StatusLine** back into the **ConfigCard**" → unambiguous.
-- "**CoordsBar** should have a Copy button" → the pinned bottom row of DetailCard.
-- "**ModeCard** hover is too subtle" → SelectorScreen cards.
+- "The **ActionsCard** buttons are too tall" → Save / Import / Reset in the RunStrip.
+- "**CoordsBar** needs a Copy button" → the pinned bottom row of the DetailCard.
+- "Move the **SessionTile** back to the Titlebar" → unambiguous.
+- "**UPDATES** should say when it last checked" → the Main tab group.
 
-Pattern that works well: **\<Name\> + what's wrong + what you want.**
+Pattern that works: **\<Name\> + what's wrong + what you want.**
