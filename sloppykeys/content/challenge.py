@@ -286,3 +286,23 @@ def next_daily_reset_at(now: datetime | None = None) -> datetime:
     moment = now or datetime.now()
     today = moment.replace(hour=DAILY_RESET_HOUR, minute=0, second=0, microsecond=0)
     return today if today > moment else today + timedelta(days=1)
+
+
+def daily_quota_spent(reads: dict) -> bool:
+    """Is the day's allowance of challenge runs gone?
+
+    True only when all three rows were read and every one of them says `0 left`. The
+    `n/10` is a **daily** limit, so that state does not clear at the next re-roll: fresh
+    maps arrive with nothing left to spend on them, and the next runnable challenge is
+    after `next_daily_reset_at`.
+
+    False on a partial read on purpose — a row that couldn't be OCR'd is unknown, not
+    zero, and calling the day finished on a missed crop would stop the macro looking.
+
+    Takes the tracker's `reads` mapping so this stays a fact about the numbers on screen,
+    with no view of what has been played or skipped.
+    """
+    return all(
+        (read := reads.get(slot)) is not None and read.runs_remaining == 0
+        for slot in SLOTS
+    )

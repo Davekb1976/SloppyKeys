@@ -20,6 +20,7 @@ from sloppykeys.content.challenge import (  # noqa: E402
     STAR_REGIONS,
     STAR_SATURATION_MIN,
     challenge_maps,
+    daily_quota_spent,
     expected_templates,
     interval_key,
     next_daily_reset_at,
@@ -107,6 +108,24 @@ assert next_interval_at(datetime(2026, 7, 30, 14, 5)) == datetime(2026, 7, 30, 1
 assert next_interval_at(datetime(2026, 7, 30, 14, 42)) == datetime(2026, 7, 30, 15, 0)
 assert next_daily_reset_at(datetime(2026, 7, 30, 9, 0)) == datetime(2026, 7, 30, 20, 0)
 assert next_daily_reset_at(datetime(2026, 7, 30, 21, 0)) == datetime(2026, 7, 31, 20, 0)
+# 20:00 is a :00 boundary, so the rotation rolls with it and the tracker drops its reads —
+# which is what sends the macro back to the panel to find the refilled counts.
+assert interval_key(datetime(2026, 7, 30, 19, 55)) != interval_key(datetime(2026, 7, 30, 20, 0))
+
+# # The day's quota: all three rows at 0, and only on a complete read
+def _spent(*remaining: int | None) -> bool:
+    return daily_quota_spent(
+        {
+            slot: ChallengeRead(slot=slot, state=STATE_UNKNOWN, runs_remaining=left)
+            for slot, left in zip(SLOTS, remaining)
+        }
+    )
+
+
+assert _spent(0, 0, 0), "every row at 0 is the day's runs gone"
+assert not _spent(0, 1, 0), "one row with a run left is not the day"
+assert not _spent(0, 0, None), "an unreadable row is unknown, not zero"
+assert not daily_quota_spent({}), "nothing read yet says nothing about the day"
 
 # # A read decides whether a row is worth attempting
 assert ChallengeRead(slot=1, state=STATE_RUNNABLE).is_candidate

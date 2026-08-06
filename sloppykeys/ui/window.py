@@ -120,7 +120,11 @@ from sloppykeys.content.challenge import SELECT_STAGE_CLICK as CHALLENGE_SELECT_
 from sloppykeys.content.challenge import START_CLICK as CHALLENGE_START
 from sloppykeys.content.challenge import debug_boxes as challenge_debug_boxes
 from sloppykeys.content.challenge import debug_path as challenge_debug_path
-from sloppykeys.content.challenge import next_interval_at
+from sloppykeys.content.challenge import (
+    daily_quota_spent,
+    next_daily_reset_at,
+    next_interval_at,
+)
 from sloppykeys.macro.challenge import (
     STATE_RUNNABLE,
     STATE_UNKNOWN,
@@ -1030,14 +1034,25 @@ class MainWindow(QWidget):
         From the clock (`next_interval_at`), so it is right whether or not the panel has
         ever been on screen — the panel's own "Resets in" text is OCR-readable but would
         only be current while you happen to be looking at it.
+
+        With the day's runs spent it counts to the 20:00 refill instead, for the reason in
+        `_challenge_next_line`: the re-roll is no longer the next time anything can be
+        played, so counting to it is a countdown to nothing.
         """
         if not self._in_task_mode():
             return
-        when = next_interval_at()
+        spent = daily_quota_spent(self._challenges.reads)
+        when = next_daily_reset_at() if spent else next_interval_at()
         left = max(0, int((when - datetime.now()).total_seconds()))
         # 12-hour with AM/PM, and no leading zero — `%I` pads to two digits and there is
         # no portable strftime flag to stop it, so it is stripped by hand.
         clock = when.strftime("%I:%M %p").lstrip("0")
+        if spent:
+            # Hours, not 300m: this one is most of a day away.
+            self._stats_page.set_challenge_reset(
+                f"refills {clock} · {left // 3600}h {left % 3600 // 60:02d}m"
+            )
+            return
         # "next re-roll" was the game's mechanic named in the developer's words. What the
         # user wants to know is when three different maps show up, and the clock time is
         # the useful half — the countdown is the reassurance that it's ticking.
@@ -2324,28 +2339,50 @@ class MainWindow(QWidget):
         return label
 
     def _challenge_fields(self) -> list[tuple[str, str]]:
-        """All three rows' quotas, and when the maps change.
+        """All three rows' quotas, and what happens next — the re-roll, or the refill.
+
+        On **every** embed while challenges are enabled, not just the ones sent from a
+        challenge run. Once the day's runs are gone the macro moves to the queue's
+        targets, and those embeds carried no challenge line at all: the one moment you
+        most want to be told the challenges are finished for the day was the one moment
+        nothing said so.
 
         Every row, not just the one being played: the point of this field on a phone is
         "how much is left today", and one row's count doesn't answer that. The row in play
         is marked, and its map is already in `_stage_label`, so nothing repeats.
         """
-        slot = self._challenge_slot
-        if slot is None or not self._runner.is_running:
+        reads = self._challenges.reads
+        if not self._director.wants_challenges or not reads:
             return []
+        # Only while a run is up: `_challenge_slot` is stale otherwise, and a marker
+        # pointing at a row nothing is playing is a lie.
+        playing = self._challenge_slot if self._runner.is_running else None
         lines = []
         for row in CHALLENGE_SLOTS:
-            read = self._challenges.reads.get(row)
-            marker = "\u25b8 " if row == slot else "   "  # the row this run is on
+            read = reads.get(row)
+            marker = "\u25b8 " if row == playing else "   "  # the row this run is on
             if read is None:
                 lines.append(f"{marker}{row}. not read")
                 continue
             where = read.map_name or "map unknown"
             left = "?" if read.runs_remaining is None else str(read.runs_remaining)
             lines.append(f"{marker}{row}. {where} — {left} left")
-        when = next_interval_at().strftime("%I:%M %p").lstrip("0")
-        lines.append(f"new maps {when}")
+        lines.append(self._challenge_next_line(reads))
         return [("Challenges today", "\n".join(lines))]
+
+    def _challenge_next_line(self, reads: dict) -> str:
+        """The last line of the challenge field: when there will be something to play.
+
+        With the day's quota spent that is the 20:00 refill, not the re-roll — quoting
+        "new maps" there promises three playable rows within half an hour, when what
+        arrives is three fresh maps with nothing left to spend on them.
+        """
+        spent = daily_quota_spent(reads)
+        when = next_daily_reset_at() if spent else next_interval_at()
+        clock = when.strftime("%I:%M %p").lstrip("0")
+        if spent:
+            return f"no runs left today — daily limit refills {clock}"
+        return f"new maps {clock}"
 
     def _queue_fields(self) -> list[tuple[str, str]]:
         """How much of the current task is left before the queue moves on.
