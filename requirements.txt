@@ -1,0 +1,22 @@
+PySide6
+mss
+numpy
+
+# **headless**, not `opencv-python`. Same `cv2` module and the same functions this project
+# calls (matchTemplate, minMaxLoc, cvtColor, resize, imread, imencode/imdecode) — the only
+# difference is the GUI half (`imshow`/`namedWindow` and the Qt/GTK backends behind them),
+# none of which is used here.
+#
+# **It is not smaller.** Measured on 5.0.0: `cv2.pyd` is 81.9MB headless against 82.3MB
+# with the GUI, and the 29MB videoio ffmpeg DLL ships either way (`build_exe.py` prunes it).
+# The reason to keep headless is that it carries no Qt plugins of its own to collide with
+# PySide6's — a real class of bug in Qt apps that also import OpenCV.
+opencv-python-headless
+
+# OCR for the challenge panel's daily limit and map name — neither string is
+# knowable in advance, so there is nothing to match a template against.
+# Pinned: onnxruntime is the piece most likely to break on a Python upgrade, and
+# rapidocr-onnxruntime (the 1.x name) caps at Python <3.13 so it can't be used here.
+# Models ship inside the rapidocr wheel, so recognition is offline.
+rapidocr==3.9.2
+onnxruntime==1.28.0

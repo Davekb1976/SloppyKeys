@@ -1,0 +1,24 @@
+{
+  "images": {
+    "C:/Users/Kylle/Pictures/Screenshots/Screenshot 2026-07-27 145652.png": {
+      "image_path": "C:\\Users\\Kylle\\Pictures\\Screenshots\\Screenshot 2026-07-27 145652.png",
+      "enabled": true,
+      "confidence": 0.7
+    },
+    "C:/Users/Kylle/Pictures/Screenshots/Screenshot 2026-07-27 145709.png": {
+      "image_path": "C:\\Users\\Kylle\\Pictures\\Screenshots\\Screenshot 2026-07-27 145709.png",
+      "enabled": true,
+      "confidence": 0.7
+    },
+    "C:/Users/Kylle/Pictures/Screenshots/Screenshot 2026-07-27 225153.png": {
+      "image_path": "C:\\Users\\Kylle\\Pictures\\Screenshots\\Screenshot 2026-07-27 225153.png",
+      "enabled": true,
+      "confidence": 0.7
+    },
+    "images/lobby/play.png": {
+      "image_path": "images\\lobby\\play.png",
+      "enabled": true,
+      "confidence": 0.7
+    }
+  }
+}

@@ -1,0 +1,44 @@
+# images/match
+
+Templates seen from **inside** a stage. Capture them from **Settings > Vision**, which
+grabs the exact pixels the matcher reads at the pinned client size.
+
+## The match cycle
+
+- `start_game.png` — the in-match Start Game button, which begins the wave. Finding it is
+  also how the macro knows a stage has loaded and the player has control.
+- `unit_ui.png` — the panel that opens when a placed unit is clicked. Every action on a
+  placed unit waits for this first, so a missed click can't send keypresses into the world.
+- `game_won.png` — the **victory screen's text**. Ends a match cycle.
+- `repeat.png` — the victory screen's **Repeat** button.
+- `game_lost.png` — the defeat screen. Optional: without it a loss simply isn't recognised
+  and the cycle waits out its timeout instead of counting the loss.
+
+**The win order is `game_won` → `repeat` → `start_game`.** The victory screen does not clear
+itself, so finding `game_won.png` proves the match ended but nothing more; Repeat is the
+click that replays the stage, and only after it does Start Game come back. Crop `repeat.png`
+tightly around the button.
+
+Repeat never fails a run: if the file is missing or the button isn't found, the macro logs it
+and falls through to Start Game, which polls on a deadline. So a missing `repeat.png` costs
+one wasted search per win, not a broken cycle.
+
+Keep `game_won.png` and `game_lost.png` visually distinct. An earlier pair both contained the
+word `Game` and a win was scored as a defeat; the current pair cross-matches at 0.41, which is
+safe. The outcome check scores **both** against one capture and takes the better, and refuses
+to decide when the two are within a hair of each other — a win once scored `won 0.57,
+lost 0.71`, which is why that guard exists.
+
+## In-match menu — captured, not yet used by any run
+
+Nothing in the run chain leaves a stage by hand today (a win returns to the lobby on its own).
+These are here so the paths are defined for leaving a stuck match or restarting after a crash.
+Each first click only *opens a panel*, so anything built on them must wait for the second
+template rather than clicking a fixed coordinate after a sleep:
+
+- `back_lobby.png` → `return_lobby_confirm.png` (the second click is the one that leaves)
+- `settings.png` → `restart_game.png`
+- `match_play.png` — opens the gamemode selection from inside a stage. A *different*, smaller
+  Play than the lobby's `images/lobby/play.png`.
+- `win_change.png` — the post-match panel's change-gamemode control. Never matched in game, so
+  `change_gamemode` clicks `CHANGE_GAMEMODE_CLICK` instead and waits `panel_fade_wait` first.

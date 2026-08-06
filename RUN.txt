@@ -1,0 +1,35 @@
+SloppyKeys — run commands (Windows, from the project root)
+
+START (run the app)
+  .venv\Scripts\python.exe main.py
+
+STOP (close the app window, or force-kill from a terminal)
+  taskkill /IM python.exe /F
+
+FIRST-TIME SETUP (only if dependencies aren't installed)
+  .venv\Scripts\python.exe -m pip install -r requirements.txt
+
+BUILD THE EXE (onedir, lands in ..\..\SLOPPYKEYS)
+  .venv\Scripts\python.exe -m pip install pyinstaller     (once)
+  .venv\Scripts\python.exe build_exe.py
+    --console         keep a console window so tracebacks are visible
+    --keep-settings   don't reset the destination's settings.json
+    --onefile         one exe, no _internal folder (slower start, same payload)
+    --dest PATH       somewhere other than SLOPPYKEYS
+  Close the app first — a running exe can't be overwritten.
+
+MAKE THE INSTALLER (needs Inno Setup 6, once, from jrsoftware.org)
+  .venv\Scripts\python.exe build_exe.py
+  "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+  -> installer_output\SloppyKeys-Setup-1.0.0.exe
+  Installs per-user to %LOCALAPPDATA%\Programs\SloppyKeys (no admin needed, and the
+  folder stays writable so captures and settings work). User data is never overwritten
+  on upgrade. Bump AppVersion in installer.iss for a new release.
+  images/, configs/, routes.json and settings.json are copied NEXT TO the exe, not
+  bundled, because the app writes to them. A rebuild replaces the program and leaves
+  those alone. The exe still needs AutoHotkey v2 installed.
+
+NOTES
+  - F1 starts/stops the macro, F3 reloads it.
+  - Close the window with the titlebar X to shut down normally;
+    taskkill is only for a stuck process.

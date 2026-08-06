@@ -1,0 +1,57 @@
+{
+  "Schema": 1,
+  "Maps": {
+    "Villian Invasion": {
+      "Acts": [
+        "Act 1"
+      ],
+      "Routes": {
+        "Act 1": [
+          {
+            "Kind": "click",
+            "X": 119,
+            "Y": 160,
+            "Button": "left",
+            "Count": 1
+          },
+          {
+            "Kind": "click",
+            "X": 711,
+            "Y": 697,
+            "Button": "left",
+            "Count": 1
+          },
+          {
+            "Kind": "find",
+            "Image": "images/events/Villian Invasion/Act 1_1.png",
+            "Timeout": 0.0,
+            "MaxScrolls": 0,
+            "Notches": 8,
+            "ScrollX": 0,
+            "ScrollY": 0,
+            "Region": [
+              533,
+              305,
+              51,
+              55
+            ]
+          },
+          {
+            "Kind": "click",
+            "X": 342,
+            "Y": 564,
+            "Button": "left",
+            "Count": 1
+          },
+          {
+            "Kind": "click",
+            "X": 722,
+            "Y": 508,
+            "Button": "left",
+            "Count": 1
+          }
+        ]
+      }
+    }
+  }
+}

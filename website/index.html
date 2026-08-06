@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SloppyKeys — the Anime Expedition macro that runs itself</title>
+<meta name="description" content="SloppyKeys is a Windows macro for Anime Expedition. It docks the live Roblox window inside its own UI, image-matches the lobby, and drives the game for you.">
+<meta name="theme-color" content="#07080D">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="SloppyKeys — the Anime Expedition macro that runs itself">
+<meta property="og:description" content="Docks the live Roblox window, image-matches the lobby, and farms while you do something else.">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<!-- ambient background layers -->
+<div class="backdrop" aria-hidden="true">
+  <div class="grid"></div>
+  <div class="blob blob-violet" data-parallax="0.18"></div>
+  <div class="blob blob-cyan"   data-parallax="0.30"></div>
+  <div class="blob blob-indigo" data-parallax="0.12"></div>
+  <div class="noise"></div>
+  <div class="vignette"></div>
+</div>
+
+<!-- ─────────────────────────── nav ─────────────────────────── -->
+<header class="nav" id="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="#top" aria-label="SloppyKeys home">
+      <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+        <defs>
+          <linearGradient id="g-mark" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#22D3EE"/>
+            <stop offset="0.5" stop-color="#6366F1"/>
+            <stop offset="1" stop-color="#A855F7"/>
+          </linearGradient>
+        </defs>
+        <rect x="1.5" y="1.5" width="29" height="29" rx="9" fill="none" stroke="url(#g-mark)" stroke-width="2"/>
+        <path d="M11 9v14M11 16l8-7M11 16l8 7" fill="none" stroke="url(#g-mark)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="brand-name">SloppyKeys</span>
+      <span class="pill pill-v">v0.3.0</span>
+    </a>
+
+    <nav class="nav-links" aria-label="Sections">
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="#modes">Gamemodes</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+
+    <a class="btn btn-primary btn-sm" href="#download">
+      <span class="btn-glow" aria-hidden="true"></span>
+      Download
+    </a>
+  </div>
+  <div class="scroll-progress" id="scrollProgress" aria-hidden="true"></div>
+</header>
+
+<main id="main">
+
+<!-- ─────────────────────────── hero ─────────────────────────── -->
+<section class="hero" id="top">
+  <div class="wrap hero-inner">
+
+    <div class="hero-copy">
+      <div class="badge reveal">
+        <span class="dot"></span>
+        Release 0.3.0 · Windows only
+      </div>
+
+      <h1 class="reveal" data-delay="60">
+        Your keys, but
+        <span class="grad">sloppy</span>
+        <span class="cursor-bar" aria-hidden="true"></span>
+      </h1>
+
+      <p class="lede reveal" data-delay="120">
+        A desktop macro for <strong>Anime Expedition</strong>. SloppyKeys docks the live
+        Roblox window inside its own interface, reads the lobby with template matching,
+        and drives the game so the grind runs without you.
+      </p>
+
+      <div class="cta-row reveal" data-delay="180">
+        <a class="btn btn-primary btn-lg" href="#download">
+          <span class="btn-glow" aria-hidden="true"></span>
+          <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4.5-4.5M12 15l-4.5-4.5M4 19h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Download for Windows
+        </a>
+        <a class="btn btn-ghost btn-lg" href="#how">
+          See how it works
+          <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m0 0-5-5m5 5-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+      </div>
+
+      <dl class="stats reveal" data-delay="240">
+        <div class="stat">
+          <dt>Gamemodes</dt>
+          <dd><span class="count" data-to="3">0</span></dd>
+        </div>
+        <div class="stat">
+          <dt>Maps wired</dt>
+          <dd><span class="count" data-to="9">0</span></dd>
+        </div>
+        <div class="stat">
+          <dt>Viewport</dt>
+          <dd class="mono small">816<span class="x">×</span>638</dd>
+        </div>
+        <div class="stat">
+          <dt>Hotkey</dt>
+          <dd><kbd>F1</kbd></dd>
+        </div>
+      </dl>
+    </div>
+
+    <!-- app mock, mirrors the real shell: titlebar + rail + viewport + strip -->
+    <div class="hero-app reveal" data-delay="120">
+      <div class="app tilt" id="appMock">
+        <div class="app-titlebar">
+          <span class="mini-mark" aria-hidden="true"></span>
+          <span class="app-brand">SloppyKeys</span>
+          <span class="pill pill-tiny">v0.3.0</span>
+          <span class="pill pill-tiny pill-good">816×638</span>
+          <span class="spacer"></span>
+          <span class="pill pill-tiny pill-mode">Story</span>
+          <span class="session"><em>SESSION</em><b id="mockTimer">00:00:00</b></span>
+          <span class="wdots" aria-hidden="true"><i></i><i></i><i></i></span>
+        </div>
+
+        <div class="app-body">
+          <div class="app-rail" aria-hidden="true">
+            <span class="rail-i on"></span>
+            <span class="rail-i"></span>
+            <span class="rail-i"></span>
+            <span class="rail-i"></span>
+          </div>
+
+          <div class="app-main">
+            <div class="app-viewport">
+              <span class="vp-tag mono">ROBLOX · attached</span>
+              <div class="vp-scan" aria-hidden="true"></div>
+              <!-- template-match reticle -->
+              <div class="vp-hit" aria-hidden="true">
+                <span class="vp-hit-label mono">play.png · 0.98</span>
+              </div>
+            </div>
+
+            <div class="app-strip">
+              <div class="strip-box">
+                <span class="strip-head">PROCESS LOG</span>
+                <pre class="log mono" id="mockLog" aria-hidden="true"></pre>
+              </div>
+              <div class="strip-box strip-narrow">
+                <span class="strip-head">CURRENT CONFIG</span>
+                <div class="kv"><span>Gamemode</span><b>Story</b></div>
+                <div class="kv"><span>Map</span><b>Rose Kingdom</b></div>
+                <div class="kv"><span>Act</span><b>Act 5</b></div>
+                <div class="kv"><span>Hard mode</span><b class="on">On</b></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <span class="app-sheen" aria-hidden="true"></span>
+      </div>
+      <div class="app-shadow" aria-hidden="true"></div>
+    </div>
+  </div>
+
+  <div class="marquee" aria-hidden="true">
+    <div class="marquee-track">
+      <span>Python 3</span><span>·</span><span>PySide6 / Qt</span><span>·</span>
+      <span>OpenCV template matching</span><span>·</span><span>mss capture</span><span>·</span>
+      <span>AutoHotkey v2 input</span><span>·</span><span>Win32 via ctypes</span><span>·</span>
+      <span>DPI-locked 1:1 pixels</span><span>·</span>
+      <span>Python 3</span><span>·</span><span>PySide6 / Qt</span><span>·</span>
+      <span>OpenCV template matching</span><span>·</span><span>mss capture</span><span>·</span>
+      <span>AutoHotkey v2 input</span><span>·</span><span>Win32 via ctypes</span><span>·</span>
+      <span>DPI-locked 1:1 pixels</span><span>·</span>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────── features ─────────────────────────── -->
+<section class="section" id="features">
+  <div class="wrap">
+    <div class="head reveal">
+      <span class="eyebrow">Features</span>
+      <h2>Built for a grind that doesn't need you</h2>
+      <p>Every part of it exists because the manual version got old. No cloud, no account, no launcher.</p>
+    </div>
+
+    <div class="bento">
+      <article class="card card-wide reveal" data-spotlight>
+        <div class="card-ico ico-violet" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="15" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="6" y="7.5" width="9" height="8" rx="1.5" fill="currentColor" opacity=".35"/></svg>
+        </div>
+        <h3>Roblox docked inside the app</h3>
+        <p>
+          The game keeps its own window; SloppyKeys punches a rounded hole in its frameless
+          shell and parks Roblox exactly behind it. Pixels and clicks fall straight through,
+          so you watch the run in the same window you control it from.
+        </p>
+        <ul class="ticks">
+          <li>Client area pinned to 816×638 for stable coordinates</li>
+          <li>DPI scaling disabled — 1 logical pixel is 1 real pixel</li>
+          <li>Minimize-safe: geometry sync guards against off-screen flings</li>
+        </ul>
+      </article>
+
+      <article class="card reveal" data-delay="60" data-spotlight>
+        <div class="card-ico ico-cyan" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m15.5 15.5 5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </div>
+        <h3>It looks, then clicks</h3>
+        <p>
+          Screens get captured with <span class="mono">mss</span> and matched against cropped
+          templates in OpenCV. Search regions keep matching fast and stop false hits
+          elsewhere on screen.
+        </p>
+      </article>
+
+      <article class="card reveal" data-delay="120" data-spotlight>
+        <div class="card-ico ico-purple" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 16.5V7a3 3 0 0 1 6 0v10a3 3 0 0 0 6 0V7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="19.5" cy="7" r="2.2" fill="currentColor"/></svg>
+        </div>
+        <h3>Human-shaped input</h3>
+        <p>
+          AutoHotkey v2 owns every click and keypress. Buttons get a real hover-glide and
+          wiggle, and the carousel scrolls one wheel notch at a time — instant teleports
+          get ignored by the game.
+        </p>
+      </article>
+
+      <article class="card reveal" data-delay="60" data-spotlight>
+        <div class="card-ico ico-good" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M5 12.5 10 17l9-10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <h3>Macro Tester</h3>
+        <p>
+          Run any single step in isolation with PASS / FAIL results, a coordinate and region
+          picker overlay, and a template tester. Tuning stops being guesswork.
+        </p>
+        <span class="kbd-row"><kbd>Ctrl</kbd><span>+</span><kbd>T</kbd></span>
+      </article>
+
+      <article class="card card-wide reveal" data-delay="120" data-spotlight>
+        <div class="card-ico ico-sky" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </div>
+        <h3>Tunable without touching code</h3>
+        <p>
+          Delays, keybinds, hard mode and the private-server link live in Settings and persist
+          to <span class="mono">settings.json</span>. Gamemodes, maps, acts and coordinates are
+          plain data tables, so new content is an edit, not a rewrite.
+        </p>
+        <div class="chips">
+          <span class="chip">Image-search cooldown</span>
+          <span class="chip">Join wait</span>
+          <span class="chip">Retry on load</span>
+          <span class="chip">Hard mode</span>
+          <span class="chip">Private server</span>
+        </div>
+      </article>
+
+      <article class="card reveal" data-delay="180" data-spotlight>
+        <div class="card-ico ico-warn" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7.5v5l3.5 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </div>
+        <h3>Never freezes</h3>
+        <p>
+          Clicks, sleeps and image searches run on worker threads, so the interface stays
+          responsive while a step is mid-flight.
+        </p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────── how it works ─────────────────────────── -->
+<section class="section section-alt" id="how">
+  <div class="wrap">
+    <div class="head reveal">
+      <span class="eyebrow">How it works</span>
+      <h2>Lobby to loot, five steps</h2>
+      <p>The navigator drives the same path you would, just without the misclicks.</p>
+    </div>
+
+    <ol class="steps">
+      <li class="step reveal" data-spotlight>
+        <span class="step-n">1</span>
+        <div>
+          <h3>Frame the camera</h3>
+          <p>Zoom in, pitch down with raw mouse input, zoom back out — a known camera state means known coordinates.</p>
+        </div>
+      </li>
+      <li class="step reveal" data-delay="60" data-spotlight>
+        <span class="step-n">2</span>
+        <div>
+          <h3>Find Play</h3>
+          <p>Template-match the Play button in the captured view and click its center. The cursor parks off-screen first so nothing sits highlighted.</p>
+        </div>
+      </li>
+      <li class="step reveal" data-delay="120" data-spotlight>
+        <span class="step-n">3</span>
+        <div>
+          <h3>Pick the gamemode and stage</h3>
+          <p>Match the mode card, then the stage label inside a thin search band. Off-screen stages get reached by scrolling the carousel and searching again.</p>
+        </div>
+      </li>
+      <li class="step reveal" data-delay="180" data-spotlight>
+        <span class="step-n">4</span>
+        <div>
+          <h3>Choose the act</h3>
+          <p>Acts sit at fixed client coordinates, captured at the pinned viewport size, so selection is exact instead of probabilistic.</p>
+        </div>
+      </li>
+      <li class="step reveal" data-delay="240" data-spotlight>
+        <span class="step-n">5</span>
+        <div>
+          <h3>Start the run</h3>
+          <p>Hard mode if enabled, confirm, Start, then wait out the join delay with retries for a slow loading screen.</p>
+        </div>
+      </li>
+      <span class="steps-line" aria-hidden="true"><i id="stepsFill"></i></span>
+    </ol>
+  </div>
+</section>
+
+<!-- ─────────────────────────── gamemodes ─────────────────────────── -->
+<section class="section" id="modes">
+  <div class="wrap">
+    <div class="head reveal">
+      <span class="eyebrow">Gamemodes</span>
+      <h2>Pick a target, save the loadout</h2>
+      <p>Unit configs save per gamemode, map and act, so switching targets keeps its own setup.</p>
+    </div>
+
+    <div class="modes">
+      <article class="mode mode-sky reveal" data-spotlight>
+        <header>
+          <h3>Story</h3>
+          <span class="mode-tag">5 maps · 7 acts</span>
+        </header>
+        <p>Fully measured and confirmed end-to-end, including the two special acts.</p>
+        <ul class="mode-list">
+          <li>School Grounds</li>
+          <li>Flower Forest</li>
+          <li>Rose Kingdom</li>
+          <li>Fairy King Forest</li>
+          <li>King's Tomb</li>
+        </ul>
+        <footer><span class="state state-good">Verified</span></footer>
+      </article>
+
+      <article class="mode mode-bad reveal" data-delay="60" data-spotlight>
+        <header>
+          <h3>Raid</h3>
+          <span class="mode-tag">1 map · 3 acts</span>
+        </header>
+        <p>Navigation is in place. Act and start coordinates are still being measured.</p>
+        <ul class="mode-list">
+          <li>Spirit City</li>
+        </ul>
+        <footer><span class="state state-warn">Coordinates pending</span></footer>
+      </article>
+
+      <article class="mode mode-good reveal" data-delay="120" data-spotlight>
+        <header>
+          <h3>Expedition</h3>
+          <span class="mode-tag">3 maps · 3 difficulties</span>
+        </header>
+        <p>Difficulty selection replaces acts. Same navigation path, own coordinate set.</p>
+        <ul class="mode-list">
+          <li>School Grounds</li>
+          <li>Flower Forest</li>
+          <li>Rose Kingdom</li>
+        </ul>
+        <footer><span class="state state-warn">Coordinates pending</span></footer>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────── download ─────────────────────────── -->
+<section class="section section-alt" id="download">
+  <div class="wrap">
+    <div class="head reveal">
+      <span class="eyebrow">Download</span>
+      <h2>Get 0.3.0 running</h2>
+      <p>Source release. Python and AutoHotkey v2 do the heavy lifting, so there's nothing to install beyond them.</p>
+    </div>
+
+    <div class="dl">
+      <div class="dl-main reveal" data-spotlight>
+        <div class="dl-top">
+          <div>
+            <span class="eyebrow">Latest release</span>
+            <h3>SloppyKeys <span class="grad">0.3.0</span></h3>
+            <p class="dl-note">Windows 10 / 11 · x64 · source archive</p>
+          </div>
+          <span class="os-badge" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M3 5.8 10.3 4.8v6.6H3zM11.5 4.6 21 3.2v8.2h-9.5zM3 12.6h7.3v6.6L3 18.2zM11.5 12.6H21v8.2l-9.5-1.4z" fill="currentColor"/></svg>
+          </span>
+        </div>
+
+        <a class="btn btn-primary btn-lg btn-block" href="#" data-noop>
+          <span class="btn-glow" aria-hidden="true"></span>
+          <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4.5-4.5M12 15l-4.5-4.5M4 19h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Download SloppyKeys 0.3.0
+        </a>
+        <p class="dl-hint">Point this at your release archive or repo when you publish it.</p>
+
+        <div class="terminal">
+          <div class="terminal-bar">
+            <span class="tdots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="mono terminal-title">PowerShell — project root</span>
+            <button class="copy" type="button" data-copy="#cmds" aria-label="Copy setup commands">Copy</button>
+          </div>
+          <pre class="mono" id="cmds"># install dependencies (first time only)
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+
+# launch
+.venv\Scripts\python.exe main.py</pre>
+        </div>
+      </div>
+
+      <aside class="dl-side">
+        <div class="side-card reveal" data-delay="60" data-spotlight>
+          <h4>Requirements</h4>
+          <ul class="ticks">
+            <li>Windows 10 or 11 — Win32 only, no Linux or macOS build</li>
+            <li>Python 3 with the bundled virtual environment</li>
+            <li>AutoHotkey v2 for synthetic input</li>
+            <li>Roblox, windowed</li>
+          </ul>
+        </div>
+
+        <div class="side-card reveal" data-delay="120" data-spotlight>
+          <h4>Default hotkeys</h4>
+          <div class="bind"><span>Start / Stop</span><kbd>F1</kbd></div>
+          <div class="bind"><span>Reload</span><kbd>F3</kbd></div>
+          <div class="bind"><span>Macro Tester</span><span class="kbd-row"><kbd>Ctrl</kbd><span>+</span><kbd>T</kbd></span></div>
+          <p class="side-note">All three are rebindable in Settings → Keybinds.</p>
+        </div>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────── faq ─────────────────────────── -->
+<section class="section" id="faq">
+  <div class="wrap wrap-narrow">
+    <div class="head reveal">
+      <span class="eyebrow">FAQ</span>
+      <h2>Straight answers</h2>
+    </div>
+
+    <div class="faq">
+      <details class="reveal">
+        <summary>Does it work on Mac or Linux?<span class="chev" aria-hidden="true"></span></summary>
+        <p>No. SloppyKeys talks to the Win32 API to find, size and position the Roblox window, and it uses AutoHotkey for input. Both are Windows-only, and there is no cross-platform path planned.</p>
+      </details>
+      <details class="reveal" data-delay="40">
+        <summary>Why does the Roblox window get resized?<span class="chev" aria-hidden="true"></span></summary>
+        <p>Every coordinate and template is captured at an 816×638 client area with DPI scaling disabled. Pinning that size is what makes clicks land in the right place on any display.</p>
+      </details>
+      <details class="reveal" data-delay="80">
+        <summary>Can I add a map or tweak the timing?<span class="chev" aria-hidden="true"></span></summary>
+        <p>Yes. Content lives in data tables — gamemodes, maps, acts, start sequences, images and search regions. Delays and keybinds are editable live in Settings and saved to <span class="mono">settings.json</span>.</p>
+      </details>
+      <details class="reveal" data-delay="120">
+        <summary>Is the full auto-run loop finished?<span class="chev" aria-hidden="true"></span></summary>
+        <p>Not in 0.3.0. Camera setup and lobby navigation are verified for Story and runnable step by step in the Macro Tester. Chaining them into the F1 loop, plus in-match unit placement, is what's next.</p>
+      </details>
+      <details class="reveal" data-delay="160">
+        <summary>Will this get my account banned?<span class="chev" aria-hidden="true"></span></summary>
+        <p>Automation tools carry risk. SloppyKeys sends ordinary mouse and keyboard input and never touches game memory or network traffic, but it still automates play, which many games disallow. Use it knowing that.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────── cta ─────────────────────────── -->
+<section class="closer">
+  <div class="wrap closer-inner reveal">
+    <h2>Stop babysitting the lobby.</h2>
+    <p>Set a target, hit <kbd>F1</kbd>, go do something better.</p>
+    <a class="btn btn-primary btn-lg" href="#download">
+      <span class="btn-glow" aria-hidden="true"></span>
+      Download 0.3.0
+    </a>
+  </div>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-inner">
+    <div class="footer-brand">
+      <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+        <rect x="1.5" y="1.5" width="29" height="29" rx="9" fill="none" stroke="url(#g-mark)" stroke-width="2"/>
+        <path d="M11 9v14M11 16l8-7M11 16l8 7" fill="none" stroke="url(#g-mark)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span>SloppyKeys</span>
+    </div>
+    <p class="disclaimer">
+      An unofficial fan-made tool. Not affiliated with, endorsed by, or connected to Roblox
+      Corporation or the developers of Anime Expedition. Use at your own risk.
+    </p>
+    <span class="footer-v mono">v0.3.0</span>
+  </div>
+</footer>
+
+<script src="main.js"></script>
+</body>
+</html>

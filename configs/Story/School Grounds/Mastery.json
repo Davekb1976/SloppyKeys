@@ -1,0 +1,24 @@
+{
+  "Schema": 1,
+  "Gamemode": "Story",
+  "Map": "School Grounds",
+  "Target": "Mastery",
+  "Units": [
+    {
+      "Step": 1,
+      "Kind": "unit",
+      "Enable": 1,
+      "Unit Name": "",
+      "Slot": "5",
+      "Upgrades": "0",
+      "X": "357",
+      "Y": "326",
+      "Priority": "",
+      "Wait": "",
+      "SellWait": "",
+      "Sell": 0,
+      "AutoUpgrade": 1,
+      "PrePlacement": 1
+    }
+  ]
+}

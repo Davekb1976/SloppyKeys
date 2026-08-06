@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+
+# Logs (log.prev.txt is the rotated log — `*.log` does not match it)
+*.log
+log.txt
+log.prev.txt
+
+# User secrets & local state (private server link, Discord webhook URL)
+/settings.json
+
+
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.sw?
+
+# Scratch client dumps, not templates: `images/debug/` and the challenge panel's
+# `images/challenge/debug/`. They are screenshots of the user's own game, they are
+# overwritten on every scan, and `build_exe.py` already refuses to ship them.
+/images/debug/
+images/**/debug/
+
+# Multi-root editor workspace: it points at sibling folders that only exist on one
+# machine (`../Anime-Expeditions-Creams-Macro-main`, `../../SLOPPYKEYS`), so committing it
+# hands the next clone a broken workspace.
+/SloppyKeys.code-workspace
+
+# PyInstaller output (see build_exe.py). The runnable folder is built, never committed.
+/build/
+/dist/
+/installer_output/
+crash.txt

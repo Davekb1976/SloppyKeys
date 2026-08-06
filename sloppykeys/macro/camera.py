@@ -1,0 +1,89 @@
+"""Camera setup step.
+
+Sets a consistent top-down-ish camera before matching:
+  1. hold I to zoom in   (~zoom_ms)
+  2. right-click drag downward to pitch the camera down (in-person view)
+  3. hold O to zoom out   (~zoom_ms)
+
+Produces an AutoHotkey v2 script; AHK performs the actual input. The script
+focuses Roblox itself (WinActivate) so it doesn't depend on Python having
+focused it first, and drags from the given viewport-centre screen coordinate so
+the right-drag lands on the game.
+
+The pitch amount is a raw-delta total, not a true angle — Roblox maps mouse
+travel to rotation and that mapping depends on sensitivity, so `pitch_delta` is a
+calibration knob, not a spec value (ponytail: naming the real-hardware corner).
+
+The right-drag uses raw relative mouse input (mouse_event MOUSEEVENTF_MOVE)
+instead of AHK's MouseMove "R". Roblox's right-drag captures and recenters the
+cursor every frame; absolute cursor moves fight that recentre and come out
+jittery / reversed, while raw deltas are read cleanly as camera rotation.
+Positive delta drags the mouse DOWN, which pitches the Roblox camera down.
+"""
+
+from __future__ import annotations
+
+ROBLOX_AHK_TARGET = "ahk_exe RobloxPlayerBeta.exe"
+
+# mouse_event flags
+_MOVE = 0x0001
+_RIGHTDOWN = 0x0008
+_RIGHTUP = 0x0010
+
+# Total downward raw-mouse travel for the pitch drag. Retuning this invalidates
+# every placement coordinate already captured, since a stored pixel only points
+# at the same ground while the camera angle stays the same.
+PITCH_DELTA = 1000
+
+
+def camera_setup_script(
+    center_x: int,
+    center_y: int,
+    zoom_ms: int = 3000,
+    pitch_delta: int = PITCH_DELTA,
+    pitch_steps: int = 40,
+) -> str:
+    step = max(1, round(pitch_delta / max(1, pitch_steps)))
+    return f"""#Requires AutoHotkey v2.0
+#SingleInstance Force
+
+if !WinExist("{ROBLOX_AHK_TARGET}")
+    ExitApp(1)
+WinActivate("{ROBLOX_AHK_TARGET}")
+if !WinWaitActive("{ROBLOX_AHK_TARGET}", , 3)
+    ExitApp(2)
+Sleep(300)
+
+; 0) Centre the cursor BEFORE zooming, while the mouse is still a free pointer.
+; Zooming fully in puts Roblox in first person and locks the mouse; after that
+; ANY cursor movement rotates the camera, so a jump to centre here would land as
+; one instant diagonal snap (pitch + yaw) whose size depends on wherever the
+; previous step left the cursor. Glide, don't teleport.
+MouseMove({center_x}, {center_y}, 10)
+Sleep(150)
+
+; 1) Zoom in — hold I
+Send("{{i down}}")
+Sleep({zoom_ms})
+Send("{{i up}}")
+Sleep(200)
+
+; 2) Right-drag down to pitch the camera down (raw relative mouse deltas).
+; No cursor move first: it is already centred and the mouse may be locked.
+DllCall("mouse_event", "UInt", {_RIGHTDOWN}, "Int", 0, "Int", 0, "UInt", 0, "UPtr", 0)
+Sleep(150)
+Loop {pitch_steps} {{
+    DllCall("mouse_event", "UInt", {_MOVE}, "Int", 0, "Int", {step}, "UInt", 0, "UPtr", 0)
+    Sleep(15)
+}}
+Sleep(150)
+DllCall("mouse_event", "UInt", {_RIGHTUP}, "Int", 0, "Int", 0, "UInt", 0, "UPtr", 0)
+Sleep(300)
+
+; 3) Zoom out — hold O
+Send("{{o down}}")
+Sleep({zoom_ms})
+Send("{{o up}}")
+
+ExitApp(0)
+"""
