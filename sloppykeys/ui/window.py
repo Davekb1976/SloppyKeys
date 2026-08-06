@@ -416,7 +416,8 @@ class TitleBar(QWidget):
         row.addWidget(self._gamemode_btn, 0, Qt.AlignmentFlag.AlignVCenter)
         row.addSpacing(10)
 
-        # The uptime clock used to sit here; it lives at the foot of the rail now.
+        # A clock used to sit here, then at the foot of the rail. It is a stat, so it lives
+        # on the Run panel's `Macro uptime` card and nowhere else.
         for button in (
             _title_button(icons.MINIMIZE, on_minimize, danger=False),
             _title_button(icons.CLOSE, on_close, danger=True),
@@ -678,10 +679,10 @@ class MainWindow(QWidget):
             button = RailButton(kind, label, lambda p=page: self._rail_clicked(p))
             self._rail_buttons[page] = button
             rail_box.addWidget(button)
+        # Nothing after the stretch: the rail is navigation. A clock lived at its foot and
+        # was a second copy of the Run panel's `Macro uptime` card, which is where a number
+        # you watch belongs.
         rail_box.addStretch(1)
-        # After the stretch, so it pins to the foot of the rail. Moved out of the titlebar:
-        # it is ambient information, and the titlebar is for identity and window controls.
-        rail_box.addWidget(self._build_uptime_tile())
         body.addWidget(rail, 0)
 
         self._viewport = RobloxViewport(on_attach=self._on_attach)
@@ -936,33 +937,6 @@ class MainWindow(QWidget):
         self._titlebar.set_hints(self._hint_texts())
         self._load_profiles()
 
-    def _build_uptime_tile(self) -> QFrame:
-        """Macro uptime at the foot of the rail: caption over value, centred.
-
-        The same number the Run panel's `Macro uptime` card and every Discord embed's
-        `macro up` carry, read from one `StatsTracker` snapshot — this used to be a
-        separate clock counting from app launch, which meant the rail and the phone
-        disagreed about how long the macro had been going.
-
-        Its own tile (`#railUptime`) rather than bare labels, so the rail ends on the same
-        card treatment the stat panel uses. Width is whatever `RAIL_WIDTH` leaves after the
-        rail's 6px margins; the value is sized so `0:00:00` fits without eliding.
-        """
-        tile = QFrame()
-        tile.setObjectName("railUptime")
-        box = QVBoxLayout(tile)
-        box.setContentsMargins(4, 4, 4, 5)
-        box.setSpacing(0)
-        caption = QLabel("UPTIME")
-        caption.setObjectName("uptimeCap")
-        caption.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._uptime_label = QLabel("0:00:00")
-        self._uptime_label.setObjectName("uptime")
-        self._uptime_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        box.addWidget(caption)
-        box.addWidget(self._uptime_label)
-        return tile
-
     # # Pages / navigation
     def _rail_clicked(self, page: str) -> None:
         # Run needs a gamemode; without one, send the user to the selector. Units
@@ -1061,16 +1035,13 @@ class MainWindow(QWidget):
         )
 
     def _tick_clocks(self) -> None:
-        # Piggyback on the existing 1s timer for the panel's two clocks, and only
-        # while a run is up — no point redrawing labels nobody is watching change.
-        if self._runner.is_running and self._right_stack.currentIndex() == 0:
-            self._refresh_stats()
+        # Only while the Run panel is the one on screen — the other panels have no clock,
+        # so redrawing their labels every second buys nothing. Not gated on a run any more:
+        # uptime ticks whether or not one is going, and the challenge countdown is a reason
+        # to *start* one.
         if self._right_stack.currentIndex() == 0:
-            # Counts down whether or not a run is up: it is a reason to *start* one.
+            self._refresh_stats()
             self._refresh_challenge_reset()
-        # One source for every surface that reports how long the macro has been up: the
-        # rail, the Run panel and the Discord embeds all format this same snapshot.
-        self._uptime_label.setText(self._stats.snapshot().macro_time)
 
     # # Logging
     def _rotate_log_file(self) -> None:
@@ -1728,7 +1699,6 @@ class MainWindow(QWidget):
 
         self._runner.start(macro_target, steps, loop_from=loop_from)
         self._run_page.set_running(True)
-        self._stats.start_macro()
         self._refresh_stats()
         self._log(
             f"Macro started ({trigger}) on {macro_target.label()} — "
@@ -1851,7 +1821,6 @@ class MainWindow(QWidget):
             self._run_plan = None
             return
         self._run_page.set_running(True)
-        self._stats.start_macro()
         self._refresh_stats()
         self._notify("Macro Started", COLOR_START, [("Trigger", trigger)])
 
@@ -1995,7 +1964,6 @@ class MainWindow(QWidget):
             # must not retire it for the rotation.
             return (False, "the run wouldn't start — see the log", False)
         self._run_page.set_running(True)
-        self._stats.start_macro()
         self._refresh_stats()
         self._notify("Macro Started", COLOR_START, [("Trigger", trigger)])
         return (True, "", True)
@@ -2789,9 +2757,9 @@ class MainWindow(QWidget):
         self._run_page.set_running(False)
         self._run_page.set_status(message)
         self._log(f"Macro finished: {message}")
-        # Notify before stopping the clocks, so the embed still carries the run time.
         self._notify("Macro Ended", COLOR_END, [("Reason", message)])
-        self._stats.stop_macro()
+        # A run that ended mid-match has no match duration to report.
+        self._stats.abandon_stage()
         self._stats_page.set_action("Idle")
         self._refresh_stats()
 

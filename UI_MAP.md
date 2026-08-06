@@ -22,7 +22,7 @@ was captured at that size.
 │ RAIL │  │       VIEWPORT         │                     │     │
 │      │  ├────────────────────────┤    RIGHT PANEL      │     │
 │ ⋮    │  │       RUN STRIP        │                     │     │
-│ CLOCK│  └────────────────────────┴─────────────────────┘     │
+│      │  └────────────────────────┴─────────────────────┘     │
 └──────┴───────────────────────────────────────────────────────┘
 ```
 
@@ -30,7 +30,7 @@ was captured at that size.
 |---|---|---|
 | **Titlebar** | Top card, full width. Drags the window. | `ui/window.py` → `TitleBar` |
 | **Rail** | Left nav card: RUN / UNITS / SETTINGS. | `window.py` → `RAIL_ITEMS`, `RailButton` |
-| **UptimeTile** | `UPTIME` caption + macro uptime, pinned to the **foot** of the Rail. Same number as the Run panel's `Macro uptime` and the embeds' `macro up`. | `_build_uptime_tile` |
+| **Uptime** | Not on the Rail. It is the StatsPanel's `Macro uptime` card, and the embeds' `macro up`. | `ui/pages/stats_page.py` |
 | **Workspace** | Viewport + RunStrip on the left, RightPanel on the right. | `_build_workspace` |
 
 The gamemode **SelectorScreen** replaces the whole workspace, because picking a mode is a

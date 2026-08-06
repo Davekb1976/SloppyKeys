@@ -68,6 +68,9 @@ class RunStats:
 
     @property
     def macro_time(self) -> str:
+        """How long the app has been open. Not how long the current run has lasted:
+        uptime means since it started, and a clock that read `0:00:00` until F1 and
+        went back to it on F2 was the one number on the panel nobody could use."""
         return format_duration(self.macro_seconds)
 
     @property
@@ -103,7 +106,10 @@ class StatsTracker:
         self._all_losses = stored[1]
         self.wins = 0
         self.losses = 0
-        self._macro_start: float | None = None
+        # Uptime, and it runs from here — the tracker is built with the window. Nothing
+        # starts or stops it: F1 and F2 are runs, and the session is the app's lifetime,
+        # which is the same span the win/loss counters cover.
+        self._launched = time.monotonic()
         self._stage_start: float | None = None
         self._last_stage = 0.0
         self._last_run = "-"
@@ -134,19 +140,13 @@ class StatsTracker:
         update_json(self._path, mutate)
 
     # # Clocks
-    def start_macro(self) -> None:
-        """Called when a run starts. Session counters are deliberately *not* reset:
-        a session is the app's lifetime, so stopping and restarting F1 keeps adding
-        to it, which is what someone farming all evening expects.
+    def abandon_stage(self) -> None:
+        """The run ended without a result — F2, or a step that failed.
 
-        The match clock is **not** started here. A run begins in the lobby and the first
-        match is several screens away, so starting both together timed the navigation,
-        the join and the pre-placement pass as if they were part of the match.
+        Drops the match clock without recording a duration: a match nobody saw the end of
+        has no length worth reporting, and freezing one would put it under `last match` as
+        if it had finished.
         """
-        self._macro_start = time.monotonic()
-
-    def stop_macro(self) -> None:
-        self._macro_start = None
         self._stage_start = None
 
     def start_stage(self) -> None:
@@ -192,7 +192,7 @@ class StatsTracker:
             losses=self.losses,
             all_wins=self._all_wins,
             all_losses=self._all_losses,
-            macro_seconds=0.0 if self._macro_start is None else now - self._macro_start,
+            macro_seconds=now - self._launched,
             stage_seconds=0.0 if self._stage_start is None else now - self._stage_start,
             last_stage_seconds=self._last_stage,
             last_run=self._last_run,

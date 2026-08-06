@@ -127,10 +127,12 @@ with tempfile.TemporaryDirectory() as root:
     # Nothing played yet reads as "-", not 0%.
     assert snap.win_rate == "-" and snap.all_win_rate == "-"
 
-    tracker.start_macro()
-    # A run starts in the lobby, so starting it must not start the match clock: `-`, not a
-    # duration that would go on to count the navigation and the join as match time.
+    # Nothing has started a match, so there is no match clock: `-`, not a duration that
+    # would go on to count the lobby chain and the join as match time.
     assert tracker.snapshot().stage_time == "-", tracker.snapshot().stage_time
+    # Uptime runs from construction, with no start call and nothing that stops it.
+    assert tracker.snapshot().macro_seconds > 0
+    assert tracker.snapshot().macro_time.startswith("0:00:0"), tracker.snapshot().macro_time
 
     tracker.record(True)
     tracker.record(True)
@@ -155,7 +157,6 @@ with tempfile.TemporaryDirectory() as root:
 # # The match clock: Start Game to the result screen, and nothing either side of it.
 with tempfile.TemporaryDirectory() as root:
     clock = StatsTracker(root)
-    clock.start_macro()
     clock.start_stage()
     assert clock.snapshot().stage_time != "-"
     clock.end_stage()
@@ -167,5 +168,12 @@ with tempfile.TemporaryDirectory() as root:
     clock.record(True)
     assert clock.snapshot().last_stage_seconds == frozen
     assert clock.snapshot().stage_time == "-"
+
+    # A run stopped mid-match reports no duration for it: `abandon_stage` drops the clock
+    # instead of filing a half-match under `last match`.
+    clock.start_stage()
+    clock.abandon_stage()
+    assert clock.snapshot().stage_time == "-"
+    assert clock.snapshot().last_stage_seconds == frozen, "the abandoned match isn't filed"
 
 print("webhook + stats: OK")

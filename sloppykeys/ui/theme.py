@@ -174,17 +174,6 @@ def stylesheet() -> str:
         font-size: 11px;
         font-weight: 800;
     }}
-    /* Macro uptime, pinned to the bottom of the rail. Same tile treatment as the
-       stat cards so the rail's foot matches the panels beside it. */
-    /* 11px, not 13: the rail interior is RAIL_WIDTH minus its 6px margins, and the value
-       is `H:MM:SS` from the first second — it had room in the titlebar and does not here. */
-    QLabel#uptime {{ color: {CYAN}; font-size: 11px; font-weight: 800; }}
-    QLabel#uptimeCap {{ color: {TEXT_FAINT}; font-size: 8px; font-weight: 800; }}
-    QFrame#railUptime {{
-        background: {INK_800};
-        border: 1px solid {LINE};
-        border-radius: 8px;
-    }}
     QLabel#h1 {{ font-size: 15px; font-weight: 700; }}
     QLabel#section {{ color: {TEXT_DIM}; font-size: 11px; font-weight: 700; }}
     QLabel#status {{ color: {TEXT_DIM}; font-size: 12px; }}
