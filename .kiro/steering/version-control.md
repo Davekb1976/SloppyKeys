@@ -57,8 +57,11 @@ Untested: no challenge run since.
 
 ## Branch and push
 
-Work on `main`; a branch per fix is ceremony in a private single-author repo. Push when
-asked or when a batch is worth backing up — not automatically.
+Work on `main`; a branch per fix is ceremony in a private single-author repo.
+
+**Push after committing, without being asked.** `origin/main` is the backup and the user
+shouldn't have to prompt for it. Report the failure and carry on if the push fails — an
+unpushed commit is not a broken change.
 
 No force push, no `reset --hard`, no `--no-verify`, no amending a pushed commit. Amend only
 your own unpushed commit, to fold in something that belonged in it.
