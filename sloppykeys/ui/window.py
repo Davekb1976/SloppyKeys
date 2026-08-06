@@ -147,6 +147,18 @@ from .pages.units_page import UnitsPage
 from .viewport import RobloxViewport
 from ..version import VERSION
 
+# Ctrl + / . Deliberately **not** in `config/keybinds.py::ACTIONS`: that dict is what builds
+# the Settings > Keybinds rows and the titlebar hint pills, so anything listed there stops
+# being a secret. It is not rebindable and not stored, which is the whole point.
+#
+# 0xBF is VK_OEM_2 — the `/` key on a US layout. On another layout that physical key sends
+# something else, so the shortcut moves with the keyboard rather than staying on `/`.
+#
+# It opens a window of our own rather than a browser: nothing leaves the machine, so finding
+# it can't be mistaken for the app phoning home.
+EASTER_EGG_BIND = Keybind(0xBF, ctrl=True)
+EASTER_EGG_TITLE = "You found it!"
+EASTER_EGG_BODY = "This was a test for auto update."
 LOG_FILE = "log.txt"
 LOG_PREV_FILE = "log.prev.txt"
 # Nothing was ever deleting log.txt. One append per line is cheap, but a long grind
@@ -516,6 +528,8 @@ class MainWindow(QWidget):
         self._latest_release = None
         self._update_manual = False
         self._update_installer = ""
+        # The Ctrl + / window, so a second press raises it instead of stacking another.
+        self._egg_dialog: QDialog | None = None
         # Task queue state for the run in flight. `_run_plan` is the plan the *macro*
         # is placing, kept separate from `self._plan` (what the Units page edits) so a
         # task switch never repoints the editor under the user.
@@ -3804,16 +3818,25 @@ class MainWindow(QWidget):
         self._edge("stop", lambda: self._stop_macro("hotkey"))
         self._edge("reload", self._trigger_reload)
         self._edge("open_tester", self._open_macro_tester)
+        self._edge_bind("easter_egg", EASTER_EGG_BIND, self._open_easter_egg)
         # No runner.tick() here on purpose: the run loop lives on a worker thread
         # (see _run_loop). Ticking from this 40ms timer would block the UI for the
         # length of every AHK step, including the F1 that stops it.
 
     def _edge(self, action: str, fire) -> None:
-        """Rising-edge detect a keybind and fire once per press."""
-        down = self._keybind_pressed(self._keybinds[action])
-        if down and not self._kb_down[action]:
+        """Rising-edge detect a rebindable action's keybind and fire once per press."""
+        self._edge_bind(action, self._keybinds[action], fire)
+
+    def _edge_bind(self, name: str, kb: Keybind, fire) -> None:
+        """The same, for a bind that isn't one of `ACTIONS` — see `EASTER_EGG_BIND`.
+
+        `.get` rather than `[name]` because `_kb_down` is seeded from `ACTIONS`, and a bind
+        that deliberately isn't in there has no entry until its first poll.
+        """
+        down = self._keybind_pressed(kb)
+        if down and not self._kb_down.get(name, False):
             fire()
-        self._kb_down[action] = down
+        self._kb_down[name] = down
 
     @staticmethod
     def _keybind_pressed(kb: Keybind) -> bool:
@@ -3826,6 +3849,48 @@ class MainWindow(QWidget):
         if kb.alt and not is_key_down(VK_MENU):
             return False
         return True
+
+    def _open_easter_egg(self) -> None:
+        """Ctrl + / . Not logged — a secret that announces itself in the log isn't one.
+
+        Guarded against a second window: the hotkey poll is edge-triggered, but the dialog
+        is modeless, so holding the app open and pressing again would otherwise stack them.
+        """
+        if self._egg_dialog is not None and self._egg_dialog.isVisible():
+            self._egg_dialog.raise_()
+            return
+
+        dialog = QDialog(self)
+        dialog.setObjectName("root")
+        dialog.setWindowTitle(EASTER_EGG_TITLE)
+        # On top of a frameless always-on-top main window, or it opens behind it.
+        dialog.setWindowFlags(dialog.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
+        dialog.setMinimumWidth(300)
+        # Modeless, and it must not keep the app alive after the main window closes.
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        dialog.finished.connect(lambda _result: setattr(self, "_egg_dialog", None))
+
+        box = QVBoxLayout(dialog)
+        box.setContentsMargins(16, 14, 16, 14)
+        box.setSpacing(8)
+
+        heading = QLabel(EASTER_EGG_TITLE)
+        heading.setObjectName("h1")
+        box.addWidget(heading)
+
+        body = QLabel(EASTER_EGG_BODY)
+        body.setStyleSheet(f"color: {theme.TEXT_DIM}; font-size: 12px;")
+        body.setWordWrap(True)
+        box.addWidget(body)
+
+        close = QPushButton("Nice")
+        close.setObjectName("primary")
+        close.setFixedHeight(34)
+        close.clicked.connect(dialog.accept)
+        box.addWidget(close)
+
+        self._egg_dialog = dialog
+        dialog.show()
 
     def _trigger_reload(self) -> None:
         self._log("Reloading...")
