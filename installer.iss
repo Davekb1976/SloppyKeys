@@ -47,8 +47,12 @@
   #error Pass the version: ISCC /DAppVersion=0.1.0 installer.iss  (README > Releasing)
 #endif
 #define AppExe "SloppyKeys.exe"
-; Where build_exe.py put the runnable folder (relative to this file).
-#define Payload "..\..\SLOPPYKEYS"
+; Where build_exe.py put the runnable folder. The default matches `build_exe.py`'s own
+; DEFAULT_DEST, relative to this file; the release workflow builds somewhere else and
+; passes /DPayload.
+#ifndef Payload
+  #define Payload "..\..\SLOPPYKEYS"
+#endif
 
 [Setup]
 ; A real GUID. Never change it after a public release — it is how an upgrade finds the

@@ -1,0 +1,115 @@
+# Publish a release. Triggered by the tag `bump_version.py` pushes, so cutting a release is
+# one command on the developer's machine and nothing here needs a button.
+#
+# Builds the installer and a portable zip on a clean runner, which is the point: a build
+# from the developer's machine can quietly depend on something only that machine has.
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  # Same compileall + tests as a normal push. A ten-minute PyInstaller run on a commit that
+  # doesn't import is wasted, and a tag can't be moved afterwards.
+  check:
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    needs: check
+    runs-on: windows-latest
+    permissions:
+      contents: write  # gh release create
+    steps:
+      # Full history and tags: the notes step asks `git describe` for the previous tag to
+      # build the compare link. A shallow clone has neither.
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+          cache: pip
+
+      # Pinned to the version the local builds were made with. PyInstaller is a build tool,
+      # not a dependency of the app, so it isn't in requirements.txt.
+      - run: pip install -r requirements.txt pyinstaller==6.21.0
+
+      # The tag is the release name users see; version.py is what the titlebar and the
+      # Discord footer show. Ship them disagreeing once and every bug report quotes the
+      # wrong number.
+      - name: version matches the tag
+        id: version
+        run: |
+          $version = python -c "from sloppykeys.version import VERSION; print(VERSION)"
+          $tag = '${{ github.ref_name }}'
+          if ($tag -ne "v$version") { throw "tag $tag does not match version.py ($version)" }
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      # No settings.json on a runner (it is gitignored — it holds the private-server link
+      # and the webhook), so shipped_settings() carries nothing and the release ships pure
+      # defaults with both secrets blank. That is exactly what a public build wants.
+      - name: build
+        run: python build_exe.py --dest "${{ runner.temp }}\payload"
+
+      - name: portable zip
+        run: |
+          Compress-Archive -Path "${{ runner.temp }}\payload\*" `
+            -DestinationPath "SloppyKeys-${{ steps.version.outputs.version }}-portable.zip"
+
+      # Not preinstalled on the runner image. Chocolatey is, and it puts ISCC in
+      # Program Files (x86) rather than the per-user path a winget install uses locally.
+      - name: install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: installer
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
+            "/DAppVersion=${{ steps.version.outputs.version }}" `
+            "/DPayload=${{ runner.temp }}\payload" `
+            installer.iss
+
+      - name: notes
+        run: |
+          $v = '${{ steps.version.outputs.version }}'
+          $setup = "installer_output\SloppyKeys-Setup-$v.exe"
+          $zip = "SloppyKeys-$v-portable.zip"
+          $hashes = @($setup, $zip) | ForEach-Object {
+            "  $((Get-FileHash $_ -Algorithm SHA256).Hash.ToLower())  $(Split-Path $_ -Leaf)"
+          }
+          $previous = git describe --tags --abbrev=0 --exclude='${{ github.ref_name }}' 2>$null
+          $changes = if ($previous) {
+            "**Changes:** https://github.com/${{ github.repository }}/compare/$previous...${{ github.ref_name }}"
+          } else { "First tagged release." }
+          @(
+            "### Requirements"
+            ""
+            "- Windows 10 or 11, x64"
+            "- [AutoHotkey v2](https://www.autohotkey.com/) — every click and keypress goes through it, so the macro can't drive the game without it"
+            "- Display scaling at 100%. At 125% the templates score as different images and matching fails."
+            ""
+            "### Install"
+            ""
+            "``SloppyKeys-Setup-$v.exe`` installs per-user to ``%LOCALAPPDATA%\Programs\SloppyKeys`` — no admin, and the folder stays writable so your captures and settings save. Your ``images``, ``configs``, ``routes.json`` and ``settings.json`` are never overwritten by an upgrade and never removed unless you say yes when uninstalling."
+            ""
+            "The portable zip is the same build with no installer: unzip anywhere writable and run ``SloppyKeys.exe``."
+            ""
+            "Neither is code-signed, so SmartScreen will warn. SHA-256:"
+            ""
+            "```"
+            $hashes
+            "```"
+            ""
+            $changes
+          ) | Set-Content notes.md -Encoding utf8
+
+      - name: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $v = '${{ steps.version.outputs.version }}'
+          gh release create '${{ github.ref_name }}' --verify-tag `
+            --title "SloppyKeys $v" --notes-file notes.md `
+            "installer_output\SloppyKeys-Setup-$v.exe" "SloppyKeys-$v-portable.zip"

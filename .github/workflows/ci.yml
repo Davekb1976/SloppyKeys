@@ -1,0 +1,45 @@
+# Compile and run the assert scripts in tests/. Windows only: the whole project is ctypes
+# to Win32, so a Linux job would fail at import and prove nothing.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  # release.yml calls this instead of copying the test loop — a tag push doesn't match the
+  # `push: branches` trigger above, so reuse is the only way it runs before a build.
+  workflow_call:
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      # compileall does not execute anything, so it catches syntax only. The tests below
+      # are what catch a bad import or a def that slid into a class body.
+      - run: python -m compileall -q sloppykeys
+
+      # Framework-free: each file is a script of asserts that exits non-zero on failure
+      # (see .kiro/steering/implementation-process.md). No pytest, nothing to configure.
+      # QT_QPA_PLATFORM=offscreen is for test_reference_images.py, the one test that needs
+      # a QApplication; there is no display on a runner.
+      - name: tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          $failed = @()
+          Get-ChildItem tests\test_*.py | ForEach-Object {
+            Write-Host "--- $($_.Name)"
+            python $_.FullName
+            if ($LASTEXITCODE -ne 0) { $failed += $_.Name }
+          }
+          if ($failed.Count) { throw "failed: $($failed -join ', ')" }
