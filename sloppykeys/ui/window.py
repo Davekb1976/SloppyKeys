@@ -9,7 +9,6 @@ from __future__ import annotations
 import os
 import random
 import sys
-import tempfile
 import threading
 import time
 import traceback
@@ -1514,6 +1513,9 @@ class MainWindow(QWidget):
         Writing `_latest_release` here and reading it in `_on_update_checked` is safe
         because `done` is a queued signal: the handler runs after this returns.
         """
+        # On the way in, not on the way out: the app quits the instant it hands over to the
+        # installer, so this is where a previous download gets cleaned up.
+        updates.clear_downloads()
         release, error = updates.latest_release()
         self._latest_release = release
         if error:
@@ -1573,7 +1575,9 @@ class MainWindow(QWidget):
         digest, why = updates.expected_sha(release)
         if not digest:
             return (False, f"Won't install unverified: {why}.")
-        self._update_installer = os.path.join(tempfile.gettempdir(), release.setup_name)
+        # `setup_name` is built from the parsed version integers, never from the asset name
+        # the API sent, so nothing user- or network-controlled reaches this path.
+        self._update_installer = os.path.join(updates.update_dir(), release.setup_name)
         ok, message = updates.download(release.setup_url, self._update_installer, digest)
         return (ok, message if not ok else f"Downloaded {message}, checksum matched.")
 

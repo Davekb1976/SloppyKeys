@@ -31,6 +31,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -119,7 +120,12 @@ def _get(url: str, limit: int) -> tuple[bytes, str]:
         with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
             return (response.read(limit + 1)[:limit], "")
     except urllib.error.HTTPError as exc:
-        # 404 is the normal answer for a repo with no releases yet, 403 is the rate limit.
+        # Both of these are ordinary answers rather than faults, and "HTTP 404 Not Found"
+        # in the Settings panel reads like a broken app.
+        if exc.code == 404:
+            return (b"", "no releases published yet")
+        if exc.code == 403:
+            return (b"", "GitHub is rate-limiting this address; try again later")
         return (b"", f"HTTP {exc.code} {exc.reason}")
     except urllib.error.URLError as exc:
         return (b"", f"could not reach GitHub: {exc.reason}")
@@ -190,6 +196,33 @@ def sha256_for(sums: str, filename: str) -> str:
     return ""
 
 
+def update_dir() -> str:
+    """Where a downloaded installer goes: a folder of ours inside %TEMP%.
+
+    Its own folder rather than %TEMP% itself so `clear_downloads` can empty it without ever
+    reasoning about whose file it is looking at.
+    """
+    return os.path.join(tempfile.gettempdir(), "SloppyKeys-update")
+
+
+def clear_downloads() -> None:
+    """Delete anything left from a previous update.
+
+    The app quits the moment it hands over to the installer, so it can't clean up after
+    itself — it cleans up on the way *in* instead. A 110MB installer nobody deletes is how
+    a tool quietly eats someone's disk. A file the running installer still holds open just
+    fails to delete and goes next launch.
+    """
+    folder = update_dir()
+    if not os.path.isdir(folder):
+        return
+    for name in os.listdir(folder):
+        try:
+            os.remove(os.path.join(folder, name))
+        except OSError:
+            pass
+
+
 def expected_sha(release: Release) -> tuple[str, str]:
     """The published SHA-256 for this release's installer, or ("", reason).
 
@@ -218,6 +251,10 @@ def download(
     """
     if not _safe_url(url):
         return (False, "That download URL isn't a GitHub release asset.")
+    try:
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+    except OSError as exc:
+        return (False, f"Failed to make a folder for the download: {exc}")
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     digest = hashlib.sha256()
     total = 0

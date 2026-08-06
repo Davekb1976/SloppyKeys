@@ -11,15 +11,18 @@ from __future__ import annotations
 
 import os
 import sys
+import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sloppykeys.core.updates import (  # noqa: E402
     SUMS_NAME,
+    clear_downloads,
     is_newer,
     parse_version,
     release_from,
     sha256_for,
+    update_dir,
 )
 
 assert parse_version("v0.1.2") == (0, 1, 2)
@@ -76,6 +79,18 @@ for bad in ({}, {"tag_name": "nightly"}, {"tag_name": 7}, [], "", None, {"tag_na
         assert result is not None and result.setup_url == ""
     else:
         assert result is None and message, bad
+
+# The download folder is ours alone, so clearing it can't reach anyone else's temp files,
+# and clearing an absent one is not an error.
+assert os.path.basename(update_dir()) == "SloppyKeys-update"
+assert os.path.dirname(update_dir()) == tempfile.gettempdir()
+clear_downloads()
+os.makedirs(update_dir(), exist_ok=True)
+litter = os.path.join(update_dir(), "SloppyKeys-Setup-9.9.9.exe")
+with open(litter, "wb") as handle:
+    handle.write(b"not really an installer")
+clear_downloads()
+assert not os.path.exists(litter), "a leftover download is deleted on the next check"
 
 digest = "0" * 63 + "1"
 listing = f"{digest}  SloppyKeys-Setup-9.9.9.exe\ndeadbeef  short.exe\n"
