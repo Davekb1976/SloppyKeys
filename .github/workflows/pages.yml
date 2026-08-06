@@ -1,8 +1,8 @@
 # Publish website/ to GitHub Pages. A static three-file site, so there is nothing to build
 # — the folder is uploaded as-is.
 #
-# One-time setup in the repo: Settings > Pages > Source = GitHub Actions. Without that this
-# workflow fails at `deploy-pages` with "Pages is not enabled".
+# Needs no manual setup: `configure-pages` below enables Pages itself. Serves from
+# https://davekb1976.github.io/SloppyKeys/
 name: pages
 
 on:
@@ -29,7 +29,11 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v5
+      # `enablement: true` turns Pages on if it isn't already, so this doesn't need a
+      # manual visit to Settings > Pages first — the first run failed for exactly that.
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@v4
         with:
           path: website
