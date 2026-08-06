@@ -1,6 +1,15 @@
 """Render the GitHub release notes for a tag.
 
-    python .github/release_notes.py 0.1.0 v0.1.0 owner/repo > notes.md
+    python .github/release_notes.py 0.1.1 v0.1.1 owner/repo > notes.md
+
+**The changelog is the release description.** Setup instructions belong in the README, which
+is one link away and stays current; repeating them in every release means a reader scrolls
+past the same three paragraphs to find the one thing they came for — what changed. Only the
+facts that are specific to *this* build stay: what's new, which file to download, and its
+checksums.
+
+The changelog itself is read back off the tagged commit, where `bump_version.py` wrote it, so
+the notes and the `Release <version>` commit cannot disagree.
 
 **Python, not PowerShell, on purpose.** These notes are markdown full of backticks, and a
 backtick is PowerShell's escape character: the first version of this lived inline in
@@ -21,47 +30,27 @@ import sys
 TEMPLATE = """\
 {changelog}
 
-### Requirements
+**[`SloppyKeys-Setup-{version}.exe`]({repo_url}/releases/download/{tag}/SloppyKeys-Setup-{version}.exe)**
+— installs per-user, no admin, keeps your `images`, `configs` and settings. The portable zip
+is the same build without the installer.
 
-- Windows 10 or 11, x64
-- [AutoHotkey v2](https://www.autohotkey.com/) — every click and keypress goes through it,
-  so the macro can't drive the game without it
-- Display scaling at 100%. At 125% the templates score as different images and matching
-  fails.
+Needs [AutoHotkey v2](https://www.autohotkey.com/) and Windows display scaling at 100% —
+[setup notes]({repo_url}#readme). Unsigned, so SmartScreen will warn.
 
-### Install
-
-`SloppyKeys-Setup-{version}.exe` installs per-user to `%LOCALAPPDATA%\\Programs\\SloppyKeys`
-— no admin, and the folder stays writable so your captures and settings save. Your
-`images`, `configs`, `routes.json` and `settings.json` are never overwritten by an upgrade,
-and never removed unless you say yes when uninstalling.
-
-The portable zip is the same build with no installer: unzip anywhere writable and run
-`SloppyKeys.exe`.
-
-### Updating
-
-If you installed a previous version with the installer, SloppyKeys can update itself:
-**Settings > Main > Updates**. It asks GitHub once per launch, downloads only when you
-click, checks the download against the `SHA256SUMS.txt` below, and never touches an update
-while the macro is running. One toggle turns the whole thing off.
-
-Neither download is code-signed, so SmartScreen will warn about an unknown publisher.
+<details><summary>SHA-256</summary>
 
 ```
 {sums}
 ```
+
+</details>
 
 {changes}
 """
 
 
 def changelog(tag: str) -> str:
-    """The tagged commit's own body, which is the changelog `bump_version.py` wrote.
-
-    Read back rather than recomputed: the release notes and the `Release <version>` commit
-    then cannot disagree about what shipped, and the grouping rules live in one place.
-    """
+    """The tagged commit's own body, which is the changelog `bump_version.py` wrote."""
     result = subprocess.run(
         ("git", "show", "-s", "--format=%b", f"{tag}^{{commit}}"),
         capture_output=True,
@@ -69,7 +58,7 @@ def changelog(tag: str) -> str:
         encoding="utf-8",
     )
     body = result.stdout.strip() if result.returncode == 0 else ""
-    return f"### What's new\n\n{body}" if body else ""
+    return body or "No recorded changes."
 
 
 def previous_tag(tag: str) -> str:
@@ -86,16 +75,22 @@ def main() -> None:
     if len(sys.argv) != 4:
         raise SystemExit(f"usage: {sys.argv[0]} <version> <tag> <owner/repo>")
     version, tag, repo = sys.argv[1:4]
+    repo_url = f"https://github.com/{repo}"
     sums = pathlib.Path("SHA256SUMS.txt").read_text(encoding="utf-8").strip()
     previous = previous_tag(tag)
     changes = (
-        f"**Changes:** https://github.com/{repo}/compare/{previous}...{tag}"
+        f"[Every commit since {previous}]({repo_url}/compare/{previous}...{tag})"
         if previous
         else "First tagged release."
     )
     sys.stdout.write(
         TEMPLATE.format(
-            version=version, sums=sums, changes=changes, changelog=changelog(tag)
+            changelog=changelog(tag),
+            version=version,
+            tag=tag,
+            repo_url=repo_url,
+            sums=sums,
+            changes=changes,
         )
     )
 
