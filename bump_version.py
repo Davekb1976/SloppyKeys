@@ -7,6 +7,10 @@
 The push of tag `vX.Y.Z` is what `.github/workflows/release.yml` triggers on, so there is
 no separate "publish" step: run this and the installer appears on the Releases page.
 
+`compileall` and every script in `tests/` run before anything is committed, and a failure
+stops the tag. That is deliberate: `release.yml` therefore doesn't run the tests a second
+time on the same commit, which used to mean two Windows jobs per release.
+
 The commit is `Release <version>` with the subjects of every commit since the previous tag
 as its body — deliberately not the `type(scope):` format the rest of the history uses, so a
 release is findable at a glance. Two things this script exists for, both of which a person
@@ -16,6 +20,7 @@ gets wrong by hand: the carry at 10 (`version.py::bump`), and that summary.
 from __future__ import annotations
 
 import argparse
+import glob
 import os
 import re
 import subprocess
@@ -33,6 +38,30 @@ def run(*command: str) -> str:
     if result.returncode != 0:
         raise SystemExit(f"Failed to run {' '.join(command)}: {result.stderr.strip()}")
     return result.stdout.strip()
+
+
+def verify() -> None:
+    """Compile and run every test script, and refuse to tag if any of it fails.
+
+    This is why `release.yml` no longer runs the tests itself: three seconds here, before the
+    tag exists, beats a ten-minute Windows job discovering it afterwards — and a tag that has
+    already been pushed is awkward to take back.
+    """
+    print("compileall...", flush=True)
+    run(sys.executable, "-m", "compileall", "-q", "sloppykeys")
+    for path in sorted(glob.glob(os.path.join(HERE, "tests", "test_*.py"))):
+        name = os.path.basename(path)
+        result = subprocess.run(
+            (sys.executable, path),
+            cwd=HERE,
+            capture_output=True,
+            text=True,
+            env={**os.environ, "QT_QPA_PLATFORM": "offscreen"},
+        )
+        if result.returncode != 0:
+            tail = (result.stderr or result.stdout).strip().splitlines()[-3:]
+            raise SystemExit("\n".join([f"{name} failed, not tagging:", *tail]))
+        print(f"  {name} ok", flush=True)
 
 
 def write_version(new: str) -> None:
@@ -123,6 +152,8 @@ def main() -> None:
     print(f"Release {new}\n\n{body}\n")
     if args.dry_run:
         return
+
+    verify()
 
     # The release commit is the changelog (`version-control.md` §Releasing), so it is made
     # even when there is no diff to carry — `--set` to the version already in the file, as

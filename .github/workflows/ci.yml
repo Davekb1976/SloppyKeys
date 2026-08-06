@@ -2,14 +2,31 @@
 # to Win32, so a Linux job would fail at import and prove nothing.
 name: ci
 
+# Nothing here can fail because of a prose change, so documentation, steering and the landing
+# page are excluded: a full Windows runner installing PySide6, OpenCV and onnxruntime to
+# compile code that didn't change is minutes spent on nothing. `website/` has its own
+# workflow (pages.yml).
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - '.kiro/**'
+      - 'website/**'
+      - '.github/ISSUE_TEMPLATE/**'
   pull_request:
+    paths-ignore:
+      - '**.md'
+      - '.kiro/**'
+      - 'website/**'
+      - '.github/ISSUE_TEMPLATE/**'
   workflow_dispatch:
-  # release.yml calls this instead of copying the test loop — a tag push doesn't match the
-  # `push: branches` trigger above, so reuse is the only way it runs before a build.
-  workflow_call:
+
+# A newer push supersedes an older run on the same branch. Waiting out a queued job for a
+# commit that has already been replaced tells you nothing.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check:
