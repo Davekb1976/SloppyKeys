@@ -24,6 +24,11 @@ HARD_MODE_KEY = "hard_mode"
 # Roblox resets the camera on a stage load, skipping misplaces every unit silently. Cheap to
 # turn on and observe; expensive to have on by default and be wrong.
 CAMERA_ONCE_KEY = "camera_once_per_session"
+# Check GitHub for a newer release once per launch. Default **on**: the alternative is a
+# user sitting on a version with a known bad Start click and no way to find out. It never
+# downloads anything by itself — see `core/updates.py`. Deliberately left out of
+# `build_exe.py`'s SHIPPED_SETTINGS_KEYS so a build always ships it on.
+AUTO_UPDATE_KEY = "auto_update"
 EXPEDITION_DIFFICULTY_KEY = "expedition_difficulty"
 EXPEDITION_DIFFICULTY_DEFAULT = 1
 # There is deliberately no **global** match-tolerance setting. One existed and was removed:
@@ -49,6 +54,7 @@ class AppSettings:
             RUN_CHALLENGES_KEY: False,
             HARD_MODE_KEY: False,
             CAMERA_ONCE_KEY: False,
+            AUTO_UPDATE_KEY: True,
             EXPEDITION_DIFFICULTY_KEY: EXPEDITION_DIFFICULTY_DEFAULT,
         }
 
@@ -103,6 +109,12 @@ class AppSettings:
 
     def set_camera_once(self, enabled: bool) -> None:
         self._set(CAMERA_ONCE_KEY, bool(enabled))
+
+    def get_auto_update(self) -> bool:
+        return bool(self.read().get(AUTO_UPDATE_KEY, True))
+
+    def set_auto_update(self, enabled: bool) -> None:
+        self._set(AUTO_UPDATE_KEY, bool(enabled))
 
     def get_expedition_difficulty(self) -> int:
         """Expedition difficulty 1-3. A toggle for how hard the same map gets, so

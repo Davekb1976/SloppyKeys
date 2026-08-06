@@ -74,6 +74,10 @@ WizardStyle=modern
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\{#AppExe}
+; Restart Manager may close the app to replace its exe, but it must not restart it: the
+; [Run] entry below already does that for a silent update, and both firing would leave two
+; instances polling the same hotkeys.
+RestartApplications=no
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Shortcuts:"
@@ -96,6 +100,11 @@ Name: "{userdesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopico
 
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "Launch {#AppName}"; Flags: nowait postinstall skipifsilent
+; The in-app updater runs this installer with /SILENT and quits so the exe can be replaced
+; (core\updates.py). `postinstall` entries are skipped when silent, so without this line an
+; update would leave the user with no app running. `Check: WizardSilent` makes it the
+; silent-only counterpart of the line above, so exactly one instance comes back.
+Filename: "{app}\{#AppExe}"; Flags: nowait; Check: WizardSilent
 
 [UninstallDelete]
 ; Written at runtime, so Inno doesn't know about them and would leave them behind. These

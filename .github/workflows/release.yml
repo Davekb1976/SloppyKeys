@@ -71,14 +71,22 @@ jobs:
             "/DPayload=${{ runner.temp }}\payload" `
             installer.iss
 
+      # Published as an asset, not just quoted in the notes: the in-app updater
+      # (core/updates.py) refuses to install anything it can't check against this file.
+      # sha256sum format — two spaces between hash and name.
+      - name: checksums
+        run: |
+          $v = '${{ steps.version.outputs.version }}'
+          @("installer_output\SloppyKeys-Setup-$v.exe", "SloppyKeys-$v-portable.zip") |
+            ForEach-Object {
+              "$((Get-FileHash $_ -Algorithm SHA256).Hash.ToLower())  $(Split-Path $_ -Leaf)"
+            } | Set-Content SHA256SUMS.txt -Encoding ascii
+
       - name: notes
         run: |
           $v = '${{ steps.version.outputs.version }}'
-          $setup = "installer_output\SloppyKeys-Setup-$v.exe"
-          $zip = "SloppyKeys-$v-portable.zip"
-          $hashes = @($setup, $zip) | ForEach-Object {
-            "  $((Get-FileHash $_ -Algorithm SHA256).Hash.ToLower())  $(Split-Path $_ -Leaf)"
-          }
+          $SUMS = 'SHA256SUMS.txt'
+          $hashes = Get-Content SHA256SUMS.txt | ForEach-Object { "  $_" }
           $previous = git describe --tags --abbrev=0 --exclude='${{ github.ref_name }}' 2>$null
           $changes = if ($previous) {
             "**Changes:** https://github.com/${{ github.repository }}/compare/$previous...${{ github.ref_name }}"
@@ -96,7 +104,11 @@ jobs:
             ""
             "The portable zip is the same build with no installer: unzip anywhere writable and run ``SloppyKeys.exe``."
             ""
-            "Neither is code-signed, so SmartScreen will warn. SHA-256:"
+            "### Updating"
+            ""
+            "If you installed a previous version with the installer, SloppyKeys can update itself: Settings > Main > Updates. It checks once per launch, downloads only when you click, verifies the download against ``$SUMS``, and never touches an update while the macro is running."
+            ""
+            "Neither download is code-signed, so SmartScreen will warn. SHA-256:"
             ""
             "```"
             $hashes
@@ -112,4 +124,5 @@ jobs:
           $v = '${{ steps.version.outputs.version }}'
           gh release create '${{ github.ref_name }}' --verify-tag `
             --title "SloppyKeys $v" --notes-file notes.md `
-            "installer_output\SloppyKeys-Setup-$v.exe" "SloppyKeys-$v-portable.zip"
+            "installer_output\SloppyKeys-Setup-$v.exe" "SloppyKeys-$v-portable.zip" `
+            SHA256SUMS.txt

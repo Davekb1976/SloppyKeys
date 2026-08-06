@@ -52,6 +52,9 @@ class SettingsPage(QWidget):
     webhookTestRequested = Signal()
     hardModeToggled = Signal(bool)
     cameraOnceToggled = Signal(bool)
+    autoUpdateToggled = Signal(bool)
+    updateCheckRequested = Signal()
+    updateActionRequested = Signal()
     openTesterRequested = Signal()
     keybindChanged = Signal(str, object)  # action, Keybind
     gameKeyChanged = Signal(str, str)     # action, single key character
@@ -232,8 +235,43 @@ class SettingsPage(QWidget):
         # A template that can't clear the default 0.70 is usually still the wrong size or
         # crop — recapture before lowering (`images/README.md`).
 
+        col.addLayout(_group("UPDATES"))
+        self._auto_update = ToggleSwitch()
+        self._auto_update.setToolTip(
+            "Ask GitHub once per launch whether there's a newer release.\n"
+            "Nothing is ever downloaded without you clicking the button below."
+        )
+        self._auto_update.toggled.connect(self.autoUpdateToggled.emit)
+        col.addWidget(_row("Check for updates on startup", self._auto_update))
+
+        check = QPushButton(f"{icons.REFRESH}  Check Now")
+        check.setStyleSheet(f"font-family: '{theme.ICON_FAMILY}';")
+        check.clicked.connect(self.updateCheckRequested.emit)
+        col.addLayout(_left(check))
+
+        # Hidden until there is something to do, so the Main tab doesn't carry a dead
+        # button. Its label says which of the two things it will do.
+        self._update_action = QPushButton("")
+        self._update_action.setStyleSheet(f"font-family: '{theme.ICON_FAMILY}';")
+        self._update_action.clicked.connect(self.updateActionRequested.emit)
+        self._update_action.hide()
+        col.addLayout(_left(self._update_action))
+        self._update_status = _status_label()
+        col.addWidget(self._update_status)
+
         col.addStretch(1)
         return body
+
+    def set_auto_update(self, enabled: bool) -> None:
+        self._auto_update.setChecked(bool(enabled))
+
+    def set_update_status(self, text: str, is_error: bool = False) -> None:
+        _paint_status(self._update_status, text, is_error)
+
+    def set_update_action(self, label: str) -> None:
+        """Show the button with `label`, or hide it when `label` is empty."""
+        self._update_action.setText(label)
+        self._update_action.setVisible(bool(label))
 
     # # Delays tab
     def _build_delays_tab(self) -> QWidget:

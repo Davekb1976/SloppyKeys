@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import random
 import sys
+import tempfile
 import threading
 import time
 import traceback
@@ -57,6 +58,7 @@ from .route_editor import RouteEditor
 
 from sloppykeys.config.settings import AppSettings, ImageProfileStore, parse_private_server_link
 from sloppykeys.config.stats import StatsTracker
+from sloppykeys.core import updates
 from sloppykeys.core.webhook import (
     COLOR_END,
     COLOR_LOSS,
@@ -508,6 +510,13 @@ class MainWindow(QWidget):
         self._run_task: Task | None = None
         # The Route tab's Test button, same lifetime rule as _run_task.
         self._route_task: Task | None = None
+        # The update check / download, same lifetime rule again. `_latest_release` is
+        # written by the worker and read by the queued handler; `_update_manual` says
+        # whether to report "nothing new" or stay quiet.
+        self._update_task: Task | None = None
+        self._latest_release = None
+        self._update_manual = False
+        self._update_installer = ""
         # Task queue state for the run in flight. `_run_plan` is the plan the *macro*
         # is placing, kept separate from `self._plan` (what the Units page edits) so a
         # task switch never repoints the editor under the user.
@@ -860,6 +869,9 @@ class MainWindow(QWidget):
         self._settings_page.webhookTestRequested.connect(self._on_webhook_test)
         self._settings_page.hardModeToggled.connect(self._on_hard_mode_toggled)
         self._settings_page.cameraOnceToggled.connect(self._on_camera_once_toggled)
+        self._settings_page.autoUpdateToggled.connect(self._on_auto_update_toggled)
+        self._settings_page.updateCheckRequested.connect(lambda: self._check_for_update(True))
+        self._settings_page.updateActionRequested.connect(self._on_update_action)
         position = self._settings_page.position_editor
         position.targetChanged.connect(self._on_position_target)
         position.movesChanged.connect(self._on_position_moves)
@@ -884,6 +896,11 @@ class MainWindow(QWidget):
         self._task_editor.load(self._task_store.slots())
         self._settings_page.set_hard_mode(self._settings.get_hard_mode())
         self._settings_page.set_camera_once(self._settings.get_camera_once())
+        auto_update = self._settings.get_auto_update()
+        self._settings_page.set_auto_update(auto_update)
+        if auto_update:
+            # A worker, so a slow or unreachable GitHub can't delay the window appearing.
+            self._check_for_update()
         self._settings_page.set_link(self._settings.get_private_server_link())
         self._settings_page.set_webhook(self._settings.get_discord_webhook())
         self._refresh_stats()
@@ -1467,6 +1484,112 @@ class MainWindow(QWidget):
     def _on_hard_mode_toggled(self, enabled: bool) -> None:
         self._settings.set_hard_mode(enabled)
         self._log(f"Hard Mode (Story) {'enabled' if enabled else 'disabled'}.")
+
+    # # Updates (Settings > Main)
+    def _on_auto_update_toggled(self, enabled: bool) -> None:
+        self._settings.set_auto_update(enabled)
+        self._log(f"Startup update check {'enabled' if enabled else 'disabled'}.")
+
+    def _check_for_update(self, manual: bool = False) -> None:
+        """Ask GitHub for the newest release, on a worker.
+
+        The automatic startup check stays silent when there is nothing new — a status line
+        nobody asked for is noise, and a network failure at launch is not the user's
+        problem. Check Now always answers.
+        """
+        if self._update_task is not None:
+            return
+        self._update_manual = manual
+        if manual:
+            self._settings_page.set_update_status("Checking GitHub...")
+        task = Task(self._fetch_latest_release)
+        task.setAutoDelete(False)
+        self._update_task = task
+        task.signals.done.connect(self._on_update_checked)  # queued to the UI thread
+        self._pool.start(task)
+
+    def _fetch_latest_release(self) -> tuple[bool, str]:
+        """Worker half. Stashes the release and returns the line to show for it.
+
+        Writing `_latest_release` here and reading it in `_on_update_checked` is safe
+        because `done` is a queued signal: the handler runs after this returns.
+        """
+        release, error = updates.latest_release()
+        self._latest_release = release
+        if error:
+            return (False, error)
+        if release is None:
+            return (True, f"You're on the latest version (v{VERSION}).")
+        return (True, f"v{release.version} is available.")
+
+    def _on_update_checked(self, ok: bool, message: str) -> None:
+        self._update_task = None
+        release = self._latest_release
+        if release is None:
+            self._settings_page.set_update_action("")
+            if self._update_manual or not ok:
+                self._settings_page.set_update_status(message, is_error=not ok)
+            if not ok:
+                self._log(f"Update check failed: {message}")
+            return
+        self._settings_page.set_update_action(
+            f"{icons.DOWN}  Install v{release.version}"
+            if self._can_install_update(release)
+            else f"{icons.LINK}  Open the release page"
+        )
+        self._settings_page.set_update_status(message)
+        self._log(f"Update available: v{release.version} (you have v{VERSION}).")
+
+    def _can_install_update(self, release) -> bool:
+        """In-place install is only offered to a copy our installer put there.
+
+        A portable-zip or source checkout gets the release page: running the installer
+        from one would leave a second copy in %LOCALAPPDATA% and keep launching this one.
+        """
+        return bool(release.setup_url) and updates.installed_by_setup(self._app_root)
+
+    def _on_update_action(self) -> None:
+        release = self._latest_release
+        if release is None:
+            return
+        if not self._can_install_update(release):
+            if not QDesktopServices.openUrl(QUrl(release.page_url)):
+                self._settings_page.set_update_status("Couldn't open your browser.", True)
+            return
+        # Replacing the exe under a running macro would end the run mid-match.
+        if self._runner.is_running or self._run_task is not None:
+            self._settings_page.set_update_status("The macro is running — stop it first.", True)
+            return
+        if self._update_task is not None:
+            return
+        self._settings_page.set_update_status(f"Downloading v{release.version}...")
+        task = Task(lambda: self._download_update(release))
+        task.setAutoDelete(False)
+        self._update_task = task
+        task.signals.done.connect(self._on_update_downloaded)
+        self._pool.start(task)
+
+    def _download_update(self, release) -> tuple[bool, str]:
+        digest, why = updates.expected_sha(release)
+        if not digest:
+            return (False, f"Won't install unverified: {why}.")
+        self._update_installer = os.path.join(tempfile.gettempdir(), release.setup_name)
+        ok, message = updates.download(release.setup_url, self._update_installer, digest)
+        return (ok, message if not ok else f"Downloaded {message}, checksum matched.")
+
+    def _on_update_downloaded(self, ok: bool, message: str) -> None:
+        self._update_task = None
+        self._settings_page.set_update_status(message, is_error=not ok)
+        self._log(f"Update: {message}")
+        if not ok:
+            return
+        started, note = updates.launch_installer(self._update_installer)
+        if not started:
+            self._settings_page.set_update_status(note, True)
+            self._log(f"Update: {note}")
+            return
+        self._log("Installer started — closing so it can replace the program.")
+        self.close()
 
     # # Start position (Settings > Position)
     def _on_position_target(self, gamemode: str, map_name: str, act: str) -> None:
