@@ -68,9 +68,19 @@ Release 0.1.1
 <the changes since the last release, one line each>
 ```
 
-That is `bump_version.py`, which writes the subject and collects the body from the commits
-since the previous tag, then pushes the tag that `release.yml` builds. Run it; don't hand-
-roll the commit. Patch carries at 10 — `0.1.9` is followed by `0.2.0`.
+That is `bump_version.py`, which verifies, writes the subject, collects the body from the
+commits since the previous tag, and pushes the tag that `release.yml` builds. Run it; don't
+hand-roll the commit. Patch carries at 10 — `0.1.9` is followed by `0.2.0`.
+
+The body is a **changelog for the build**, so `feat` `fix` `perf` only; docs, chore,
+refactor, ci and the `build`/`steering`/`website` scopes are dropped. A subject that would
+read as noise in a release note is a sign the subject was written for the diff, not the
+reader.
+
+**Rehearse the pipeline before spending a version.** `gh workflow run release.yml` builds the
+installer, the zip and the notes and publishes nothing, handing them back as artifacts. Every
+release bug so far was found by cutting a real release and unwinding it, which costs a tag, a
+force-push and a re-cut — a dry run costs nothing.
 
 ## Branch and push
 
