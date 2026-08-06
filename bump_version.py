@@ -48,16 +48,48 @@ def write_version(new: str) -> None:
         handle.write(patched)
 
 
+# A release body is a changelog for the build, not a list of everything that happened. These
+# types and scopes change nothing a user of the exe can see — CI plumbing, steering, the
+# README, an internal refactor — so they are dropped rather than padding the notes with work
+# nobody downloading it can observe.
+SKIP_TYPES = {"docs", "chore", "refactor", "test", "style", "ci"}
+SKIP_SCOPES = {"steering", "build", "ci", "tests", "docs", "website"}
+# type -> heading, in the order they appear. Anything not listed here is skipped, so a new
+# commit type has to be classified deliberately before it can reach a release note.
+HEADINGS = (("feat", "New"), ("fix", "Fixed"), ("perf", "Changed"))
+
+SUBJECT = re.compile(r"^(?P<type>[a-z]+)(?:\((?P<scope>[^)]+)\))?: (?P<subject>.+)$")
+
+
 def changes_since(tag: str) -> str:
-    """The commit subjects since `tag`, as the release commit's body.
+    """The user-visible changes since `tag`, grouped under New / Fixed / Changed.
 
     No tag yet (the first release) means everything, which is right — there is no earlier
-    release to diff against.
+    release to compare against.
     """
     span = f"{tag}..HEAD" if tag else "HEAD"
-    log = run("git", "log", "--no-merges", "--pretty=%s", span)
-    lines = [f"- {line}" for line in log.splitlines() if line]
-    return "\n".join(lines) if lines else "- no commits since the last release"
+    return group_subjects(run("git", "log", "--no-merges", "--pretty=%s", span).splitlines())
+
+
+def group_subjects(subjects: list[str]) -> str:
+    """The changelog body for a list of commit subjects. Pure, so it can be tested."""
+    grouped: dict[str, list[str]] = {name: [] for name, _heading in HEADINGS}
+    for line in subjects:
+        match = SUBJECT.match(line.strip())
+        if match is None:
+            continue
+        kind = match.group("type")
+        scope = (match.group("scope") or "").lower()
+        if kind in SKIP_TYPES or scope in SKIP_SCOPES or kind not in grouped:
+            continue
+        grouped[kind].append(match.group("subject"))
+
+    sections: list[str] = []
+    for kind, heading in HEADINGS:
+        if grouped[kind]:
+            body = "\n".join(f"- {subject}" for subject in grouped[kind])
+            sections.append(f"{heading}:\n{body}")
+    return "\n\n".join(sections) if sections else "Maintenance only: nothing user-facing."
 
 
 def previous_tag() -> str:

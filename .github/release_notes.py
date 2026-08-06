@@ -19,6 +19,8 @@ import subprocess
 import sys
 
 TEMPLATE = """\
+{changelog}
+
 ### Requirements
 
 - Windows 10 or 11, x64
@@ -54,6 +56,22 @@ Neither download is code-signed, so SmartScreen will warn about an unknown publi
 """
 
 
+def changelog(tag: str) -> str:
+    """The tagged commit's own body, which is the changelog `bump_version.py` wrote.
+
+    Read back rather than recomputed: the release notes and the `Release <version>` commit
+    then cannot disagree about what shipped, and the grouping rules live in one place.
+    """
+    result = subprocess.run(
+        ("git", "show", "-s", "--format=%b", f"{tag}^{{commit}}"),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    body = result.stdout.strip() if result.returncode == 0 else ""
+    return f"### What's new\n\n{body}" if body else ""
+
+
 def previous_tag(tag: str) -> str:
     """The tag before this one, or "" for the first release."""
     result = subprocess.run(
@@ -75,7 +93,11 @@ def main() -> None:
         if previous
         else "First tagged release."
     )
-    sys.stdout.write(TEMPLATE.format(version=version, sums=sums, changes=changes))
+    sys.stdout.write(
+        TEMPLATE.format(
+            version=version, sums=sums, changes=changes, changelog=changelog(tag)
+        )
+    )
 
 
 if __name__ == "__main__":
