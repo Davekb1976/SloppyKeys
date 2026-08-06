@@ -1,6 +1,11 @@
-PySide6
-mss
-numpy
+# Everything is pinned to the versions the macro has actually been run against in game.
+# A release is built on a GitHub runner from a fresh install of this file, so an unpinned
+# line means the published exe contains a PySide6 or numpy nobody has tested — and the
+# failure would land on someone else's machine, mid-run, looking like a macro bug.
+# Bump one at a time, deliberately.
+PySide6==6.11.1
+mss==10.2.0
+numpy==2.5.1
 
 # **headless**, not `opencv-python`. Same `cv2` module and the same functions this project
 # calls (matchTemplate, minMaxLoc, cvtColor, resize, imread, imencode/imdecode) — the only
@@ -11,7 +16,7 @@ numpy
 # with the GUI, and the 29MB videoio ffmpeg DLL ships either way (`build_exe.py` prunes it).
 # The reason to keep headless is that it carries no Qt plugins of its own to collide with
 # PySide6's — a real class of bug in Qt apps that also import OpenCV.
-opencv-python-headless
+opencv-python-headless==5.0.0.93
 
 # OCR for the challenge panel's daily limit and map name — neither string is
 # knowable in advance, so there is nothing to match a template against.
