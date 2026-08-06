@@ -128,6 +128,10 @@ with tempfile.TemporaryDirectory() as root:
     assert snap.win_rate == "-" and snap.all_win_rate == "-"
 
     tracker.start_macro()
+    # A run starts in the lobby, so starting it must not start the match clock: `-`, not a
+    # duration that would go on to count the navigation and the join as match time.
+    assert tracker.snapshot().stage_time == "-", tracker.snapshot().stage_time
+
     tracker.record(True)
     tracker.record(True)
     tracker.record(False)
@@ -147,5 +151,21 @@ with tempfile.TemporaryDirectory() as root:
     with open(os.path.join(root, "settings.json"), encoding="utf-8") as handle:
         saved = json.load(handle)
     assert saved["stats"] == {"wins": 2, "losses": 1}, saved
+
+# # The match clock: Start Game to the result screen, and nothing either side of it.
+with tempfile.TemporaryDirectory() as root:
+    clock = StatsTracker(root)
+    clock.start_macro()
+    clock.start_stage()
+    assert clock.snapshot().stage_time != "-"
+    clock.end_stage()
+    frozen = clock.snapshot().last_stage_seconds
+    assert frozen > 0, frozen
+    assert clock.snapshot().stage_time == "-", "the clock stops at the result screen"
+    # `record` runs after the result screenshot's delay: it must neither extend the match
+    # nor start a clock for a match that hasn't begun.
+    clock.record(True)
+    assert clock.snapshot().last_stage_seconds == frozen
+    assert clock.snapshot().stage_time == "-"
 
 print("webhook + stats: OK")

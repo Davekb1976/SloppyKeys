@@ -45,8 +45,8 @@ class RunStats:
     macro_seconds: float = 0.0
     stage_seconds: float = 0.0
     # How long the match that just finished took. Separate from `stage_seconds`, which is
-    # the clock on the match *in progress*: `record()` restarts that clock, so anything
-    # reading it after a result — every win/loss embed did — got 0:00:00.
+    # the clock on the match *in progress* and reads 0 between matches: anything reporting
+    # a duration after a result — every win/loss embed — wants this one.
     last_stage_seconds: float = 0.0
     last_run: str = "-"
 
@@ -72,6 +72,10 @@ class RunStats:
 
     @property
     def stage_time(self) -> str:
+        """The match in progress, or `-` when there isn't one — the lobby chain, a
+        placement pass and the result screen are all outside a match."""
+        if self.stage_seconds <= 0:
+            return "-"
         return format_duration(self.stage_seconds)
 
     @property
@@ -133,24 +137,44 @@ class StatsTracker:
     def start_macro(self) -> None:
         """Called when a run starts. Session counters are deliberately *not* reset:
         a session is the app's lifetime, so stopping and restarting F1 keeps adding
-        to it, which is what someone farming all evening expects."""
+        to it, which is what someone farming all evening expects.
+
+        The match clock is **not** started here. A run begins in the lobby and the first
+        match is several screens away, so starting both together timed the navigation,
+        the join and the pre-placement pass as if they were part of the match.
+        """
         self._macro_start = time.monotonic()
-        self._stage_start = self._macro_start
 
     def stop_macro(self) -> None:
         self._macro_start = None
         self._stage_start = None
 
     def start_stage(self) -> None:
+        """A match has begun. Called when the in-match Start Game click lands, which is
+        the moment the waves start — the only event that means "the match is running"."""
         self._stage_start = time.monotonic()
+
+    def end_stage(self) -> None:
+        """A match has finished: freeze its duration and stop the clock.
+
+        Called the moment the win or defeat screen is matched, not when the result is
+        recorded — the result screenshot waits out the reward animation in between, and
+        that second belongs to neither match.
+
+        Idempotent: a second call keeps the frozen duration, so `record()` can call it
+        without knowing whether the caller already did.
+        """
+        if self._stage_start is None:
+            return
+        self._last_stage = max(0.0, time.monotonic() - self._stage_start)
+        self._stage_start = None
 
     # # Outcomes
     def record(self, won: bool) -> None:
-        # Capture how long this match took *before* `start_stage()` below zeroes the clock
-        # for the next one. Every win/loss embed is built after this call, which is why
-        # they all reported a stage time of 0:00:00.
-        if self._stage_start is not None:
-            self._last_stage = max(0.0, time.monotonic() - self._stage_start)
+        # A no-op when the outcome step already ended the match, which is the normal path.
+        # Kept as a backstop so a result counted from anywhere else still freezes the clock
+        # rather than leaving it running into the next match.
+        self.end_stage()
         if won:
             self.wins += 1
             self._all_wins += 1
@@ -160,7 +184,6 @@ class StatsTracker:
             self._all_losses += 1
             self._last_run = "Loss"
         self._write()
-        self.start_stage()
 
     def snapshot(self) -> RunStats:
         now = time.monotonic()

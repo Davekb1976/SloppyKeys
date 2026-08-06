@@ -2435,6 +2435,10 @@ class MainWindow(QWidget):
 
     def _record_outcome(self, won: bool) -> None:
         """Called from the macro worker: count it, tell the UI, tell Discord."""
+        # First, before anything that waits: the result screen is what just matched, so
+        # this is the end of the match. `_result_screenshot` below sleeps out the reward
+        # animation, and that second is not match time.
+        self._stats.end_stage()
         # Read by the "Next task" step, which runs straight after this one.
         self._last_won = won
         # Spend the challenge run *here*, not in `note_match`, for two reasons: the game
@@ -2519,9 +2523,17 @@ class MainWindow(QWidget):
         Costs one `move_script`, and only once per match cycle. No wait afterwards: the
         search polls on a deadline, so it picks the button up the moment the tooltip fades.
         Also covers the post-Repeat entry to this step, where the cursor is left on Repeat.
+
+        Starts the match clock on the way out. This click is the start of the match — the
+        lobby chain, the join and the pre-placement pass all happen before it, and timing
+        them as match time is what made `last match` read minutes longer than the match.
         """
         self._placer.park()
-        return self._nav.click_start_game()
+        ok, message = self._nav.click_start_game()
+        if ok:
+            self._stats.start_stage()
+            self.statsChanged.emit()
+        return (ok, message)
 
     def _repeat_step(self) -> MacroStep:
         """After a win, click Repeat on the victory screen so the next match can start.
