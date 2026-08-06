@@ -385,30 +385,6 @@ def load_reference(
 
 
 
-def save_reference(
-    images_dir: str,
-    gamemode: str,
-    stage: str,
-    act: str,
-    pixmap: QPixmap,
-) -> str | None:
-    """Write `pixmap` as the reference for this target. Returns the path, or None.
-
-    With an act it writes the **per-act** file, which is the point: two acts can
-    share a map and still be different areas of it, so one picture per map would
-    show the wrong playfield for all but one of them. `load_reference` still falls
-    back to the per-map file, so nothing that already has one changes.
-    """
-    path = reference_path(images_dir, gamemode, stage, act)
-    if path is None:
-        return None
-    try:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-    except OSError:
-        return None
-    return path if pixmap.save(path, "PNG") else None
-
-
 def capture_pixmap(rect: tuple[int, int, int, int]) -> QPixmap | None:
     """Grab the Roblox client area with mss (already a dependency for image
     search). Returns None if the capture fails rather than raising into the UI."""
