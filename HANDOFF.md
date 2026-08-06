@@ -1,7 +1,13 @@
-﻿# HANDOFF
+﻿# HANDOFF — FROZEN, NOT MAINTAINED
 
-Keep this file under ~250 lines. Facts, file names, current state. No investigation narrative, no
-changelog, no re-explaining code comments. Rules at the bottom.
+**Do not update this file.** `git log` is the history and a commit's `Untested:` footer is the
+untested list (`git log --grep Untested`); see `.kiro/steering/version-control.md`. The durable rules
+that were here — the ban surface, the calibration constants, the dead ends not to retry, the Qt and
+threading traps — now live in `.kiro/steering/coding-standards.md`.
+
+Kept only as a snapshot of the state at the first commit: the build/installer specifics, the
+re-calibration table, and what had not been exercised in game at that point. Treat every claim below as
+dated and verify before relying on it.
 
 **Now:** the viewport is **1152×756**, the client size Cream's Anime Expeditions macro uses
 (`core/config.py::FIXED_WIN_W/H` there) — picked because it is proven on many machines, not just this one.
@@ -601,20 +607,5 @@ templates are re-captured at 1152×756 but no full run has been watched since.
 
 ## Rules for this file
 
-**This is not a changelog. `git log` is.** See `.kiro/steering/version-control.md` — a fix, its root cause
-and the evidence for it belong in a commit message, not here.
-
-What stays here is only what a commit history cannot answer:
-
-- What works, and what is **untested in game**.
-- Measured constants that live in code and why they are load-bearing (the viewport size, `PITCH_DELTA`, the
-  OCR boxes).
-- Dead ends not to retry.
-- The module map.
-
-- Edit sections in place. No dated entries, no second handoff file.
-- An item described as broken here **is** broken. When the user moves on to another topic, close the previous
-  fix out in that turn: delete its Untested entry and any "in progress" wording.
-- Don't promote anything on the strength of `compileall` or a probe. Say "untested".
-- **611 lines today against a ~250 budget.** Every edit should leave it shorter. Cut the story of how a bug
-  was found first — that is what commit bodies are for now.
+There are none: it is frozen. Record work in commits (`.kiro/steering/version-control.md`) and durable
+rules in `.kiro/steering/coding-standards.md`.
