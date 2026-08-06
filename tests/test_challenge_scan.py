@@ -141,7 +141,7 @@ assert tracker.candidates() == [], "nothing until it is read again"
 
 
 # # TaskDirector: challenges preempt, a loss skips, targets take turns by limit
-from sloppykeys.config.tasks import KIND_CHALLENGE, KIND_TARGET, TaskSlot  # noqa: E402
+from sloppykeys.config.tasks import KIND_TARGET, TaskSlot  # noqa: E402
 from sloppykeys.macro.tasks import (  # noqa: E402
     DO_CHALLENGE,
     DO_NOTHING,
@@ -184,7 +184,7 @@ live.note_reads(
         ChallengeRead(slot=3, state=STATE_EXHAUSTED),
     ]
 )
-director = TaskDirector(slots=[TaskSlot(kind=KIND_CHALLENGE), story], tracker=live)
+director = TaskDirector(slots=[story], tracker=live, challenges=True)
 first = director.decide()
 assert first.kind == DO_CHALLENGE and first.challenge.slot == 1, first
 # **Winning** it also consumes the row: one run of each per rotation, so the next
@@ -211,8 +211,9 @@ assert not live.is_skipped(1), "new maps, so the old losses stop applying"
 live.note_reads([ChallengeRead(slot=1, state=STATE_RUNNABLE, map_name="Rose Kingdom")])
 assert director.decide(later).kind == DO_CHALLENGE, "a fresh scan puts challenges first again"
 
-# No challenge slot in the queue means challenges never run, whatever the panel says.
-# That is the only switch — there is no Settings toggle left to get out of step with it.
+# Challenges off means they never run, whatever the panel says. The toggle is the only
+# switch — a challenge is no longer one of the three queue slots, so there is no queued
+# slot that can disagree with it.
 read_but_unqueued = ChallengeTracker()
 read_but_unqueued.note_reads([ChallengeRead(slot=1, state=STATE_RUNNABLE, map_name="Rose Kingdom")])
 targets_only = TaskDirector(slots=[story], tracker=read_but_unqueued)
@@ -221,16 +222,16 @@ assert targets_only.decide().kind == DO_TARGET
 
 # current_target ignores challenges, so a caller that can't run one yet still gets on
 # with the queue instead of refusing to start.
-both = TaskDirector(slots=[TaskSlot(kind=KIND_CHALLENGE), story, raid], tracker=live)
+both = TaskDirector(slots=[story, raid], tracker=live, challenges=True)
 assert both.current_target() is story
 both.note_match(TaskDecision(kind=DO_TARGET, slot=story), won=True)
 both.note_match(TaskDecision(kind=DO_TARGET, slot=story), won=True)
 assert both.current_target() is raid, "the limit moved it along"
-assert TaskDirector(slots=[TaskSlot(kind=KIND_CHALLENGE)]).current_target() is None
+assert TaskDirector(challenges=True).current_target() is None
 
-# Challenges queued but nothing read yet, with no target: nothing to do rather than a
-# guess at what the panel might hold.
-empty = TaskDirector(slots=[TaskSlot(kind=KIND_CHALLENGE)], tracker=ChallengeTracker())
+# Challenges on but nothing read yet, with no target: nothing to do rather than a guess at
+# what the panel might hold.
+empty = TaskDirector(tracker=ChallengeTracker(), challenges=True)
 assert empty.decide().kind == DO_NOTHING
 
 print("challenge scan: OK")
