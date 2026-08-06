@@ -94,12 +94,16 @@ jobs:
       # Python, not an inline PowerShell string: the notes are markdown full of backticks
       # and a backtick is PowerShell's escape character, so the inline version died at the
       # first code fence with "Unexpected token". See .github/release_notes.py.
+      #
+      # The **path argument, not `> notes.md`**: PowerShell re-encodes a redirected native
+      # command's output, which shipped the 0.1.0 notes with two `U+FFFD` where the template
+      # has em dashes. Python writes the file as UTF-8 itself.
       - name: notes
         run: |
           python .github/release_notes.py `
             '${{ steps.version.outputs.version }}' `
             '${{ steps.version.outputs.tag }}' `
-            '${{ github.repository }}' > notes.md
+            '${{ github.repository }}' notes.md
           Get-Content notes.md
 
       # Only a tag push publishes. A dry run stops here and hands the artifacts back, so the

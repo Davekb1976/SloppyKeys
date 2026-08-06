@@ -1,6 +1,13 @@
 """Render the GitHub release notes for a tag.
 
-    python .github/release_notes.py 0.1.1 v0.1.1 owner/repo > notes.md
+    python .github/release_notes.py 0.1.1 v0.1.1 owner/repo notes.md
+    python .github/release_notes.py 0.1.1 v0.1.1 owner/repo          # to stdout, to read
+
+**Write through the path argument, never `> notes.md`.** PowerShell decodes a native
+command's stdout with the console encoding and re-encodes it on the way to the file, so the
+em dashes in the template below left the runner as cp1252 `0x97` — one invalid byte in a
+file GitHub reads as UTF-8. The published 0.1.0 notes carry two `U+FFFD` because of it. With
+a path, Python writes the bytes itself with `encoding="utf-8"` and nothing re-encodes them.
 
 **The changelog is the release description.** Setup instructions belong in the README, which
 is one link away and stays current; repeating them in every release means a reader scrolls
@@ -72,9 +79,10 @@ def previous_tag(tag: str) -> str:
 
 
 def main() -> None:
-    if len(sys.argv) != 4:
-        raise SystemExit(f"usage: {sys.argv[0]} <version> <tag> <owner/repo>")
+    if len(sys.argv) not in (4, 5):
+        raise SystemExit(f"usage: {sys.argv[0]} <version> <tag> <owner/repo> [out.md]")
     version, tag, repo = sys.argv[1:4]
+    out = sys.argv[4] if len(sys.argv) == 5 else ""
     repo_url = f"https://github.com/{repo}"
     sums = pathlib.Path("SHA256SUMS.txt").read_text(encoding="utf-8").strip()
     previous = previous_tag(tag)
@@ -83,16 +91,18 @@ def main() -> None:
         if previous
         else "First tagged release."
     )
-    sys.stdout.write(
-        TEMPLATE.format(
-            changelog=changelog(tag),
-            version=version,
-            tag=tag,
-            repo_url=repo_url,
-            sums=sums,
-            changes=changes,
-        )
+    notes = TEMPLATE.format(
+        changelog=changelog(tag),
+        version=version,
+        tag=tag,
+        repo_url=repo_url,
+        sums=sums,
+        changes=changes,
     )
+    if not out:
+        sys.stdout.write(notes)
+        return
+    pathlib.Path(out).write_text(notes, encoding="utf-8")
 
 
 if __name__ == "__main__":
