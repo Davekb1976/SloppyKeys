@@ -123,7 +123,9 @@ SHIPPED_SETTINGS_KEYS = (
     "run_challenges",
     "hard_mode",
     "expedition_difficulty",
+    "camera_once_per_session",
     "keybinds",
+    "game_keys",
     "delays",
     "start_position",
 )
