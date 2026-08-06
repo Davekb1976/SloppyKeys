@@ -2686,9 +2686,26 @@ class MainWindow(QWidget):
                 self._director.note_match(decision, True)
                 return StepResult.DONE
 
+            # **Leave the match before handing over.** The next task needs a whole new
+            # chain and it starts wherever the macro is standing — which, at this point in
+            # the cycle, is the result screen. Every other handover out of a match already
+            # clicks Match Play (`_rescan_challenges_after_match`, the challenge branch
+            # above); a target-to-target switch was the one that didn't, so the new chain
+            # opened with the lobby's Play against a victory screen and died on
+            # `Play not found (best 0.54 < 0.70)`.
+            ok, message = self._nav.leave_match()
+            self._log(f"  Switching to {wanted.label()} — leaving match: {message}")
+            if not ok:
+                # Still on the result screen, so no chain can start. Stopping says so;
+                # carrying on would fail the same way one step later with a worse message.
+                return StepResult.FAILED
+            # Match Play lands on the gamemode panel, so the next chain starts there:
+            # Change gamemode, then the card. Events ignores this and finds the lobby
+            # itself (`_route_steps`) — its button doesn't exist on that panel.
+            self._entry_screen = ENTRY_MODE_PANEL
+
             self._pending_target = wanted
             self._pending_plan = plan
-            self._log(f"  Switching to {wanted.label()} after this match.")
             self._runner.request_stop()
             return StepResult.DONE
 
