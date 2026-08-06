@@ -15,6 +15,12 @@ the same map, so each needs its own).
 Use the per-map file when every act looks the same, the per-act files when they
 don't. A missing per-act file falls back to the per-map one, then to a live capture.
 
+**Don't mix the two for one map.** The per-act file wins, and only Raid and Events get
+per-act rows in Settings > Vision (`image_manager.PER_ACT_MAPS`) — so a per-act file
+under a per-map gamemode like Story is used by the picker and shown nowhere in the UI,
+which reads as the app having picked a backdrop out of nowhere. `Story/School
+Grounds/Act 1.png` sat next to `Story/School Grounds.png` and shadowed it that way.
+
 Drop the files in by hand. Capture them at the pinned **800x599** client size, from
 inside the stage, with the macro's camera already set: a stored coordinate only
 points at the same ground while the camera angle matches. A file at another size
