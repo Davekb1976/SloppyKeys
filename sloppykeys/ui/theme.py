@@ -12,8 +12,14 @@ from __future__ import annotations
 # height shows up as dead space under the run strip (and as a drag outline taller than
 # the content); a shortfall clips the strip.
 WINDOW_WIDTH = 1690
-WINDOW_HEIGHT = 1004
-TITLEBAR_HEIGHT = 40
+WINDOW_HEIGHT = 1012
+# The drag strip. 8px taller than the card inside it (`TITLEBAR_CARD_HEIGHT`), and that 8px
+# is a *top* margin: the card was flush against the window's top edge, which read as a band
+# stuck to the frame rather than a card. `WINDOW_HEIGHT` grew by the same 8 so the
+# viewport/strip budget below stays balanced. Headroom checked: the primary screen reports
+# 1032px available, so 1012 still fits with room to spare.
+TITLEBAR_HEIGHT = 48
+TITLEBAR_CARD_HEIGHT = 40
 RAIL_WIDTH = 78
 
 # # Viewport — Roblox's client area is resized to exactly this.
@@ -114,8 +120,9 @@ def stylesheet() -> str:
     }}
     QWidget#root {{ background: {INK_900}; }}
     /* The titlebar itself is only the drag strip — transparent, so the card inside it
-       reads as a sibling of the rail and the page rather than a full-bleed band. Its
-       total height stays TITLEBAR_HEIGHT: the window height budget depends on it. */
+       reads as a sibling of the rail and the page rather than a band stuck to the window
+       edge. The strip is TITLEBAR_HEIGHT, the card TITLEBAR_CARD_HEIGHT, and the
+       difference is the gap above it. */
     QWidget#titlebar {{ background: transparent; }}
     QFrame#titlebarCard {{
         background: {INK_850};

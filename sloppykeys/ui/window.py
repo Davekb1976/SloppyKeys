@@ -350,13 +350,15 @@ class TitleBar(QWidget):
         self.setObjectName("titlebar")
         self.setFixedHeight(theme.TITLEBAR_HEIGHT)
 
-        # A card inside the drag strip, inset to the same 12px the body uses, so the
-        # titlebar reads as a sibling of the rail and the page instead of a flat band.
-        # The outer widget keeps the full TITLEBAR_HEIGHT and stays the drag target —
-        # the height budget in `theme.py` depends on it, and the inset margin is still
-        # draggable because it belongs to this widget.
+        # A card inside the drag strip, inset 12px at the sides like the body and 8px from
+        # the top so it doesn't sit flush against the window's edge. The outer widget keeps
+        # the full TITLEBAR_HEIGHT and stays the drag target — the height budget in
+        # `theme.py` depends on it, and the inset margin is still draggable because it
+        # belongs to this widget.
         outer = QHBoxLayout(self)
-        outer.setContentsMargins(12, 0, 12, 0)
+        outer.setContentsMargins(
+            12, theme.TITLEBAR_HEIGHT - theme.TITLEBAR_CARD_HEIGHT, 12, 0
+        )
         outer.setSpacing(0)
         card = QFrame()
         card.setObjectName("titlebarCard")
@@ -3852,7 +3854,9 @@ def _panel(widget: QWidget) -> QWidget:
 
 def _title_button(glyph: str, on_click, danger: bool) -> QLabel:
     button = QLabel(glyph)
-    button.setFixedSize(38, theme.TITLEBAR_HEIGHT)
+    # Shorter than the card it sits in, so its hover fill can't square off the card's
+    # rounded corners. It used to be the full strip height, when the strip had no card.
+    button.setFixedSize(38, theme.TITLEBAR_CARD_HEIGHT - 8)
     button.setAlignment(Qt.AlignmentFlag.AlignCenter)
     hover = theme.BAD if danger else theme.TEXT
     base = f"font-family: '{theme.ICON_FAMILY}'; font-size: 13px; color: {theme.TEXT_DIM};"
