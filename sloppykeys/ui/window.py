@@ -617,6 +617,9 @@ class MainWindow(QWidget):
         self._gamemode: str | None = None
         self._tester: MacroTesterWindow | None = None
         self._ws_rail = "run"
+        # `screenChanged` is connected once, from the first `showEvent` — that is the
+        # earliest point `windowHandle()` exists, and showEvent fires again on every restore.
+        self._screen_hooked = False
 
         self._build_ui()
         self._connect()
@@ -4038,13 +4041,46 @@ class MainWindow(QWidget):
         invented. Deferred as well as immediate, because Windows can apply its own geometry
         after this event — the same reason `changeEvent` does it twice.
 
-        No `screenChanged` hook here. One existed and re-ran this on every monitor move; it
-        caused window glitches and never fixed the drag ghost it was written for (that was
-        `DragFullWindows = 0` — see `TitleBar.mousePressEvent`).
+        No `screenChanged` hook calls *this*. One did, re-running it on every monitor move;
+        it caused window glitches and never fixed the drag ghost it was written for (that was
+        `DragFullWindows = 0` — see `TitleBar.mousePressEvent`). `_hook_screen_changes` below
+        uses that signal for the refresh rate, which reads state and touches no geometry.
         """
         super().showEvent(event)
         self._enforce_window_size()
         QTimer.singleShot(0, self._enforce_window_size)
+        self._hook_screen_changes()
+
+    def _hook_screen_changes(self) -> None:
+        """Re-read the game monitor's refresh rate when this window moves to another display.
+
+        Without it, `_sync_refresh_rate` ran once — on the first attach — so dragging the
+        macro (and the Roblox window glued to it) from a 165Hz panel to a 60Hz one left every
+        AHK timing sized for 165Hz. Each settle then covers 2.75x fewer rendered frames, and
+        Roblox acts on the last mouse-move it *processed*, one per frame: the click lands on a
+        stale cursor position. Measured here as `165Hz` and `60Hz` on two displays that are
+        both 1920x1080 at 100% scaling, which is why it reads as the macro misbehaving on one
+        monitor for no visible reason.
+
+        Connected from `showEvent` because `windowHandle()` is None until the native window
+        exists, and guarded so the repeat showEvents on restore don't stack connections.
+        """
+        handle = self.windowHandle()
+        if handle is None or self._screen_hooked:
+            return
+        self._screen_hooked = True
+        handle.screenChanged.connect(self._on_screen_changed)
+
+    def _on_screen_changed(self, _screen) -> None:
+        """`screenChanged` passes the new QScreen, which nothing here needs — the monitor is
+        resolved from the *Roblox* window, not ours, and those can differ while dragging.
+
+        Skipped with nothing attached: `refresh_hz_for_window(None)` answers the 60Hz default
+        and would pin 60Hz timings for a session that later attaches on a 165Hz panel.
+        """
+        if self._roblox_hwnd is None:
+            return
+        self._sync_refresh_rate()
 
     def moveEvent(self, event) -> None:
         # Keep Roblox glued to the viewport hole while the window is dragged.
