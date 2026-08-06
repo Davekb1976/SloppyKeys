@@ -46,7 +46,7 @@
         <path d="M11 9v14M11 16l8-7M11 16l8 7" fill="none" stroke="url(#g-mark)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
       <span class="brand-name">SloppyKeys</span>
-      <span class="pill pill-v">v0.3.0</span>
+      <span class="pill pill-v" data-sk-version="v{v}">v0.1.0</span>
     </a>
 
     <nav class="nav-links" aria-label="Sections">
@@ -54,6 +54,7 @@
       <a href="#how">How it works</a>
       <a href="#modes">Gamemodes</a>
       <a href="#faq">FAQ</a>
+      <a href="https://github.com/Davekb1976/SloppyKeys">GitHub</a>
     </nav>
 
     <a class="btn btn-primary btn-sm" href="#download">
@@ -73,7 +74,7 @@
     <div class="hero-copy">
       <div class="badge reveal">
         <span class="dot"></span>
-        Release 0.3.0 · Windows only
+        Release <span data-sk-version="{v}"> </span>0.1.0</span> · Windows only
       </div>
 
       <h1 class="reveal" data-delay="60">
@@ -111,7 +112,7 @@
         </div>
         <div class="stat">
           <dt>Viewport</dt>
-          <dd class="mono small">816<span class="x">×</span>638</dd>
+          <dd class="mono small">1152<span class="x">×</span>756</dd>
         </div>
         <div class="stat">
           <dt>Hotkey</dt>
@@ -126,8 +127,8 @@
         <div class="app-titlebar">
           <span class="mini-mark" aria-hidden="true"></span>
           <span class="app-brand">SloppyKeys</span>
-          <span class="pill pill-tiny">v0.3.0</span>
-          <span class="pill pill-tiny pill-good">816×638</span>
+          <span class="pill pill-tiny" data-sk-version="v{v}">v0.1.0</span>
+          <span class="pill pill-tiny pill-good">1152×756</span>
           <span class="spacer"></span>
           <span class="pill pill-tiny pill-mode">Story</span>
           <span class="session"><em>SESSION</em><b id="mockTimer">00:00:00</b></span>
@@ -208,7 +209,7 @@
           so you watch the run in the same window you control it from.
         </p>
         <ul class="ticks">
-          <li>Client area pinned to 816×638 for stable coordinates</li>
+          <li>Client area pinned to 1152×756 for stable coordinates</li>
           <li>DPI scaling disabled — 1 logical pixel is 1 real pixel</li>
           <li>Minimize-safe: geometry sync guards against off-screen flings</li>
         </ul>
@@ -393,8 +394,8 @@
   <div class="wrap">
     <div class="head reveal">
       <span class="eyebrow">Download</span>
-      <h2>Get 0.3.0 running</h2>
-      <p>Source release. Python and AutoHotkey v2 do the heavy lifting, so there's nothing to install beyond them.</p>
+      <h2>Get it running</h2>
+      <p>A per-user installer — no admin prompt. Add AutoHotkey v2 and you're done.</p>
     </div>
 
     <div class="dl">
@@ -402,31 +403,35 @@
         <div class="dl-top">
           <div>
             <span class="eyebrow">Latest release</span>
-            <h3>SloppyKeys <span class="grad">0.3.0</span></h3>
-            <p class="dl-note">Windows 10 / 11 · x64 · source archive</p>
+            <h3>SloppyKeys <span class="grad" data-sk-version="{v}">0.1.0</span></h3>
+            <p class="dl-note">Windows 10 / 11 · x64 · installer or portable zip</p>
           </div>
           <span class="os-badge" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M3 5.8 10.3 4.8v6.6H3zM11.5 4.6 21 3.2v8.2h-9.5zM3 12.6h7.3v6.6L3 18.2zM11.5 12.6H21v8.2l-9.5-1.4z" fill="currentColor"/></svg>
           </span>
         </div>
 
-        <a class="btn btn-primary btn-lg btn-block" href="#" data-noop>
+        <a class="btn btn-primary btn-lg btn-block" href="https://github.com/Davekb1976/SloppyKeys/releases/latest" data-sk-setup>
           <span class="btn-glow" aria-hidden="true"></span>
           <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4.5-4.5M12 15l-4.5-4.5M4 19h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Download SloppyKeys 0.3.0
+          Download the installer
         </a>
-        <p class="dl-hint">Point this at your release archive or repo when you publish it.</p>
+        <p class="dl-hint">
+          Prefer no installer? The
+          <a href="https://github.com/Davekb1976/SloppyKeys/releases/latest">release page</a>
+          also has a portable zip and the SHA-256 of both. Neither is code-signed, so
+          SmartScreen will warn about an unknown publisher.
+        </p>
 
         <div class="terminal">
           <div class="terminal-bar">
             <span class="tdots" aria-hidden="true"><i></i><i></i><i></i></span>
-            <span class="mono terminal-title">PowerShell — project root</span>
+            <span class="mono terminal-title">PowerShell — or run from source</span>
             <button class="copy" type="button" data-copy="#cmds" aria-label="Copy setup commands">Copy</button>
           </div>
-          <pre class="mono" id="cmds"># install dependencies (first time only)
+          <pre class="mono" id="cmds">git clone https://github.com/Davekb1976/SloppyKeys
+py -3.14 -m venv .venv
 .venv\Scripts\python.exe -m pip install -r requirements.txt
-
-# launch
 .venv\Scripts\python.exe main.py</pre>
         </div>
       </div>
@@ -435,9 +440,9 @@
         <div class="side-card reveal" data-delay="60" data-spotlight>
           <h4>Requirements</h4>
           <ul class="ticks">
-            <li>Windows 10 or 11 — Win32 only, no Linux or macOS build</li>
-            <li>Python 3 with the bundled virtual environment</li>
-            <li>AutoHotkey v2 for synthetic input</li>
+            <li>Windows 10 or 11, x64 — Win32 only, no Linux or macOS build</li>
+            <li><a href="https://www.autohotkey.com/">AutoHotkey v2</a> — every click and keypress goes through it</li>
+            <li>Display scaling at 100%, or template matching fails</li>
             <li>Roblox, windowed</li>
           </ul>
         </div>
@@ -445,9 +450,10 @@
         <div class="side-card reveal" data-delay="120" data-spotlight>
           <h4>Default hotkeys</h4>
           <div class="bind"><span>Start / Stop</span><kbd>F1</kbd></div>
+          <div class="bind"><span>Stop</span><kbd>F2</kbd></div>
           <div class="bind"><span>Reload</span><kbd>F3</kbd></div>
           <div class="bind"><span>Macro Tester</span><span class="kbd-row"><kbd>Ctrl</kbd><span>+</span><kbd>T</kbd></span></div>
-          <p class="side-note">All three are rebindable in Settings → Keybinds.</p>
+          <p class="side-note">All four are rebindable in Settings → Keybinds.</p>
         </div>
       </aside>
     </div>
@@ -469,15 +475,19 @@
       </details>
       <details class="reveal" data-delay="40">
         <summary>Why does the Roblox window get resized?<span class="chev" aria-hidden="true"></span></summary>
-        <p>Every coordinate and template is captured at an 816×638 client area with DPI scaling disabled. Pinning that size is what makes clicks land in the right place on any display.</p>
+        <p>Every coordinate and template is captured at a 1152×756 client area with DPI scaling disabled. Pinning that size is what makes clicks land in the right place on any display — and it's why Windows display scaling has to be 100%: a template cropped at 100% scores as a different image at 125%.</p>
       </details>
       <details class="reveal" data-delay="80">
         <summary>Can I add a map or tweak the timing?<span class="chev" aria-hidden="true"></span></summary>
         <p>Yes. Content lives in data tables — gamemodes, maps, acts, start sequences, images and search regions. Delays and keybinds are editable live in Settings and saved to <span class="mono">settings.json</span>.</p>
       </details>
       <details class="reveal" data-delay="120">
-        <summary>Is the full auto-run loop finished?<span class="chev" aria-hidden="true"></span></summary>
-        <p>Not in 0.3.0. Camera setup and lobby navigation are verified for Story and runnable step by step in the Macro Tester. Chaining them into the F1 loop, plus in-match unit placement, is what's next.</p>
+        <summary>Does it run a full session on its own?<span class="chev" aria-hidden="true"></span></summary>
+        <p>Yes. F1 walks the lobby, starts the stage, places your units, watches for the result and goes again. Queue up to three targets with a run limit each, and daily challenges preempt the queue while any are left. Every step is still runnable on its own in the Macro Tester when something needs tuning.</p>
+      </details>
+      <details class="reveal" data-delay="140">
+        <summary>Does it update itself?<span class="chev" aria-hidden="true"></span></summary>
+        <p>If you want it to. It checks GitHub once per launch and tells you when there's a newer release; nothing downloads until you click. An installed copy can update in place, and the download is verified against the checksum published with the release. One toggle turns the whole thing off.</p>
       </details>
       <details class="reveal" data-delay="160">
         <summary>Will this get my account banned?<span class="chev" aria-hidden="true"></span></summary>
@@ -494,7 +504,7 @@
     <p>Set a target, hit <kbd>F1</kbd>, go do something better.</p>
     <a class="btn btn-primary btn-lg" href="#download">
       <span class="btn-glow" aria-hidden="true"></span>
-      Download 0.3.0
+      Download <span data-sk-version="{v}"></span>0.1.0</span>
     </a>
   </div>
 </section>
@@ -511,10 +521,11 @@
       <span>SloppyKeys</span>
     </div>
     <p class="disclaimer">
-      An unofficial fan-made tool. Not affiliated with, endorsed by, or connected to Roblox
-      Corporation or the developers of Anime Expedition. Use at your own risk.
+      An unofficial fan-made tool, MIT licensed. Not affiliated with, endorsed by, or
+      connected to Roblox Corporation or the developers of Anime Expedition. Automating a
+      game may breach its terms of service — use at your own risk.
     </p>
-    <span class="footer-v mono">v0.3.0</span>
+    <span class="footer-v mono" data-sk-version="v{v}">v0.1.0</span>
   </div>
 </footer>
 

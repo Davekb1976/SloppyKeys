@@ -193,13 +193,41 @@
     });
   }
 
-  /* ── placeholder download link ──────────────────────────
-     Stays honest until a real release URL is wired in: swap the
-     href on the [data-noop] button and delete this block.        */
-  for (const link of $$("[data-noop]")) {
-    link.addEventListener("click", (ev) => {
-      ev.preventDefault();
-      alert("No release URL wired up yet — point this button at your release archive or repo.");
-    });
+  /* ── latest release ─────────────────────────────────────
+     Every version on the page is markup with a fallback already in it, so the page is
+     correct-ish with JS off and exact with it on. `data-sk-version` holds a template
+     ("v{v}" or "{v}"); `[data-sk-setup]` gets pointed straight at the installer asset.
+
+     The static fallbacks are only bumped when the site is next touched — that is the
+     point of fetching: nobody has to remember.                    */
+  const REPO = "Davekb1976/SloppyKeys";
+
+  async function showLatestRelease() {
+    let release;
+    try {
+      const response = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
+        headers: { Accept: "application/vnd.github+json" },
+      });
+      if (!response.ok) return;  // no releases yet, or rate-limited: keep the fallbacks
+      release = await response.json();
+    } catch (err) {
+      return;  // offline. The markup already says something sensible.
+    }
+
+    const version = String(release.tag_name || "").replace(/^v/, "");
+    if (!/^\d+\.\d+\.\d+$/.test(version)) return;
+    for (const node of $$("[data-sk-version]")) {
+      node.textContent = node.dataset.skVersion.replace("{v}", version);
+    }
+
+    const setup = (release.assets || []).find(
+      (asset) => asset.name === `SloppyKeys-Setup-${version}.exe`
+    );
+    if (!setup) return;
+    for (const link of $$("[data-sk-setup]")) {
+      link.href = setup.browser_download_url;
+    }
   }
+
+  showLatestRelease();
 })();
