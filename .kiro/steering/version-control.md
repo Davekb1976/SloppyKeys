@@ -55,6 +55,23 @@ scale, so no threshold can separate a fading button from a live one.
 Untested: no challenge run since.
 ```
 
+## Releasing
+
+**Only when the user says "release".** Never cut one because a change looks finished, and
+never as the tail end of another task. A tag can't be moved once it's pushed.
+
+When they say it, one commit, and it is the only commit that breaks the format above:
+
+```
+Release 0.1.1
+
+<the changes since the last release, one line each>
+```
+
+That is `bump_version.py`, which writes the subject and collects the body from the commits
+since the previous tag, then pushes the tag that `release.yml` builds. Run it; don't hand-
+roll the commit. Patch carries at 10 — `0.1.9` is followed by `0.2.0`.
+
 ## Branch and push
 
 Work on `main`; a branch per fix is ceremony in a private single-author repo.

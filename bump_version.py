@@ -1,14 +1,16 @@
-"""Bump the version, commit it, tag it, push it — which is what publishes a release.
+"""Cut a release: bump the version, commit it, tag it, push it.
 
     .venv\\Scripts\\python.exe bump_version.py            # 0.1.0 -> 0.1.1
     .venv\\Scripts\\python.exe bump_version.py --set 0.2.0
-    .venv\\Scripts\\python.exe bump_version.py --dry-run
+    .venv\\Scripts\\python.exe bump_version.py --dry-run  # prints the commit, changes nothing
 
 The push of tag `vX.Y.Z` is what `.github/workflows/release.yml` triggers on, so there is
-no separate "make a release" step: bump, and the installer appears on the Releases page.
+no separate "publish" step: run this and the installer appears on the Releases page.
 
-Patch carries at 10 (`version.py::bump`), which is the one rule a person gets wrong by
-hand, and the only reason this script exists rather than an edit and two git commands.
+The commit is `Release <version>` with the subjects of every commit since the previous tag
+as its body — deliberately not the `type(scope):` format the rest of the history uses, so a
+release is findable at a glance. Two things this script exists for, both of which a person
+gets wrong by hand: the carry at 10 (`version.py::bump`), and that summary.
 """
 
 from __future__ import annotations
@@ -46,6 +48,25 @@ def write_version(new: str) -> None:
         handle.write(patched)
 
 
+def changes_since(tag: str) -> str:
+    """The commit subjects since `tag`, as the release commit's body.
+
+    No tag yet (the first release) means everything, which is right — there is no earlier
+    release to diff against.
+    """
+    span = f"{tag}..HEAD" if tag else "HEAD"
+    log = run("git", "log", "--no-merges", "--pretty=%s", span)
+    lines = [f"- {line}" for line in log.splitlines() if line]
+    return "\n".join(lines) if lines else "- no commits since the last release"
+
+
+def previous_tag() -> str:
+    result = subprocess.run(
+        ("git", "describe", "--tags", "--abbrev=0"), cwd=HERE, capture_output=True, text=True
+    )
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--set", dest="exact", help="use this version instead of the next one")
@@ -65,13 +86,15 @@ def main() -> None:
     if dirty and not args.dry_run:
         raise SystemExit(f"Working tree is not clean; commit or stash first:\n{dirty}")
 
-    print(f"{VERSION} -> {new}, tag {tag}")
+    body = changes_since(previous_tag())
+    print(f"{VERSION} -> {new}, tag {tag}\n")
+    print(f"Release {new}\n\n{body}\n")
     if args.dry_run:
         return
 
     write_version(new)
     run("git", "add", "sloppykeys/version.py")
-    run("git", "commit", "-m", f"chore(release): {new}")
+    run("git", "commit", "-m", f"Release {new}", "-m", body)
     run("git", "tag", "-a", tag, "-m", f"SloppyKeys {new}")
     run("git", "push", "origin", "main")
     run("git", "push", "origin", tag)
