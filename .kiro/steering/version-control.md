@@ -80,5 +80,30 @@ Work on `main`; a branch per fix is ceremony in a private single-author repo.
 shouldn't have to prompt for it. Report the failure and carry on if the push fails — an
 unpushed commit is not a broken change.
 
-No force push, no `reset --hard`, no `--no-verify`, no amending a pushed commit. Amend only
-your own unpushed commit, to fold in something that belonged in it.
+### Say what the change is, plainly
+
+A subject is read months later by someone scrolling a list of forty of them. It has to name
+the thing that is different now, in the words the project already uses for it.
+
+- **Name the change, not the git operation.** `docs(steering): add rules for writing a
+  commit subject`, not `squash a correction into the commit it corrects`. Rebasing,
+  amending and squashing are how the commit got there; they are not what it does.
+- **Plain over clever.** No metaphor, no euphemism, no wording that sounds like something
+  is being tidied away. `fix(updates): delete the downloaded installer after installing`
+  beats "keep the download out of the way".
+- **Name the real subject when a fix has an odd shape.** `feat(build): release without
+  bumping the version` says it; "let the first release tag the version already in the file"
+  describes the plumbing and leaves the reader guessing.
+- **Proportional.** Don't write `feat` over a renamed variable or `fix` over a comment, and
+  don't let a subject imply a whole surface changed when one function did.
+- **The body states facts, not the conversation.** Root cause, the measurement, the option
+  rejected. Never why it was asked for, never what a previous commit got wrong, never
+  anything a reader could mistake for a motive. If the diff already says it, leave it out.
+
+### One commit per change
+
+A correction to a commit that isn't pushed yet belongs *in* it — amend, don't stack a second
+commit beside it. Once pushed, leave it: rewriting shared history needs asking first, and a
+tag with a published release behind it is frozen.
+
+No force push, no `reset --hard`, no `--no-verify` without being asked.
