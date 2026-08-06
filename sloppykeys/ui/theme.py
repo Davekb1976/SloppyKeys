@@ -174,13 +174,13 @@ def stylesheet() -> str:
         font-size: 11px;
         font-weight: 800;
     }}
-    /* Session clock, pinned to the bottom of the rail. Same tile treatment as the
+    /* Macro uptime, pinned to the bottom of the rail. Same tile treatment as the
        stat cards so the rail's foot matches the panels beside it. */
     /* 11px, not 13: the rail interior is RAIL_WIDTH minus its 6px margins, and the value
-       reaches `H:MM:SS` after an hour — it had room in the titlebar and does not here. */
-    QLabel#session {{ color: {CYAN}; font-size: 11px; font-weight: 800; }}
-    QLabel#sessionCap {{ color: {TEXT_FAINT}; font-size: 8px; font-weight: 800; }}
-    QFrame#railSession {{
+       is `H:MM:SS` from the first second — it had room in the titlebar and does not here. */
+    QLabel#uptime {{ color: {CYAN}; font-size: 11px; font-weight: 800; }}
+    QLabel#uptimeCap {{ color: {TEXT_FAINT}; font-size: 8px; font-weight: 800; }}
+    QFrame#railUptime {{
         background: {INK_800};
         border: 1px solid {LINE};
         border-radius: 8px;

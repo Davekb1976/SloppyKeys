@@ -412,7 +412,7 @@ class TitleBar(QWidget):
         row.addWidget(self._gamemode_btn, 0, Qt.AlignmentFlag.AlignVCenter)
         row.addSpacing(10)
 
-        # The session clock used to sit here; it lives at the foot of the rail now.
+        # The uptime clock used to sit here; it lives at the foot of the rail now.
         for button in (
             _title_button(icons.MINIMIZE, on_minimize, danger=False),
             _title_button(icons.CLOSE, on_close, danger=True),
@@ -612,7 +612,6 @@ class MainWindow(QWidget):
         self._gamemode: str | None = None
         self._tester: MacroTesterWindow | None = None
         self._ws_rail = "run"
-        self._session_start = time.monotonic()
 
         self._build_ui()
         self._connect()
@@ -636,10 +635,10 @@ class MainWindow(QWidget):
         self._hotkeys.timeout.connect(self._poll_hotkeys)
         self._hotkeys.start(HOTKEY_MS)
 
-        self._session_timer = QTimer(self)
-        self._session_timer.timeout.connect(self._tick_session)
-        self._session_timer.start(1000)
-        self._tick_session()
+        self._clocks = QTimer(self)
+        self._clocks.timeout.connect(self._tick_clocks)
+        self._clocks.start(1000)
+        self._tick_clocks()
 
     # # Build
     def _build_ui(self) -> None:
@@ -678,7 +677,7 @@ class MainWindow(QWidget):
         rail_box.addStretch(1)
         # After the stretch, so it pins to the foot of the rail. Moved out of the titlebar:
         # it is ambient information, and the titlebar is for identity and window controls.
-        rail_box.addWidget(self._build_session_tile())
+        rail_box.addWidget(self._build_uptime_tile())
         body.addWidget(rail, 0)
 
         self._viewport = RobloxViewport(on_attach=self._on_attach)
@@ -933,26 +932,31 @@ class MainWindow(QWidget):
         self._titlebar.set_hints(self._hint_texts())
         self._load_profiles()
 
-    def _build_session_tile(self) -> QFrame:
-        """The session clock at the foot of the rail: caption over value, centred.
+    def _build_uptime_tile(self) -> QFrame:
+        """Macro uptime at the foot of the rail: caption over value, centred.
 
-        Its own tile (`#railSession`) rather than bare labels, so the rail ends on the same
+        The same number the Run panel's `Macro uptime` card and every Discord embed's
+        `macro up` carry, read from one `StatsTracker` snapshot — this used to be a
+        separate clock counting from app launch, which meant the rail and the phone
+        disagreed about how long the macro had been going.
+
+        Its own tile (`#railUptime`) rather than bare labels, so the rail ends on the same
         card treatment the stat panel uses. Width is whatever `RAIL_WIDTH` leaves after the
-        rail's 6px margins; the value is at 12px so `0:00:00` fits without eliding.
+        rail's 6px margins; the value is sized so `0:00:00` fits without eliding.
         """
         tile = QFrame()
-        tile.setObjectName("railSession")
+        tile.setObjectName("railUptime")
         box = QVBoxLayout(tile)
         box.setContentsMargins(4, 4, 4, 5)
         box.setSpacing(0)
-        caption = QLabel("SESSION")
-        caption.setObjectName("sessionCap")
+        caption = QLabel("UPTIME")
+        caption.setObjectName("uptimeCap")
         caption.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._session_label = QLabel("00:00")
-        self._session_label.setObjectName("session")
-        self._session_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._uptime_label = QLabel("0:00:00")
+        self._uptime_label.setObjectName("uptime")
+        self._uptime_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         box.addWidget(caption)
-        box.addWidget(self._session_label)
+        box.addWidget(self._uptime_label)
         return tile
 
     # # Pages / navigation
@@ -1041,7 +1045,7 @@ class MainWindow(QWidget):
             f"new maps {clock} · {left // 60}m {left % 60:02d}s"
         )
 
-    def _tick_session(self) -> None:
+    def _tick_clocks(self) -> None:
         # Piggyback on the existing 1s timer for the panel's two clocks, and only
         # while a run is up — no point redrawing labels nobody is watching change.
         if self._runner.is_running and self._right_stack.currentIndex() == 0:
@@ -1049,11 +1053,9 @@ class MainWindow(QWidget):
         if self._right_stack.currentIndex() == 0:
             # Counts down whether or not a run is up: it is a reason to *start* one.
             self._refresh_challenge_reset()
-        elapsed = int(time.monotonic() - self._session_start)
-        hours, rem = divmod(elapsed, 3600)
-        minutes, seconds = divmod(rem, 60)
-        text = f"{hours}:{minutes:02d}:{seconds:02d}" if hours else f"{minutes:02d}:{seconds:02d}"
-        self._session_label.setText(text)
+        # One source for every surface that reports how long the macro has been up: the
+        # rail, the Run panel and the Discord embeds all format this same snapshot.
+        self._uptime_label.setText(self._stats.snapshot().macro_time)
 
     # # Logging
     def _rotate_log_file(self) -> None:

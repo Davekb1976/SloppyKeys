@@ -30,7 +30,7 @@ was captured at that size.
 |---|---|---|
 | **Titlebar** | Top card, full width. Drags the window. | `ui/window.py` → `TitleBar` |
 | **Rail** | Left nav card: RUN / UNITS / SETTINGS. | `window.py` → `RAIL_ITEMS`, `RailButton` |
-| **SessionTile** | `SESSION` caption + running clock, pinned to the **foot** of the Rail. | `_build_session_tile` |
+| **UptimeTile** | `UPTIME` caption + macro uptime, pinned to the **foot** of the Rail. Same number as the Run panel's `Macro uptime` and the embeds' `macro up`. | `_build_uptime_tile` |
 | **Workspace** | Viewport + RunStrip on the left, RightPanel on the right. | `_build_workspace` |
 
 The gamemode **SelectorScreen** replaces the whole workspace, because picking a mode is a
