@@ -113,7 +113,15 @@ def stylesheet() -> str:
         font-size: 13px;
     }}
     QWidget#root {{ background: {INK_900}; }}
-    QWidget#titlebar {{ background: {INK_850}; }}
+    /* The titlebar itself is only the drag strip — transparent, so the card inside it
+       reads as a sibling of the rail and the page rather than a full-bleed band. Its
+       total height stays TITLEBAR_HEIGHT: the window height budget depends on it. */
+    QWidget#titlebar {{ background: transparent; }}
+    QFrame#titlebarCard {{
+        background: {INK_850};
+        border: 1px solid {LINE};
+        border-radius: 10px;
+    }}
     QWidget#rail {{
         background: {INK_850};
         border: 1px solid {LINE};
@@ -159,8 +167,17 @@ def stylesheet() -> str:
         font-size: 11px;
         font-weight: 800;
     }}
-    QLabel#session {{ color: {CYAN}; font-size: 13px; font-weight: 800; }}
+    /* Session clock, pinned to the bottom of the rail. Same tile treatment as the
+       stat cards so the rail's foot matches the panels beside it. */
+    /* 11px, not 13: the rail interior is RAIL_WIDTH minus its 6px margins, and the value
+       reaches `H:MM:SS` after an hour — it had room in the titlebar and does not here. */
+    QLabel#session {{ color: {CYAN}; font-size: 11px; font-weight: 800; }}
     QLabel#sessionCap {{ color: {TEXT_FAINT}; font-size: 8px; font-weight: 800; }}
+    QFrame#railSession {{
+        background: {INK_800};
+        border: 1px solid {LINE};
+        border-radius: 8px;
+    }}
     QLabel#h1 {{ font-size: 15px; font-weight: 700; }}
     QLabel#section {{ color: {TEXT_DIM}; font-size: 11px; font-weight: 700; }}
     QLabel#status {{ color: {TEXT_DIM}; font-size: 12px; }}

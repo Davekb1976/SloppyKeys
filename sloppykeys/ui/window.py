@@ -40,6 +40,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QFileDialog,
+    QFrame,
     QGridLayout,
     QHBoxLayout,
     QLabel,
@@ -349,8 +350,24 @@ class TitleBar(QWidget):
         self.setObjectName("titlebar")
         self.setFixedHeight(theme.TITLEBAR_HEIGHT)
 
-        row = QHBoxLayout(self)
-        row.setContentsMargins(14, 0, 8, 0)
+        # A card inside the drag strip, inset to the same 12px the body uses, so the
+        # titlebar reads as a sibling of the rail and the page instead of a flat band.
+        # The outer widget keeps the full TITLEBAR_HEIGHT and stays the drag target —
+        # the height budget in `theme.py` depends on it, and the inset margin is still
+        # draggable because it belongs to this widget.
+        outer = QHBoxLayout(self)
+        outer.setContentsMargins(12, 0, 12, 0)
+        outer.setSpacing(0)
+        card = QFrame()
+        card.setObjectName("titlebarCard")
+        # No `WA_TransparentForMouseEvents`: that attribute also blocks delivery to a
+        # widget's children, which would kill the close button. A plain QFrame ignores a
+        # press anyway, so it bubbles to this widget's `mousePressEvent` and the drag works
+        # over the card as well as the inset margin.
+        outer.addWidget(card)
+
+        row = QHBoxLayout(card)
+        row.setContentsMargins(14, 0, 6, 0)
         row.setSpacing(8)
 
         brand = QLabel("SloppyKeys")
@@ -381,26 +398,14 @@ class TitleBar(QWidget):
         self._gamemode_btn.setFixedHeight(30)
         self._gamemode_btn.hide()
         row.addWidget(self._gamemode_btn, 0, Qt.AlignmentFlag.AlignVCenter)
-        row.addSpacing(14)
+        row.addSpacing(10)
 
-        # Session timer (counts up since launch).
-        sess = QVBoxLayout()
-        sess.setSpacing(0)
-        cap = QLabel("SESSION")
-        cap.setObjectName("sessionCap")
-        cap.setAlignment(Qt.AlignmentFlag.AlignRight)
-        self._session = QLabel("00:00")
-        self._session.setObjectName("session")
-        self._session.setAlignment(Qt.AlignmentFlag.AlignRight)
-        sess.addWidget(cap)
-        sess.addWidget(self._session)
-        row.addLayout(sess)
-        row.addSpacing(12)
-
-        minimize = _title_button(icons.MINIMIZE, on_minimize, danger=False)
-        close = _title_button(icons.CLOSE, on_close, danger=True)
-        row.addWidget(minimize)
-        row.addWidget(close)
+        # The session clock used to sit here; it lives at the foot of the rail now.
+        for button in (
+            _title_button(icons.MINIMIZE, on_minimize, danger=False),
+            _title_button(icons.CLOSE, on_close, danger=True),
+        ):
+            row.addWidget(button, 0, Qt.AlignmentFlag.AlignVCenter)
 
     def set_gamemode(self, name: str | None) -> None:
         if not name:
@@ -408,9 +413,6 @@ class TitleBar(QWidget):
             return
         self._gamemode_btn.setText(f"\u2039  {name}   ·  change")
         self._gamemode_btn.show()
-
-    def set_session(self, text: str) -> None:
-        self._session.setText(text)
 
     def set_hints(self, texts: list[str]) -> None:
         while self._hint_labels:
@@ -653,6 +655,9 @@ class MainWindow(QWidget):
             self._rail_buttons[page] = button
             rail_box.addWidget(button)
         rail_box.addStretch(1)
+        # After the stretch, so it pins to the foot of the rail. Moved out of the titlebar:
+        # it is ambient information, and the titlebar is for identity and window controls.
+        rail_box.addWidget(self._build_session_tile())
         body.addWidget(rail, 0)
 
         self._viewport = RobloxViewport(on_attach=self._on_attach)
@@ -899,6 +904,28 @@ class MainWindow(QWidget):
         self._titlebar.set_hints(self._hint_texts())
         self._load_profiles()
 
+    def _build_session_tile(self) -> QFrame:
+        """The session clock at the foot of the rail: caption over value, centred.
+
+        Its own tile (`#railSession`) rather than bare labels, so the rail ends on the same
+        card treatment the stat panel uses. Width is whatever `RAIL_WIDTH` leaves after the
+        rail's 6px margins; the value is at 12px so `0:00:00` fits without eliding.
+        """
+        tile = QFrame()
+        tile.setObjectName("railSession")
+        box = QVBoxLayout(tile)
+        box.setContentsMargins(4, 4, 4, 5)
+        box.setSpacing(0)
+        caption = QLabel("SESSION")
+        caption.setObjectName("sessionCap")
+        caption.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._session_label = QLabel("00:00")
+        self._session_label.setObjectName("session")
+        self._session_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        box.addWidget(caption)
+        box.addWidget(self._session_label)
+        return tile
+
     # # Pages / navigation
     def _rail_clicked(self, page: str) -> None:
         # Run needs a gamemode; without one, send the user to the selector. Units
@@ -997,7 +1024,7 @@ class MainWindow(QWidget):
         hours, rem = divmod(elapsed, 3600)
         minutes, seconds = divmod(rem, 60)
         text = f"{hours}:{minutes:02d}:{seconds:02d}" if hours else f"{minutes:02d}:{seconds:02d}"
-        self._titlebar.set_session(text)
+        self._session_label.setText(text)
 
     # # Logging
     def _rotate_log_file(self) -> None:
