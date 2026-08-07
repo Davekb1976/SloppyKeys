@@ -63,14 +63,20 @@ resolution still hold · **a commit** (`version-control.md`).
 
 ## Reporting
 
-**10 lines or fewer.** Files touched, one line each, naming the function or setting. Then
-what you verified and what still needs the user. Name the commits rather than re-describing
-them.
+**6 lines or fewer.** Files touched, one line each, naming the function or setting. Then
+one line for what you verified, one for what still needs the user. Name the commits rather
+than re-describing them.
+
+Stop when the facts run out. Do not add a closing paragraph, a "worth noting", a suggested
+next step nobody asked for, or an offer to do more work — the user asks for the next thing
+when they want it. One line of genuinely new information beats five of context.
 
 Cut: restating the request, rationale that's already a code comment or a commit body,
 walking through code the user can read, what you decided not to do, recaps of previous
-turns, and step announcements ("now I'll…", "let me check…"). A question gets an answer,
-not a report.
+turns, and step announcements ("now I'll…", "let me check…").
+
+**A question gets an answer, not a report.** Answer it in as few lines as the answer
+takes, and stop — no file list, no verification line, no options menu appended to it.
 
 ## Shell
 

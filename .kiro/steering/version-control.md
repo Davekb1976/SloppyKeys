@@ -39,8 +39,11 @@ Untested: <what has not run in game>
 - **type** — `fix` `feat` `refactor` `perf` `docs` `build` `chore`.
 - **scope** — the module or surface: `lobby` `placement` `challenge` `tasks` `runner`
   `vision` `ui` `settings` `delays` `installer` `build` `steering`.
-- **body** — only what the diff can't say: the root cause, the measurement quoted from a
-  log, and any obvious fix you rejected so nobody retries it. Omit it for a one-liner.
+- **body** — **three sentences at most, and usually none.** Only what the diff can't say:
+  the root cause, the measurement quoted from a log, or an obvious fix that was rejected so
+  nobody retries it. One fact per sentence, no restating the subject, no explaining the
+  design — the code is right there. A body that reads as a paragraph of prose is too long;
+  a list of seven before/after numbers belongs in one sentence with the worst one quoted.
 - **`Untested:`** — required unless the change was exercised in the game. This is the
   tracker; without it a green `compileall` later reads as "it worked".
 
