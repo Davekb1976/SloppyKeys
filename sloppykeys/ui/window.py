@@ -90,6 +90,7 @@ from sloppykeys.core.image_search import (
     apply_confidence_overrides,
 )
 from sloppykeys.core.ocr import OcrReader
+from sloppykeys.config.delays import DEFAULTS as DELAY_DEFAULTS
 from sloppykeys.config.delays import DelaysStore
 from sloppykeys.config.regions import ConfidenceStore, PointStore, RegionStore
 from sloppykeys.config.start_position import StartPositionStore
@@ -205,10 +206,11 @@ CHALLENGE_PANEL_READ_TIMEOUT = 8.0
 # the weakest of those. The floor is deliberately well above the engine's 0.50 minimum:
 # below it, a "match" is as likely to be noise, and calibrating against noise would set a
 # threshold that makes every small text crop a false positive.
-# How long to wait for the lobby after re-joining the private server. A cold client launch
-# plus a place load is minutes, not seconds, and the alternative to waiting is failing a run
-# that was about to work.
-LOBBY_REJOIN_TIMEOUT = 150.0
+# How often to look for the lobby while waiting for a re-join. The *budget* is not here: it
+# is `lobby_rejoin_wait` in `DELAY_SPEC`, because a cold client launch plus a place load is
+# minutes on some machines and seconds on others, and none of it is ours to speed up. Keeping
+# the default in one place — the spec — is what stops the step timeout and the poll deadline
+# disagreeing about how long the user asked for.
 LOBBY_REJOIN_POLL = 2.0
 
 
@@ -2181,11 +2183,16 @@ class MainWindow(QWidget):
                 "not in the lobby, and no private server link is set to re-join with "
                 "(Settings > Main)",
             )
+        # Was there a client at all before the link went out? The answer is what separates
+        # "Roblox never launched" from "it launched and the lobby just isn't matching", and
+        # the old single failure message could not tell them apart.
+        had_client = rbx.find_roblox_window() is not None
         self._log(f"  Not in the lobby ({message}) — re-joining the private server.")
         # Marshalled to the UI thread: this runs on the macro worker and the deep link
         # goes out through QDesktopServices, which is Qt.
         self.joinServerRequested.emit()
-        deadline = time.monotonic() + LOBBY_REJOIN_TIMEOUT
+        budget = self._lobby_rejoin_wait()
+        deadline = time.monotonic() + budget
         while True:
             if self._runner.stop_requested:
                 return (False, "stopped by user while waiting for the lobby")
@@ -2194,11 +2201,30 @@ class MainWindow(QWidget):
             if ok:
                 return (True, f"back in the lobby ({message})")
             if time.monotonic() >= deadline:
+                # Which of the two failures this was, named rather than guessed at.
+                client = "no Roblox window at all" if rbx.find_roblox_window() is None else (
+                    "a Roblox window is up but the lobby isn't matching"
+                )
+                launched = "" if had_client else " (there was no client before the link, either)"
                 return (
                     False,
-                    f"the lobby didn't appear within {LOBBY_REJOIN_TIMEOUT:.0f}s of "
-                    f"re-joining ({message})",
+                    f"the lobby didn't appear within {budget:.0f}s of re-joining — "
+                    f"{client}{launched} ({message}). Settings > Delays > "
+                    f"'Wait for the lobby after re-joining' if this needs longer",
                 )
+
+    def _lobby_rejoin_wait(self) -> float:
+        """Seconds to wait for the lobby after the deep link, from Settings > Delays.
+
+        Read in two places that must agree — the poll's deadline and the enclosing step's
+        timeout. When they disagreed, raising the wait did nothing: the step was killed at
+        the old budget while the poll was still inside the one the user asked for.
+
+        Floored at the poll interval so a hand-edited 0 still takes one look rather than
+        giving up before Roblox has been asked anything.
+        """
+        stored = float(self._delays.get("lobby_rejoin_wait", DELAY_DEFAULTS["lobby_rejoin_wait"]))
+        return max(LOBBY_REJOIN_POLL, stored)
 
     def _route_steps(self, map_name: str, act: str) -> tuple[list[MacroStep], str]:
         """The Events chain: reach the lobby, click Events, then the saved route.
@@ -2226,7 +2252,10 @@ class MainWindow(QWidget):
                 "Find the lobby",
                 self._ensure_lobby,
                 settle=False,
-                timeout=LOBBY_REJOIN_TIMEOUT + 30.0,
+                # The same budget the wait itself uses, plus room for the launch and the
+                # final look. Derived, not a second constant: these two disagreeing is what
+                # made a raised delay do nothing.
+                timeout=self._lobby_rejoin_wait() + 30.0,
             ),
             self._nav_step(
                 "Events",
@@ -3948,7 +3977,26 @@ class MainWindow(QWidget):
         dialog.show()
 
     def _trigger_reload(self) -> None:
-        self._log("Reloading...")
+        """F3. Stop a run *before* re-execing, or the abandoned step keeps driving the game.
+
+        `_restart` replaces this process with `os.execl`, and an AHK script is a separate
+        process that survives it — so a reload during the camera sequence left `i`, the right
+        mouse button, or `o` held down while the new instance came up and the user pressed
+        buttons at a Roblox that was mid right-drag. Nothing was stuck permanently (the
+        script does reach its own `up` calls), but for those seconds the game answers to a
+        drag, not to clicks, which is what made a re-join right after a reload look broken.
+
+        Cooperative, like F2: ask, don't kill. An AHK script in flight is always allowed to
+        finish, because killing one mid-press never sends the release.
+        """
+        if self._runner.is_running:
+            self._runner.request_stop()
+            self._log(
+                "Reloading — stopping the run first; an AHK script already in flight will "
+                "finish on its own."
+            )
+        else:
+            self._log("Reloading...")
         QTimer.singleShot(25, self._restart)
 
     def _on_keybind_changed(self, action: str, keybind: Keybind) -> None:
