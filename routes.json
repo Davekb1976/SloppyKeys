@@ -3,7 +3,8 @@
   "Maps": {
     "Villian Invasion": {
       "Acts": [
-        "Act 1"
+        "Act 1",
+        "Act 3"
       ],
       "Routes": {
         "Act 1": [
@@ -47,6 +48,61 @@
             "Kind": "click",
             "X": 722,
             "Y": 508,
+            "Button": "left",
+            "Count": 1
+          }
+        ],
+        "Act 3": [
+          {
+            "Kind": "click",
+            "X": 117,
+            "Y": 162,
+            "Button": "left",
+            "Count": 1
+          },
+          {
+            "Kind": "click",
+            "X": 712,
+            "Y": 698,
+            "Button": "left",
+            "Count": 1
+          },
+          {
+            "Kind": "scroll",
+            "Notches": 10,
+            "ScrollX": 767,
+            "ScrollY": 681
+          },
+          {
+            "Kind": "wait",
+            "Ms": 1000
+          },
+          {
+            "Kind": "find",
+            "Image": "images/events/Villian Invasion/Act 3_1.png",
+            "Timeout": 0.0,
+            "MaxScrolls": 0,
+            "Notches": 8,
+            "ScrollX": 0,
+            "ScrollY": 0,
+            "Region": [
+              969,
+              268,
+              73,
+              63
+            ]
+          },
+          {
+            "Kind": "click",
+            "X": 336,
+            "Y": 567,
+            "Button": "left",
+            "Count": 1
+          },
+          {
+            "Kind": "click",
+            "X": 727,
+            "Y": 507,
             "Button": "left",
             "Count": 1
           }
