@@ -970,7 +970,14 @@ class MainWindow(QWidget):
         self._show_page("workspace")
 
     def _show_selector(self) -> None:
-        """From the titlebar 'change' button: drop the current mode and reselect."""
+        """From the titlebar 'change' button: drop the current mode and reselect.
+
+        Leaves side-task editing **before** blanking the plan. `_clear_edit_override`
+        writes `self._plan` to `_edit_target` on the way out, so blanking first and
+        clearing later wrote 72 empty steps over the side task's config — see the note
+        there.
+        """
+        self._clear_edit_override()
         self._gamemode = None
         self._plan = UnitPlan.empty()
         self._active_config_path = None
@@ -1368,6 +1375,16 @@ class MainWindow(QWidget):
         if self._edit_target is None:
             return
         target = self._edit_target
+        # `_plan` and `_edit_target` have to still be describing the same file. Any path
+        # that replaces the plan without dropping the override turns this save into a
+        # silent overwrite, and `_active_config_path = None` is exactly what those paths
+        # leave behind — the plan now belongs to no config. Refusing beats writing 72
+        # empty steps over a unit plan the user spent an evening placing.
+        if self._active_config_path is None:
+            self._log(f"Left {target.label()} without saving — no plan was loaded for it.")
+            self._edit_target = None
+            self._units_page.set_editing_note("")
+            return
         self._units_page.commit()
         saved = self._config_store.save(
             target.gamemode, target.map_name, target.target, self._plan
