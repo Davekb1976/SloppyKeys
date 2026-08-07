@@ -11,11 +11,13 @@ ability click is captured exactly like a placement.
 
 from __future__ import annotations
 
+import os
 from typing import Callable
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QCheckBox,
     QComboBox,
     QHBoxLayout,
     QLabel,
@@ -30,15 +32,20 @@ from PySide6.QtWidgets import (
 
 from sloppykeys.content.units import (
     ACTION_FIELDS,
+    ACTION_FIND_CLICK,
     ACTION_LABELS,
     ACTION_TYPES,
     ACTION_WAIT,
     BUTTON_OPTIONS,
     StepAction,
 )
+from sloppykeys.core.image_search import ImageSearchEngine
 
 from . import icons, theme
+from .macro_tester import RegionOverlay
 from .widgets import SecondsSpin
+
+RectProvider = Callable[[], "tuple[int, int, int, int] | None"]
 
 
 class SequenceEditor(QWidget):
@@ -47,8 +54,23 @@ class SequenceEditor(QWidget):
     changed = Signal()
     pickRequested = Signal(int, str)  # action row, which coordinate ("from"/"to")
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        app_root: str = "",
+        get_rect: RectProvider | None = None,
+        engine: "ImageSearchEngine | None" = None,
+        template_name: "Callable[[int], str] | None" = None,
+        log: Callable[[str], None] | None = None,
+    ) -> None:
+        """The last four are only needed by Find + Click's capture. Optional so the
+        editor still builds standalone, in which case Capture says it can't."""
         super().__init__()
+        self._app_root = app_root
+        self._get_rect = get_rect or (lambda: None)
+        self._engine = engine
+        self._template_name = template_name or (lambda _row: "")
+        self._log = log or (lambda _m: None)
+        self._overlay: RegionOverlay | None = None
         self._actions: list[StepAction] = []
         self._loading = False
         # Last row that had fields on screen, so a cleared selection can be
@@ -128,6 +150,39 @@ class SequenceEditor(QWidget):
             to_coords.addWidget(widget)
         to_coords.addStretch(1)
         grid.addLayout(to_coords)
+
+        # # Find + Click: the template, its search region, and click-every-instance
+        image_row = QHBoxLayout()
+        image_row.setSpacing(6)
+        self._image = QLineEdit()
+        self._image.setReadOnly(True)
+        self._image.setPlaceholderText("no template — Capture one")
+        self._image.setToolTip(
+            "Captured from the live window, so it matches at the resolution it was taken "
+            "at.\nTolerance for it is set per template in Settings > Vision."
+        )
+        self._capture = self._text_button("Capture", "Drag a box around the button to press")
+        self._capture.clicked.connect(self._capture_image)
+        self._region = self._text_button("Region", "Limit where this template is searched for")
+        self._region.clicked.connect(self._pick_region)
+        self._lbl_image = QLabel("Image")
+        for widget in (self._lbl_image, self._image, self._capture, self._region):
+            image_row.addWidget(widget)
+        grid.addLayout(image_row)
+
+        all_row = QHBoxLayout()
+        all_row.setSpacing(6)
+        self._click_all = QCheckBox("Click every instance found")
+        self._click_all.setToolTip(
+            "Off: click the single best match.\n"
+            "On: click each place the template appears, left to right.\n\n"
+            "Matching is grayscale, so it cannot tell a greyed-out button on cooldown from "
+            "a ready one — set a Region that excludes the cooldown overlay if that matters."
+        )
+        self._click_all.toggled.connect(lambda on: self._write("click_all", bool(on)))
+        all_row.addWidget(self._click_all)
+        all_row.addStretch(1)
+        grid.addLayout(all_row)
 
         misc = QHBoxLayout()
         misc.setSpacing(6)
@@ -402,6 +457,10 @@ class SequenceEditor(QWidget):
         self._hold.set_ms(action.hold_ms)
         self._notches.setValue(action.notches)
         self._wait.set_ms(action.wait_ms)
+        self._image.setText(action.image)
+        region = action.region()
+        self._region.setText("Region" if region is None else f"{region[2]}x{region[3]}")
+        self._click_all.setChecked(bool(action.click_all))
         self._loading = False
         self._apply_field_visibility(action.type)
 
@@ -418,10 +477,122 @@ class SequenceEditor(QWidget):
             (("hold_ms",), (self._lbl_hold, self._hold)),
             (("notches",), (self._lbl_notches, self._notches)),
             (("wait_ms",), (self._lbl_wait, self._wait)),
+            (
+                ("image",),
+                (self._lbl_image, self._image, self._capture, self._region),
+            ),
+            (("click_all",), (self._click_all,)),
         )
         for names, widgets in groups:
             visible = any(name in used for name in names)
             for widget in widgets:
                 widget.setVisible(visible)
+
+    # # Find + Click's template
+    def _pick_region(self) -> None:
+        """Limit where the template is searched for. Also the cooldown workaround: a
+        region that excludes the greyed overlay is the only way to tell a ready button
+        from a disabled one, since matching is grayscale."""
+        action = self._current_action()
+        if action is None or action.type != ACTION_FIND_CLICK:
+            return
+
+        def done(result) -> None:
+            self._overlay = None
+            if result is None or result[0] != "region":
+                return
+            _mode, ax, ay, bx, by = result
+            action.region_x = min(ax, bx)
+            action.region_y = min(ay, by)
+            action.region_w = abs(bx - ax)
+            action.region_h = abs(by - ay)
+            self._after_capture()
+
+        self._open_overlay("region", done)
+
+    def _capture_image(self) -> None:
+        """Drag a box around the button; screenshot exactly that box.
+
+        Same approach as the route editor's capture, and for the same measured reason: a
+        template cropped from a full-desktop screenshot lands at a different scale, and
+        `matchTemplate` is not scale invariant — a wrong-size crop costs 0.253 correlation
+        and then matches at no threshold at all.
+        """
+        action = self._current_action()
+        if action is None or action.type != ACTION_FIND_CLICK:
+            return
+        if self._engine is None or not self._app_root:
+            self._log("Capture needs the running app — no image engine here.")
+            return
+        relative = self._template_name(self._list.currentRow())
+        if not relative:
+            self._log("Capture needs a target selected on the Run strip first.")
+            return
+
+        def done(result) -> None:
+            self._overlay = None
+            if result is None or result[0] != "region":
+                return
+            _mode, ax, ay, bx, by = result
+            box = (min(ax, bx), min(ay, by), abs(bx - ax), abs(by - ay))
+            if box[2] < 4 or box[3] < 4:
+                self._log("That box is too small to match on — drag a bigger one.")
+                return
+            # The overlay was covering Roblox a moment ago; let the desktop repaint or
+            # the crop catches the picker instead of the game.
+            QTimer.singleShot(150, lambda: self._write_capture(action, relative, box))
+
+        self._open_overlay("region", done)
+
+    def _write_capture(
+        self, action: StepAction, relative: str, box: tuple[int, int, int, int]
+    ) -> None:
+        rect = self._get_rect()
+        if rect is None or self._engine is None:
+            self._log("Roblox not found — start it first.")
+            return
+        png = self._engine.capture_png(
+            (rect[0] + box[0], rect[1] + box[1], box[2], box[3])
+        )
+        if png is None:
+            self._log("Could not capture that area.")
+            return
+        target = os.path.join(self._app_root, relative)
+        try:
+            os.makedirs(os.path.dirname(target), exist_ok=True)
+            with open(target, "wb") as handle:
+                handle.write(png)
+        except OSError as exc:
+            self._log(f"Could not save the template: {exc}")
+            return
+
+        action.image = relative
+        # The box it came from is its search region: faster, and it can't false-hit
+        # elsewhere on screen. Editable afterwards with Region.
+        action.region_x, action.region_y, action.region_w, action.region_h = box
+        self._log(f"Action template saved: {relative} ({box[2]}x{box[3]})")
+        self._after_capture()
+
+    def _after_capture(self) -> None:
+        self._show_fields()
+        self._refresh_row_text(self._list.currentRow())
+        self.changed.emit()
+
+    def _open_overlay(self, mode: str, done) -> None:
+        rect = self._get_rect()
+        if rect is None:
+            self._log("Roblox not found — start it first.")
+            return
+        # Keep the reference: a local would be collected mid-pick, taking the callback
+        # with it.
+        self._overlay = RegionOverlay(mode, rect, done)
+        self._overlay.show()
+        self._overlay.raise_()
+
+    def _current_action(self) -> StepAction | None:
+        row = self._list.currentRow()
+        if not 0 <= row < len(self._actions):
+            return None
+        return self._actions[row]
 
 

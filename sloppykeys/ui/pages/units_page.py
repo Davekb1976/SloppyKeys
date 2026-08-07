@@ -46,6 +46,7 @@ from sloppykeys.content.units import (
     autoupgrade_presses,
     slot_index,
 )
+from sloppykeys.config.unit_configs import safe_component
 
 from .. import icons, theme
 from ..placement_overlay import (
@@ -62,11 +63,21 @@ FILTERS = ("All", "On", "Off")
 # Ceiling for the two step delays. Sixty seconds is already longer than a match phase;
 # anything past it is a typo, and the field is what stops one being entered.
 WAIT_MAX_MS = 60000
+# What a step gets when During match is switched on with no interval set. Roughly an
+# ability cooldown, and far enough above the result poll to be obviously deliberate.
+DURING_MATCH_DEFAULT_MS = 2000
 
 
 def _ms_text(spin: SecondsSpin) -> str:
     """What a step stores for a delay: milliseconds as text, empty at zero."""
     return str(spin.ms()) if spin.ms() > 0 else ""
+
+
+def _as_int(value: object) -> int:
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return 0
 
 
 def _short(name: str, limit: int = 9) -> str:
@@ -186,9 +197,25 @@ class DetailEditor(QWidget):
     resetRequested = Signal(int)  # step number should be cleared
     editingFinished = Signal()  # done editing a side task's config
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        app_root: str = "",
+        get_rect: Callable[[], "tuple[int, int, int, int] | None"] | None = None,
+        engine=None,
+        template_name: Callable[[int], str] | None = None,
+        log: Callable[[str], None] | None = None,
+    ) -> None:
+        """Everything after the first argument is only for Find + Click's capture, and is
+        forwarded straight to the sequence editor."""
         super().__init__()
         self._step: UnitStep | None = None
+        self._sequence_args = {
+            "app_root": app_root,
+            "get_rect": get_rect,
+            "engine": engine,
+            "template_name": template_name,
+            "log": log,
+        }
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -346,6 +373,20 @@ class DetailEditor(QWidget):
         self._preplacement.toggled.connect(lambda on: self._set("preplacement", bool(on)))
         fields.addWidget(self._preplacement)
 
+        # The third phase, and the only repeating one. Everything else in a plan runs once
+        # in the first seconds of a wave; this runs over and over until the match ends,
+        # which is what makes an ability press possible at all.
+        self._during_match = QCheckBox("During match (repeat every Wait, until the result)")
+        self._during_match.setToolTip(
+            "Repeats this step for the whole match instead of running it once.\n\n"
+            "Wait is the interval, not a delay before acting — 2 s means every 2 seconds.\n"
+            "The result screen is still checked between repeats, so this doesn't delay the\n"
+            "end of the match. Pair it with a Sequence step's Find + Click to press an\n"
+            "ability whenever it is off cooldown."
+        )
+        self._during_match.toggled.connect(self._on_during_match)
+        fields.addWidget(self._during_match)
+
         self._sell = QCheckBox("Sell this unit instead of keeping it")
         self._sell.toggled.connect(lambda on: self._set("sell", bool(on)))
         fields.addWidget(self._sell)
@@ -380,7 +421,7 @@ class DetailEditor(QWidget):
         unit_layout.addLayout(coords)
 
         # Sequence page
-        self._sequence = SequenceEditor()
+        self._sequence = SequenceEditor(**self._sequence_args)
         self._sequence.changed.connect(self._on_sequence_changed)
         self._sequence.pickRequested.connect(self._on_action_pick)
         self._stack.addWidget(self._sequence)
@@ -467,6 +508,7 @@ class DetailEditor(QWidget):
         for box, value in (
             (self._sell, step.sell),
             (self._preplacement, step.preplacement),
+            (self._during_match, step.during_match),
         ):
             box.blockSignals(True)
             box.setChecked(bool(value))
@@ -477,6 +519,27 @@ class DetailEditor(QWidget):
         self._sequence.load(step.actions)
         self._coord_note.setText("")
         self._step = step
+
+    def _on_during_match(self, on: bool) -> None:
+        """Turning this on gives the step a usable interval if it hasn't got one.
+
+        `Wait` becomes the repeat interval here, and the floor is one result poll — so a
+        step left at 0 would fire as fast as AHK can run, which is not what anyone means by
+        turning a checkbox on. Pre-placement is cleared with it: that phase ends when the
+        wave starts, so the two can't both be true.
+        """
+        if self._step is None:
+            return
+        if on:
+            if not _as_int(self._step.wait):
+                self._step.wait = str(DURING_MATCH_DEFAULT_MS)
+                self._wait.set_ms(DURING_MATCH_DEFAULT_MS)
+            if self._step.preplacement:
+                self._step.preplacement = False
+                self._preplacement.blockSignals(True)
+                self._preplacement.setChecked(False)
+                self._preplacement.blockSignals(False)
+        self._set("during_match", bool(on))
 
     def _set(self, attr: str, value) -> None:
         if self._step is None:
@@ -501,6 +564,9 @@ class UnitsPage(QWidget):
         get_rect: Callable[[], "tuple[int, int, int, int] | None"] | None = None,
         get_target: Callable[[], "tuple[str, str]"] | None = None,
         images_dir: str = "",
+        app_root: str = "",
+        engine=None,
+        log: Callable[[str], None] | None = None,
     ) -> None:
         super().__init__()
         self._plan_provider = plan_provider
@@ -567,7 +633,13 @@ class UnitsPage(QWidget):
         detail_box.setObjectName("sectionBox")
         detail_outer = QVBoxLayout(detail_box)
         detail_outer.setContentsMargins(12, 10, 12, 12)
-        self._detail = DetailEditor()
+        self._detail = DetailEditor(
+            app_root=app_root,
+            get_rect=self._get_rect,
+            engine=engine,
+            template_name=self._action_template_name,
+            log=log,
+        )
         self._detail.stepChanged.connect(self._on_detail_changed)
         self._detail.pickRequested.connect(self._open_picker)
         self._detail.actionPickRequested.connect(self._open_action_picker)
@@ -816,6 +888,21 @@ class UnitsPage(QWidget):
         """Show which config is open when it isn't the Run strip's selection. Empty
         clears it."""
         self._detail.set_editing_note(target)
+
+    def _action_template_name(self, row: int) -> str:
+        """Where a Find + Click template goes, relative to the app root.
+
+        `images/actions/<Gamemode>/<Map>/<Act>_<step>_<row>.png` — keyed by the config it
+        belongs to and by position within it, so two abilities in one plan can't overwrite
+        each other. Every segment goes through `safe_component`, the same validator the
+        unit configs and reference images use, because this becomes a path.
+        """
+        gamemode, stage, act = self._get_target()
+        if not gamemode or not stage:
+            return ""
+        parts = [safe_component(gamemode), safe_component(stage)]
+        leaf = f"{safe_component(act) or 'main'}_{int(self._selected)}_{int(row) + 1}.png"
+        return "/".join(["images", "actions", *parts, leaf])
 
     @property
     def editing_finished(self):

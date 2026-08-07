@@ -708,6 +708,11 @@ class MainWindow(QWidget):
             get_rect=self._roblox_rect,
             get_target=self._placement_target,
             images_dir=self._profile_store.images_dir,
+            # For a Find + Click action's template capture, which writes a PNG under
+            # `images/actions/` the same way the route editor writes under `images/events/`.
+            app_root=self._app_root,
+            engine=self._search_engine,
+            log=self._log,
         )
         self._route_editor = RouteEditor(
             self._routes,
