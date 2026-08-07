@@ -1,35 +1,68 @@
+<div align="center">
+
 # SloppyKeys
 
-A Windows macro for the Roblox game *Anime Expedition*. It shows the live Roblox window
-inside its own UI, reads that view with template matching, and plays the game through
-ordinary Windows input.
+**A macro that plays *Anime Expedition* by looking at it.**<br>
+It hosts the live Roblox window inside its own UI, reads that view with template matching,
+and plays through ordinary Windows input — nothing injected, no process memory touched.<br>
+Queue up Story, Challenge, Expedition, Raid and Events runs, place your units, and leave it.
 
-Queue up Story, Challenge, Expedition, Raid and Events runs, place your units where you
-want them, and leave it. It reads the challenge panel, tracks wins and losses, and posts
-progress to a Discord webhook if you give it one.
+[![release](https://img.shields.io/github/v/release/Davekb1976/SloppyKeys?label=release&color=blue)](https://github.com/Davekb1976/SloppyKeys/releases/latest)
+[![downloads](https://img.shields.io/github/downloads/Davekb1976/SloppyKeys/total?label=downloads&color=success)](https://github.com/Davekb1976/SloppyKeys/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/Davekb1976/SloppyKeys/ci.yml?branch=main&label=CI&logo=github)](https://github.com/Davekb1976/SloppyKeys/actions/workflows/ci.yml)
+[![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011%20x64-informational)](#requirements)
+
+[Website](https://davekb1976.github.io/SloppyKeys/) · [Download](https://github.com/Davekb1976/SloppyKeys/releases/latest) · [Report a bug](../../issues/new/choose)
+
+</div>
+
+> **Before you download:** Windows 10/11 x64, [AutoHotkey v2](https://www.autohotkey.com/)
+> installed, and display scaling at 100%. Miss the last one and every image match fails —
+> see [Requirements](#requirements).
+
+## Table of Contents
+
+- [Features](#features)
+- [Requirements](#requirements)
+- [Download & Install](#download--install)
+- [Updates](#updates)
+- [Your data](#your-data)
+- [Usage](#usage)
+- [How it works, and what it will not do](#how-it-works-and-what-it-will-not-do)
+- [Running from source](#running-from-source)
+- [Project layout](#project-layout)
+- [Bugs and requests](#bugs-and-requests)
+- [Licence](#licence)
+- [Disclaimer](#disclaimer)
+
+## Features
+
+- **Every mode.** Story, Challenge, Expedition, Raid and Events, with hard mode and
+  Expedition difficulty as toggles.
+- **A task queue.** Give each target a run limit; it moves to the next one when that limit
+  is met, without stopping between matches.
+- **Unit plans you place yourself.** Pick the coordinates on the live window, set the slot
+  and the upgrade level, save it per gamemode/map/act.
+- **Reads the challenge panel**, including the daily limit, and waits out the 8PM refill
+  rather than burning runs.
+- **Events routes you author** — click, find, expect, scroll, wait — for the modes whose
+  lobby changes with every event.
+- **Win/loss stats and a Discord webhook**, if you give it one. Nothing is posted anywhere
+  else.
+- **Per-template match tolerance** with a test button, so one stubborn image can't drag the
+  rest down.
+- **In-app updates** from the GitHub release, checksum-verified.
+
+## Requirements
 
 - **Windows 10/11, x64 only.** The whole thing is ctypes to Win32; there is no other path.
-- Requires **[AutoHotkey v2](https://www.autohotkey.com/)** — every click and keypress
-  goes through it, so nothing works without it.
-- Requires **display scaling at 100%**. At 125% a template cropped at 100% scores as a
-  different image (measured 0.80x) and matching fails.
+- **[AutoHotkey v2](https://www.autohotkey.com/)** — every click and keypress goes through
+  it, so nothing works without it.
+- **Display scaling at 100%.** At 125% a template cropped at 100% scores as a different
+  image (measured 0.80x) and matching fails.
 
-## How it works, and what it will not do
-
-Everything the macro knows comes from **pixels on screen**. Everything it does goes out as
-**ordinary Windows input**. That boundary is the whole design:
-
-- It captures the screen with [mss](https://github.com/BoboTiG/python-mss) and matches
-  templates with OpenCV. Two strings no template can cover (the challenge daily limit and
-  the map name) go through offline OCR.
-- It sends input by generating an AutoHotkey v2 script and running it. Python decides
-  *what* to do; AHK does it.
-- Roblox is never reparented, injected into, hooked, or read from memory. Nothing is
-  written to a Roblox file. No fast flags, no anti-cheat interaction of any kind.
-
-If a feature would need more than pixels in and OS input out, it doesn't get built.
-
-## Install
+## Download & Install
 
 Grab the latest [release](../../releases):
 
@@ -45,7 +78,7 @@ lists SHA-256 hashes if you want to check what you downloaded.
 Then install AutoHotkey v2 if you haven't. The installer says so too, rather than letting
 you find out by every click doing nothing.
 
-### Updates
+## Updates
 
 **Settings > Main > Updates.** It asks GitHub once per launch whether there's a newer
 release and stays quiet unless there is. Nothing downloads until you click.
@@ -58,7 +91,7 @@ just leave a second copy elsewhere.
 
 Turn the whole thing off with the toggle and nothing contacts GitHub.
 
-### Your data
+## Your data
 
 `images\`, `configs\`, `routes.json` and `settings.json` live **beside the exe** — the app
 writes to all of them, so a captured template has to survive a restart. An upgrade never
@@ -67,7 +100,7 @@ overwrites them, and an uninstall asks before removing them.
 `settings.json` holds your private-server link and your Discord webhook URL. It stays on
 your machine; nothing is uploaded anywhere except the webhook you configured.
 
-## Using it
+## Usage
 
 | Key | Does |
 |---|---|
@@ -82,6 +115,21 @@ priority, upgrade, sell and auto-upgrade.
 Start and stop are separate keys on purpose: with one toggle, pressing it to start a run
 you thought had stopped stops it instead, and there's no way to be sure which state you're
 in before you press.
+
+## How it works, and what it will not do
+
+Everything the macro knows comes from **pixels on screen**. Everything it does goes out as
+**ordinary Windows input**. That boundary is the whole design:
+
+- It captures the screen with [mss](https://github.com/BoboTiG/python-mss) and matches
+  templates with OpenCV. Two strings no template can cover (the challenge daily limit and
+  the map name) go through offline OCR.
+- It sends input by generating an AutoHotkey v2 script and running it. Python decides
+  *what* to do; AHK does it.
+- Roblox is never reparented, injected into, hooked, or read from memory. Nothing is
+  written to a Roblox file. No fast flags, no anti-cheat interaction of any kind.
+
+If a feature would need more than pixels in and OS input out, it doesn't get built.
 
 ## Running from source
 
@@ -134,7 +182,7 @@ portable zip on a clean runner and publishes them.
 Versions are `MAJOR.MINOR.PATCH` with a **single-digit patch**: `0.1.9` is followed by
 `0.2.0`, not `0.1.10`.
 
-## Layout
+## Project layout
 
 ```
 sloppykeys/
