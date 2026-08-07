@@ -74,6 +74,13 @@ not a report.
 
 ## Shell
 
+- **Don't read or search the tree through the shell.** Use the editor's own file tools to
+  read a file, list a folder or grep the project; `Get-Content`, `Select-String`, `dir` and
+  `findstr` are the wrong instrument for it. The shell decodes UTF-8 as the console
+  codepage, so every em dash and `·` in this project comes back as `â€"` or `ù` — output
+  that has to be mentally un-mangled before it can be read, and that gets quoted back into
+  code or a commit message wrong. It also truncates, wraps and reorders. Reserve the shell
+  for things that must actually execute: git, the tests, `compileall`, a probe.
 - PowerShell. Chain with `;`. No heredocs. `Select-String` has no `-Recurse`.
 - Long lines overwrite earlier console output. To *read* output, redirect to a workspace
   file and read it back, then delete it. Fire-and-forget commands can trust the exit code.
