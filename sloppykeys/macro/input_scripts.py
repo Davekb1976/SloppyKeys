@@ -255,6 +255,29 @@ def move_script(x: int, y: int) -> str:
 """
 
 
+def point_at_script(x: int, y: int) -> str:
+    """Put the cursor on a screen point. No activation, no click, no wiggle.
+
+    Deliberately **not** `_header`, which is wrong twice for a diagnostic. It activates
+    Roblox and waits up to 3s for the switch — and moving the mouse needs no focus at all,
+    so that wait bought nothing and cost more than the whole script: pressed from the macro's
+    own window, with Roblox behind a frameless always-on-top window, `WinWaitActive` ran its
+    full 3s and the caller timed out at 5.
+
+    Nor should it steal focus. This exists to show *where* a template matched, and raising
+    the game over the window the button lives in would hide the answer.
+
+    Glides rather than teleports (`MouseMove` speed 10) because the point is for a person to
+    watch it arrive.
+    """
+    return f"""#Requires AutoHotkey v2.0
+#SingleInstance Force
+CoordMode("Mouse", "Screen")
+MouseMove({int(x)}, {int(y)}, 10)
+ExitApp(0)
+"""
+
+
 def scroll_script(cx: int, cy: int, park_x: int, park_y: int, notches: int) -> str:
     """Wheel over (cx, cy), then park at (park_x, park_y).
 

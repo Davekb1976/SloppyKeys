@@ -2944,13 +2944,15 @@ class MainWindow(QWidget):
         (`coding-standards.md`). A move and nothing else: no click, no key, so this commits
         nothing in the game even though the point is usually a button.
 
-        Called from the UI thread on a button press. `wait=True` with a short timeout
-        because the script is one `MouseMove` and the note that follows should describe a
-        cursor that has already arrived.
+        **`wait=False`, because this is the UI thread.** It first shipped as `wait=True` with
+        a 5s timeout and froze the window for the full 5s on every press: `move_script`'s
+        header activates Roblox and waits 3s for the switch, which from behind a frameless
+        always-on-top window it does not win. `point_at_script` drops the activation
+        entirely — a mouse move needs no focus — so there is nothing left worth blocking on.
         """
         if not self._ahk.available():
             return (False, "AutoHotkey v2 not found")
-        return self._ahk.run(input_scripts.move_script(int(x), int(y)), wait=True, timeout=5)
+        return self._ahk.run(input_scripts.point_at_script(int(x), int(y)), wait=False)
 
     def _roblox_rect(self) -> tuple[int, int, int, int] | None:
         """Roblox client area in screen coordinates, for image capture/search."""

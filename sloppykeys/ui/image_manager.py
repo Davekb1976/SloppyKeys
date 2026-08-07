@@ -629,9 +629,10 @@ class ImageManager(QWidget):
         self._log(f"Template test: {entry.path} best {score:.3f} vs {needed:.2f} at {where}")
         moved = ""
         if self._move_cursor is not None:
+            # Fire-and-forget, so this says the cursor was *sent* rather than claiming it has
+            # arrived — waiting for that on the UI thread is what froze the window.
             ok, message = self._move_cursor(match.center_x, match.center_y)
-            # Reported, not fatal: the score is still the answer if AHK is missing.
-            moved = " Cursor is on it." if ok else f" Couldn't move the cursor: {message}."
+            moved = " Cursor sent there." if ok else f" Couldn't move the cursor: {message}."
             if not ok:
                 self._log(f"  cursor move failed: {message}")
         self._set_note(
