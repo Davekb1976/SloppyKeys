@@ -45,6 +45,7 @@ from sloppykeys.core.image_search import (
     ImageProfile,
     ImageSearchEngine,
     clamp_confidence,
+    confidence_for,
     find_until,
 )
 
@@ -553,8 +554,21 @@ class UnitPlacer:
         return (scores[0] - scores[1]) >= OUTCOME_MARGIN
 
     def _outcome_profiles(self) -> list[ImageProfile]:
+        """The win and defeat screens, each at **its own** tolerance.
+
+        `confidence_for(path)`, not `ImageProfile`'s default: Settings > Vision offers a
+        threshold row for Won and Lost and its Test button reports against that number, but
+        this list took the 0.70 default, so tuning either one changed what the tester said
+        and nothing about the run. Every other search resolves the per-template threshold
+        inside `find_until`; these two are built by hand because the outcome is a race
+        between two templates, which is the only reason they were ever different.
+        """
         return [
-            ImageProfile(name=path, image_path=self._engine.to_absolute_path(path))
+            ImageProfile(
+                name=path,
+                image_path=self._engine.to_absolute_path(path),
+                confidence=confidence_for(path),
+            )
             for path in (game_won_image(), game_lost_image())
         ]
 
