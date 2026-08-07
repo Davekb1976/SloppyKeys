@@ -55,6 +55,7 @@ class SettingsPage(QWidget):
     autoUpdateToggled = Signal(bool)
     updateCheckRequested = Signal()
     updateActionRequested = Signal()
+    repoRequested = Signal()
     openTesterRequested = Signal()
     keybindChanged = Signal(str, object)  # action, Keybind
     gameKeyChanged = Signal(str, str)     # action, single key character
@@ -247,7 +248,12 @@ class SettingsPage(QWidget):
         check = QPushButton(f"{icons.REFRESH}  Check Now")
         check.setStyleSheet(f"font-family: '{theme.ICON_FAMILY}';")
         check.clicked.connect(self.updateCheckRequested.emit)
-        col.addLayout(_left(check))
+
+        repo = QPushButton("  GitHub")
+        repo.setIcon(icons.github_icon(theme.TEXT))
+        repo.setToolTip("Open the SloppyKeys repository on GitHub.")
+        repo.clicked.connect(self.repoRequested.emit)
+        col.addLayout(_left(check, repo))
 
         # Hidden until there is something to do, so the Main tab doesn't carry a dead
         # button. Its label says which of the two things it will do.
@@ -510,9 +516,10 @@ def _row(label_text: str, control: QWidget, stretch_widget: bool = False) -> QWi
     return holder
 
 
-def _left(widget: QWidget) -> QHBoxLayout:
+def _left(*widgets: QWidget) -> QHBoxLayout:
     row = QHBoxLayout()
-    row.addWidget(widget)
+    for widget in widgets:
+        row.addWidget(widget)
     row.addStretch(1)
     return row
 

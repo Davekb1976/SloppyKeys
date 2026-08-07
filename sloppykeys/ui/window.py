@@ -905,6 +905,7 @@ class MainWindow(QWidget):
         self._settings_page.autoUpdateToggled.connect(self._on_auto_update_toggled)
         self._settings_page.updateCheckRequested.connect(lambda: self._check_for_update(True))
         self._settings_page.updateActionRequested.connect(self._on_update_action)
+        self._settings_page.repoRequested.connect(self._open_repo)
         position = self._settings_page.position_editor
         position.targetChanged.connect(self._on_position_target)
         position.movesChanged.connect(self._on_position_moves)
@@ -1506,6 +1507,10 @@ class MainWindow(QWidget):
     def _on_auto_update_toggled(self, enabled: bool) -> None:
         self._settings.set_auto_update(enabled)
         self._log(f"Startup update check {'enabled' if enabled else 'disabled'}.")
+
+    def _open_repo(self) -> None:
+        if not QDesktopServices.openUrl(QUrl(updates.REPO_URL)):
+            self._settings_page.set_update_status("Couldn't open your browser.", True)
 
     def _check_for_update(self, manual: bool = False) -> None:
         """Ask GitHub for the newest release, on a worker.

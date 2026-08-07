@@ -41,8 +41,9 @@ from urllib.parse import urlparse
 from ..version import VERSION
 
 REPO = "Davekb1976/SloppyKeys"
+REPO_URL = f"https://github.com/{REPO}"
 LATEST_URL = f"https://api.github.com/repos/{REPO}/releases/latest"
-RELEASES_URL = f"https://github.com/{REPO}/releases/latest"
+RELEASES_URL = f"{REPO_URL}/releases/latest"
 
 # Every URL taken from the API response is checked against this before it is fetched. The
 # response is untrusted input like any other JSON off the network; without the check, a
