@@ -55,9 +55,18 @@ from ..placement_overlay import (
     load_reference,
 )
 from ..sequence_editor import SequenceEditor
+from ..widgets import SecondsSpin
 
 GRID_COLS = 3
 FILTERS = ("All", "On", "Off")
+# Ceiling for the two step delays. Sixty seconds is already longer than a match phase;
+# anything past it is a typo, and the field is what stops one being entered.
+WAIT_MAX_MS = 60000
+
+
+def _ms_text(spin: SecondsSpin) -> str:
+    """What a step stores for a delay: milliseconds as text, empty at zero."""
+    return str(spin.ms()) if spin.ms() > 0 else ""
 
 
 def _short(name: str, limit: int = 9) -> str:
@@ -311,18 +320,22 @@ class DetailEditor(QWidget):
 
         # TIMING
         fields.addLayout(_group("TIMING"))
-        self._wait = QLineEdit()
-        self._wait.setPlaceholderText("Wait (ms)")
-        self._wait.textChanged.connect(lambda v: self._set("wait", v.strip()))
+        # Seconds in the field; `UnitStep.wait`/`sell_wait` stay strings of milliseconds,
+        # and **stay empty at zero**. `_has_data` decides whether a step is written at all
+        # by comparing its payload to a blank one, so storing "0" instead of "" would make
+        # all 72 steps look like they hold data and write a file full of empty steps.
+        self._wait = SecondsSpin(WAIT_MAX_MS, width=96, arrows=False)
+        self._wait.valueChanged.connect(lambda _v: self._set("wait", _ms_text(self._wait)))
         # Sell delay: counted from the end of the step, not from placement, so a
         # unit can earn for a while before it's sold. Needs Sell on to do anything.
-        self._sell_wait = QLineEdit()
-        self._sell_wait.setPlaceholderText("Sell after (ms)")
+        self._sell_wait = SecondsSpin(WAIT_MAX_MS, width=96, arrows=False)
         self._sell_wait.setToolTip(
             "With Sell on: how long to wait after the step's other settings finish, "
-            "before selling. Blank sells immediately."
+            "before selling. 0 sells immediately."
         )
-        self._sell_wait.textChanged.connect(lambda v: self._set("sell_wait", v.strip()))
+        self._sell_wait.valueChanged.connect(
+            lambda _v: self._set("sell_wait", _ms_text(self._sell_wait))
+        )
         fields.addLayout(_pair("Wait", self._wait, "Sell after", self._sell_wait))
 
         # ACTIONS — what the step does beyond setting the unit up. Auto upgrade used
@@ -438,8 +451,8 @@ class DetailEditor(QWidget):
         self._badge.setText(str(step.step))
         self._name.setText(step.unit_name)
         _set_combo(self._slot, step.slot)
-        self._wait.setText(step.wait)
-        self._sell_wait.setText(step.sell_wait)
+        self._wait.set_ms(step.wait or 0)
+        self._sell_wait.set_ms(step.sell_wait or 0)
         self._x.setText(step.x)
         self._y.setText(step.y)
         _set_combo(self._priority, step.priority)

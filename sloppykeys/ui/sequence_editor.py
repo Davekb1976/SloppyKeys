@@ -38,6 +38,7 @@ from sloppykeys.content.units import (
 )
 
 from . import icons, theme
+from .widgets import SecondsSpin
 
 
 class SequenceEditor(QWidget):
@@ -140,16 +141,19 @@ class SequenceEditor(QWidget):
         self._key.setFixedWidth(44)
         self._key.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._key.textChanged.connect(lambda v: self._write("key", v.strip().lower()))
-        self._hold = self._spin(0, 10000, lambda v: self._write("hold_ms", v), step=50)
+        # Seconds in the field, milliseconds in `StepAction` — see `SecondsSpin`.
+        self._hold = SecondsSpin(10000)
+        self._hold.valueChanged.connect(lambda _v: self._write("hold_ms", self._hold.ms()))
         self._notches = self._spin(-50, 50, lambda v: self._write("notches", v))
-        self._wait = self._spin(0, 60000, lambda v: self._write("wait_ms", v), step=50)
+        self._wait = SecondsSpin(60000)
+        self._wait.valueChanged.connect(lambda _v: self._write("wait_ms", self._wait.ms()))
 
         self._lbl_button = QLabel("Button")
         self._lbl_count = QLabel("Times")
         self._lbl_key = QLabel("Key")
-        self._lbl_hold = QLabel("Hold ms")
+        self._lbl_hold = QLabel("Hold")
         self._lbl_notches = QLabel("Notches")
-        self._lbl_wait = QLabel("Wait ms")
+        self._lbl_wait = QLabel("Wait")
         for widget in (
             self._lbl_button, self._button,
             self._lbl_count, self._count,
@@ -395,9 +399,9 @@ class SequenceEditor(QWidget):
         self._button.setCurrentText(action.button)
         self._count.setValue(max(1, action.count))
         self._key.setText(action.key)
-        self._hold.setValue(action.hold_ms)
+        self._hold.set_ms(action.hold_ms)
         self._notches.setValue(action.notches)
-        self._wait.setValue(action.wait_ms)
+        self._wait.set_ms(action.wait_ms)
         self._loading = False
         self._apply_field_visibility(action.type)
 

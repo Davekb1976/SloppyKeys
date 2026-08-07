@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from PySide6.QtCore import Property, QEasingCurve, QPropertyAnimation, QRectF, Qt, Signal
 from PySide6.QtGui import QColor, QPainter
-from PySide6.QtWidgets import QAbstractButton, QPlainTextEdit, QPushButton
+from PySide6.QtWidgets import (
+    QAbstractButton,
+    QAbstractSpinBox,
+    QDoubleSpinBox,
+    QPlainTextEdit,
+    QPushButton,
+)
 
 from sloppykeys.config.keybinds import Keybind
 
@@ -89,6 +95,50 @@ class ToggleSwitch(QAbstractButton):
         p.setBrush(QColor("#FFFFFF"))
         p.drawEllipse(QRectF(self._pos, self._margin, knob_d, knob_d))
         p.end()
+
+
+class SecondsSpin(QDoubleSpinBox):
+    """A delay field the user reads in seconds, stored in milliseconds.
+
+    Every timing value on disk is an integer of milliseconds and stays that way — the
+    macro sleeps in ms, `settings.json`, `configs/` and `routes.json` all hold ms, and
+    changing that would mean migrating every saved file. Only the field is seconds,
+    because "2.5" is a number people can judge and "2500" is one they mistype.
+
+    **Two decimals, not one.** Every default and step the app writes is a multiple of
+    50ms (a sequence action defaults to 250ms), and at one decimal 0.25s would round to
+    0.3 and write 300ms back — the field would retune a delay just by being opened. Two
+    decimals resolve 10ms, so a hand-typed 12345ms from the old field does snap to
+    12350ms; that is 5ms against a click settle of 200-550ms, and nothing the app itself
+    writes is affected.
+    """
+
+    def __init__(
+        self, max_ms: int, min_ms: int = 0, width: int = 112, arrows: bool = True
+    ) -> None:
+        super().__init__()
+        self.setDecimals(2)
+        self.setRange(min_ms / 1000.0, max_ms / 1000.0)
+        self.setSingleStep(0.1)
+        self.setSuffix(" s")
+        self.setFixedWidth(width)
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # `arrows=False` for a field in a narrow row: the step buttons cost ~16px, which
+        # is the difference between "60.00 s" fitting and being elided (measured 108px
+        # needed against a 96px field in the Units detail card).
+        if not arrows:
+            self.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
+
+    def ms(self) -> int:
+        """The value in milliseconds, which is what everything downstream wants."""
+        return int(round(self.value() * 1000))
+
+    def set_ms(self, value: object) -> None:
+        """Show a stored millisecond value. Junk reads as zero rather than raising."""
+        try:
+            self.setValue(int(value) / 1000.0)
+        except (TypeError, ValueError):
+            self.setValue(0.0)
 
 
 def qt_key_to_vk(qt_key: int) -> int | None:

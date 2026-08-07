@@ -24,7 +24,6 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QPushButton,
-    QSpinBox,
     QVBoxLayout,
     QWidget,
 )
@@ -46,6 +45,7 @@ from sloppykeys.content.start_position import (
 )
 
 from . import icons, theme
+from .widgets import SecondsSpin
 
 
 class PositionEditor(QWidget):
@@ -222,12 +222,9 @@ class PositionEditor(QWidget):
         self._key.setFixedWidth(120)
         self._key.currentIndexChanged.connect(lambda _i: self._write("key", self._key.currentData()))
 
-        self._hold = QSpinBox()
-        self._hold.setRange(MIN_HOLD_MS, MAX_HOLD_MS)
-        self._hold.setSingleStep(100)
-        self._hold.setSuffix(" ms")
-        self._hold.setFixedWidth(100)
-        self._hold.valueChanged.connect(lambda value: self._write("hold_ms", int(value)))
+        # Seconds in the field, milliseconds in `PositionMove` — see `SecondsSpin`.
+        self._hold = SecondsSpin(MAX_HOLD_MS, min_ms=MIN_HOLD_MS)
+        self._hold.valueChanged.connect(lambda _v: self._write("hold_ms", self._hold.ms()))
 
         for widget in (QLabel("Key"), self._key, QLabel("Hold"), self._hold):
             row.addWidget(widget)
@@ -245,7 +242,7 @@ class PositionEditor(QWidget):
         index = self._key.findData(move.key)
         if index >= 0:
             self._key.setCurrentIndex(index)
-        self._hold.setValue(move.hold_ms)
+        self._hold.set_ms(move.hold_ms)
         self._loading = False
 
     def _write(self, attr: str, value) -> None:

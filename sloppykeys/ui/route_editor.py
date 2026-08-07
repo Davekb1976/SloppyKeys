@@ -53,6 +53,7 @@ from sloppykeys.content.nav_route import (
 
 from . import icons, theme
 from .macro_tester import RegionOverlay
+from .widgets import SecondsSpin
 
 
 RectProvider = Callable[[], "tuple[int, int, int, int] | None"]
@@ -323,10 +324,12 @@ class RouteEditor(QWidget):
         self._button.setFixedWidth(86)
         self._button.currentTextChanged.connect(lambda v: self._write("button", v))
         self._count = self._spin(1, 20, lambda v: self._write("count", v))
-        self._wait = self._spin(0, 60000, lambda v: self._write("wait_ms", v), step=100)
+        # Seconds in the field, milliseconds in `NavStep` — see `SecondsSpin`.
+        self._wait = SecondsSpin(60000)
+        self._wait.valueChanged.connect(lambda _v: self._write("wait_ms", self._wait.ms()))
         self._lbl_button = QLabel("Button")
         self._lbl_count = QLabel("Times")
-        self._lbl_wait = QLabel("Wait ms")
+        self._lbl_wait = QLabel("Wait")
         for widget in (
             self._lbl_button, self._button,
             self._lbl_count, self._count,
@@ -994,7 +997,7 @@ class RouteEditor(QWidget):
         self._scroll_y.setValue(step.scroll_y)
         self._button.setCurrentText(step.button)
         self._count.setValue(max(1, step.count))
-        self._wait.setValue(step.wait_ms)
+        self._wait.set_ms(step.wait_ms)
         self._loading = False
         self._apply_visibility(step.kind)
 
