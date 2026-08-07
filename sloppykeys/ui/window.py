@@ -2577,7 +2577,12 @@ class MainWindow(QWidget):
         """Ends a match cycle: wait for the win or defeat screen, then count it."""
 
         def action() -> StepResult:
-            outcome, message = self._placer.wait_for_outcome()
+            # Read here, not captured when the chain was built: the task queue can swap
+            # `_run_plan` between cycles, and the abilities belong to the plan being played.
+            plan = self._run_plan or self._plan
+            outcome, message = self._placer.wait_for_outcome(
+                match_steps=plan.match_steps()
+            )
             self._log(f"  Match result: {message}")
             if outcome == OUTCOME_WON:
                 self._record_outcome(True)

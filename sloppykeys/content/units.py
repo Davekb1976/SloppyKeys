@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
+
+# Shared with the route steps on purpose: a template path is a template path, and one
+# validator means a Find + Click action can't be laxer than a route's Find step.
+from .nav_route import safe_rel_path
 
 # 12 index tabs x 6 steps per tab.
 INDEX_COUNT = 12
@@ -119,10 +124,14 @@ ACTION_DRAG = "drag"
 ACTION_KEY = "key"
 ACTION_SCROLL = "scroll"
 ACTION_WAIT = "wait"
+# Click where a template is on screen, rather than at a coordinate. For an ability button
+# that moves, or appears more than once: `click_all` presses every instance found.
+ACTION_FIND_CLICK = "findclick"
 
 ACTION_TYPES = (
     ACTION_MOVE,
     ACTION_CLICK,
+    ACTION_FIND_CLICK,
     ACTION_DRAG,
     ACTION_KEY,
     ACTION_SCROLL,
@@ -131,6 +140,7 @@ ACTION_TYPES = (
 ACTION_LABELS = {
     ACTION_MOVE: "Move",
     ACTION_CLICK: "Click",
+    ACTION_FIND_CLICK: "Find + Click",
     ACTION_DRAG: "Drag",
     ACTION_KEY: "Key",
     ACTION_SCROLL: "Scroll",
@@ -140,6 +150,7 @@ ACTION_LABELS = {
 ACTION_FIELDS = {
     ACTION_MOVE: ("x", "y"),
     ACTION_CLICK: ("x", "y", "button", "count"),
+    ACTION_FIND_CLICK: ("image", "region", "button", "click_all"),
     ACTION_DRAG: ("x", "y", "to_x", "to_y", "button"),
     ACTION_KEY: ("key", "hold_ms"),
     ACTION_SCROLL: ("notches",),
@@ -170,9 +181,32 @@ class StepAction:
     hold_ms: int = 0
     notches: int = 0
     wait_ms: int = 0
+    # Find + Click only. `image` is a path under `images/`, validated by `safe_rel_path`
+    # like a route step's template. The region is client-space; width or height of 0 means
+    # the whole client, same convention as `NavStep`. No per-action confidence: tolerance
+    # is per *template* in this project (Settings > Vision), so a threshold here would be
+    # a second answer to the same question.
+    image: str = ""
+    region_x: int = 0
+    region_y: int = 0
+    region_w: int = 0
+    region_h: int = 0
+    click_all: bool = False
 
     def uses(self, field_name: str) -> bool:
+        if field_name == "region":
+            return "region" in ACTION_FIELDS.get(self.type, ())
         return field_name in ACTION_FIELDS.get(self.type, ())
+
+    def region(self) -> tuple[int, int, int, int] | None:
+        """Client-space (x, y, w, h), or None for the whole client area.
+
+        A template taller than its region can never match, so an unset region is the safe
+        default rather than a zero-sized one — same rule as `NavStep.region`.
+        """
+        if self.region_w <= 0 or self.region_h <= 0:
+            return None
+        return (self.region_x, self.region_y, self.region_w, self.region_h)
 
     def summary(self) -> str:
         """One-line description for the editor list."""
@@ -192,6 +226,9 @@ class StepAction:
             return f"{label}  {abs(self.notches)} {way}"
         if self.type == ACTION_WAIT:
             return f"{label}  {self.wait_ms} ms"
+        if self.type == ACTION_FIND_CLICK:
+            every = "  all" if self.click_all else ""
+            return f"{label}  {os.path.basename(self.image) or '?'}  {self.button}{every}"
         return label
 
     def as_payload(self) -> dict[str, object]:
@@ -207,12 +244,17 @@ class StepAction:
             "hold_ms": "HoldMs",
             "notches": "Notches",
             "wait_ms": "Ms",
+            "image": "Image",
         }
         # Only the fields this type uses get written, so a Wait doesn't carry
         # meaningless coordinates around.
         for attr, key in mapping.items():
             if self.uses(attr):
                 payload[key] = getattr(self, attr)
+        if self.uses("click_all"):
+            payload["ClickAll"] = 1 if self.click_all else 0
+        if self.uses("region") and self.region() is not None:
+            payload["Region"] = [self.region_x, self.region_y, self.region_w, self.region_h]
         return payload
 
     @classmethod
@@ -226,6 +268,21 @@ class StepAction:
         raw_type = str(payload.get("Type", "")).strip().lower()
         action_type = raw_type if raw_type in ACTION_TYPES else ACTION_CLICK
         button = str(payload.get("Button", BUTTON_DEFAULT)).strip().lower()
+
+        region = payload.get("Region")
+        rx = ry = rw = rh = 0
+        if isinstance(region, (list, tuple)) and len(region) == 4:
+            try:
+                rx, ry, rw, rh = (int(value) for value in region)
+            except (TypeError, ValueError):
+                rx = ry = rw = rh = 0
+
+        def flag(key: str) -> bool:
+            value = payload.get(key, 0)
+            if isinstance(value, str):
+                return value.strip().lower() in {"1", "true", "yes", "on"}
+            return bool(value)
+
         return cls(
             type=action_type,
             x=number("X"),
@@ -238,6 +295,13 @@ class StepAction:
             hold_ms=max(0, number("HoldMs")),
             notches=number("Notches"),
             wait_ms=max(0, number("Ms")),
+            # Same validator the route steps use: this becomes a path on disk.
+            image=safe_rel_path(payload.get("Image", "")),
+            region_x=max(0, rx),
+            region_y=max(0, ry),
+            region_w=max(0, rw),
+            region_h=max(0, rh),
+            click_all=flag("ClickAll"),
         )
 
 
@@ -273,6 +337,17 @@ class UnitStep:
     # during the placement phase, before the wave starts, instead of mid-wave.
     sell: bool = False
     preplacement: bool = False
+    # Third phase, and the only *repeating* one: the step runs over and over while the
+    # macro waits for the match result, every `wait` milliseconds. That is what makes an
+    # ability usable — the placement pass all happens in the first seconds of a wave, and
+    # the run loop is strictly sequential, so nothing else can act during a match.
+    #
+    # `wait` is the interval here rather than a delay before acting. For a repeating step
+    # "wait 2s then act, again" and "act every 2s" are the same number, and a second field
+    # for it would only be a second way to be wrong. A step with no interval runs once per
+    # poll, which is every `OUTCOME_POLL` (0.2s) — usually not what anyone wants, so the
+    # editor defaults it.
+    during_match: bool = False
     # Sequence steps only.
     actions: list[StepAction] = field(default_factory=list)
 
@@ -294,6 +369,7 @@ class UnitStep:
         "sell",
         "autoupgrade",
         "preplacement",
+        "during_match",
     )
 
     def copy_settings(self) -> dict[str, object]:
@@ -332,6 +408,8 @@ class UnitStep:
                 "Kind": KIND_SEQUENCE,
                 "Enable": 1 if self.is_actionable() else 0,
                 "Unit Name": self.unit_name,
+                "Wait": self.wait,
+                "DuringMatch": 1 if self.during_match else 0,
                 "Actions": [action.as_payload() for action in self.actions],
             }
         return {
@@ -351,6 +429,7 @@ class UnitStep:
             # written by an older build reads back as 1 = one press = auto level 1.
             "AutoUpgrade": autoupgrade_presses(self.autoupgrade),
             "PrePlacement": 1 if self.preplacement else 0,
+            "DuringMatch": 1 if self.during_match else 0,
         }
 
     @classmethod
@@ -409,6 +488,7 @@ class UnitStep:
             sell=flag("Sell"),
             autoupgrade=autoupgrade_presses(payload.get("AutoUpgrade", AUTOUPGRADE_OFF)),
             preplacement=flag("PrePlacement"),
+            during_match=flag("DuringMatch"),
         )
 
 
@@ -431,6 +511,19 @@ class UnitPlan:
 
     def enabled_steps(self) -> list[UnitStep]:
         return [step for step in self.steps if step.is_actionable()]
+
+    def chain_steps(self) -> list[UnitStep]:
+        """The steps that run once, in order, as their own entries in the run chain."""
+        return [step for step in self.enabled_steps() if not step.during_match]
+
+    def match_steps(self) -> list[UnitStep]:
+        """The steps that repeat while the macro waits for the result, in step order.
+
+        Kept out of the chain: a chain entry runs once and holds the run loop until it
+        returns, so a repeating step there would stop anything else happening — including
+        looking for the win screen.
+        """
+        return [step for step in self.enabled_steps() if step.during_match]
 
     def reset_step(self, step_number: int) -> UnitStep:
         """Blank one step in place and return the fresh object. Used by the detail

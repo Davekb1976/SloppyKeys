@@ -32,6 +32,11 @@ CONFIDENCE_MAX = 0.99
 # Settings > Vision before spending the last of this range.
 CONFIDENCE_USER_MIN = 0.51
 
+# Most places `find_instances` will report one template appearing at once. It is a bound on
+# clicks as much as on work: a template cropped loose enough to match flat background can
+# peak hundreds of times, and the caller turns each hit into a click in the game.
+MAX_INSTANCES = 8
+
 # Per-template thresholds from Settings > Vision, keyed by the template's relative path with
 # forward slashes. Module-level and read through `confidence_for` for the same reason
 # `content/challenge.py` holds its region overrides that way: several call sites resolve the
@@ -215,6 +220,91 @@ class ImageSearchEngine:
             )
 
         matches.sort(key=lambda match: match.score, reverse=True)
+        return matches
+
+    def find_instances(
+        self,
+        profile: ImageProfile,
+        viewport_rect: tuple[int, int, int, int],
+        limit: int = MAX_INSTANCES,
+        confidence: float | None = None,
+    ) -> list[ImageMatch]:
+        """Every place **one** template appears, best score first.
+
+        `find_all` can't answer this: it takes `cv2.minMaxLoc` of the correlation map,
+        which is the single best pixel, so two copies of an icon come back as one hit at
+        the better-scoring one. This thresholds the whole map instead and suppresses the
+        neighbours of each peak — the pixels immediately around a real hit all score just
+        under it, and without suppression one icon reports as dozens of matches a pixel
+        apart.
+
+        Suppression distance is the template's own size: anything overlapping a hit by
+        more than half is the same element, not a second one. `limit` bounds the work and
+        the clicks, because a badly cropped template can match a flat background hundreds
+        of times.
+
+        **Grayscale, so cooldown shading is invisible.** Normalized correlation ignores a
+        uniform brightness scale (the same reason a panel at 40% opacity still scores
+        0.96), so a greyed-out ability matches a ready one. Callers that must not press a
+        disabled ability need a region that excludes the overlay — no threshold separates
+        them.
+        """
+        viewport_x, viewport_y, viewport_width, viewport_height = viewport_rect
+        if viewport_width <= 0 or viewport_height <= 0:
+            return []
+        viewport_gray = self._capture_gray(viewport_rect)
+        if viewport_gray is None:
+            return []
+        template = self._load_template_gray(profile.image_path)
+        if template is None:
+            return []
+
+        region = profile.region or SearchRegion(0, 0, viewport_width, viewport_height)
+        region = region.normalized(viewport_width, viewport_height)
+        if region.width <= 0 or region.height <= 0:
+            return []
+        region_gray = viewport_gray[
+            region.y : region.y + region.height,
+            region.x : region.x + region.width,
+        ]
+        template_height, template_width = template.shape[:2]
+        if region_gray.shape[1] < template_width or region_gray.shape[0] < template_height:
+            return []
+
+        result = cv2.matchTemplate(region_gray, template, cv2.TM_CCOEFF_NORMED)
+        threshold = profile.confidence if confidence is None else confidence
+        ys, xs = np.where(result >= float(threshold))
+        if len(xs) == 0:
+            return []
+
+        # Strongest first, so suppression always keeps the best of a cluster.
+        order = np.argsort(result[ys, xs])[::-1]
+        keep_x = max(1, template_width // 2)
+        keep_y = max(1, template_height // 2)
+        taken: list[tuple[int, int]] = []
+        matches: list[ImageMatch] = []
+        for index in order:
+            x = int(xs[index])
+            y = int(ys[index])
+            if any(abs(x - tx) < keep_x and abs(y - ty) < keep_y for tx, ty in taken):
+                continue
+            taken.append((x, y))
+            match_left = viewport_x + region.x + x
+            match_top = viewport_y + region.y + y
+            matches.append(
+                ImageMatch(
+                    profile_name=profile.name,
+                    score=float(result[y, x]),
+                    center_x=match_left + (template_width // 2),
+                    center_y=match_top + (template_height // 2),
+                    left=match_left,
+                    top=match_top,
+                    width=template_width,
+                    height=template_height,
+                )
+            )
+            if len(matches) >= max(1, int(limit)):
+                break
         return matches
 
     # # Capture

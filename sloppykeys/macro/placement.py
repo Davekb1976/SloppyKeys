@@ -29,6 +29,7 @@ from sloppykeys.content.start_position import PositionMove
 from sloppykeys.content.units import (
     ACTION_CLICK,
     ACTION_DRAG,
+    ACTION_FIND_CLICK,
     ACTION_KEY,
     ACTION_MOVE,
     ACTION_SCROLL,
@@ -42,8 +43,10 @@ from sloppykeys.content.units import (
     slot_index,
 )
 from sloppykeys.core.image_search import (
+    MAX_INSTANCES,
     ImageProfile,
     ImageSearchEngine,
+    SearchRegion,
     clamp_confidence,
     confidence_for,
     find_until,
@@ -168,6 +171,19 @@ class UnitPlacer:
         ok, message = self._run(
             nudge_click_script(point[0], point[1], button=button, spread=spread)
         )
+        if ok:
+            time.sleep(self.settle)
+        return (ok, message)
+
+    def _click_screen(
+        self, x: int, y: int, button: str = "left", spread: int = SPREAD_WIDE
+    ) -> tuple[bool, str]:
+        """Click a point already in screen space — where a template matched.
+
+        `ImageMatch` centres are absolute, because the search takes the client rect as its
+        origin. Passing one to `_click_client` would add the window offset a second time.
+        """
+        ok, message = self._run(nudge_click_script(int(x), int(y), button=button, spread=spread))
         if ok:
             time.sleep(self.settle)
         return (ok, message)
@@ -399,6 +415,9 @@ class UnitPlacer:
         if action.type == ACTION_CLICK:
             return self._click_client(action.x, action.y, button=action.button)
 
+        if action.type == ACTION_FIND_CLICK:
+            return self._find_and_click(action)
+
         if action.type == ACTION_DRAG:
             start = self._screen(action.x, action.y)
             end = self._screen(action.to_x, action.to_y)
@@ -421,6 +440,53 @@ class UnitPlacer:
             return self._run(scroll_script(cx, cy, park[0], park[1], action.notches))
 
         return (False, f"unknown action type '{action.type}'")
+
+    def _find_and_click(self, action: StepAction) -> tuple[bool, str]:
+        """Click where a template is, rather than at a fixed coordinate.
+
+        **Not finding it is success, not failure.** An ability on cooldown simply isn't
+        on screen, and this action's whole purpose is to run repeatedly and press when it
+        can — reporting "not found" as a failed action would stop the run on the first
+        poll that came too early.
+
+        Tolerance comes from the template's own threshold (Settings > Vision), because
+        that is where every other search in the app reads it from.
+        """
+        if not action.image:
+            return (False, "no image set")
+        rect = self._rect()
+        if rect is None:
+            return (False, "Roblox not found")
+        if not self._engine.template_exists(action.image):
+            return (False, f"{action.image} is missing")
+
+        region = action.region()
+        profile = ImageProfile(
+            name=action.image,
+            image_path=action.image,
+            region=SearchRegion(*region) if region is not None else None,
+            confidence=confidence_for(action.image),
+        )
+        limit = MAX_INSTANCES if action.click_all else 1
+        matches = self._engine.find_instances(profile, rect, limit=limit)
+        if not matches:
+            return (True, "not on screen")
+
+        # Left to right, not by score: two instances of one button are usually a row, and
+        # pressing them in reading order is what a person would do — and what the user can
+        # predict from the log when one of them does the wrong thing.
+        matches.sort(key=lambda match: (match.center_x, match.center_y))
+        clicked: list[str] = []
+        for match in matches:
+            if self._should_stop():
+                break
+            ok, message = self._click_screen(
+                match.center_x, match.center_y, button=action.button
+            )
+            if not ok:
+                return (False, f"click at {match.center_x},{match.center_y}: {message}")
+            clicked.append(f"{match.center_x},{match.center_y} ({match.score:.2f})")
+        return (True, f"clicked {' + '.join(clicked)}")
 
     def _press_raw(self, key: str, hold_ms: int = 0) -> tuple[bool, str]:
         """Press a sequence action's key. Sanitised the same way as game keys,
@@ -459,7 +525,9 @@ class UnitPlacer:
         return (True, f"{len(usable)} moves, {seconds:.1f}s of walking")
 
     # # Match cycle
-    def wait_for_outcome(self, timeout: float | None = None) -> tuple[str, str]:
+    def wait_for_outcome(
+        self, timeout: float | None = None, match_steps: "list[UnitStep] | None" = None
+    ) -> tuple[str, str]:
         """Park the cursor and idle until the match ends.
 
         Returns (outcome, message) where outcome is OUTCOME_WON, OUTCOME_LOST, or
@@ -469,12 +537,20 @@ class UnitPlacer:
 
         The loss template is optional — with no `game_lost.png` on disk a defeat
         simply isn't recognised and this waits out its budget.
+
+        `match_steps` are the plan's During match steps, and this is the only place they
+        can run. The run loop advances one step at a time and waits for it to return, so a
+        repeating step in the chain would hold the whole run and stop anything looking for
+        the result. Here the two share one loop: each pass looks for the outcome **first**,
+        so a result is never delayed behind an ability press, then runs whichever steps
+        are due. A press counts as activity, so it also defers the keep-alive click.
         """
         budget = self.won_timeout if timeout is None else float(timeout)
         deadline = time.monotonic() + max(0.0, budget)
         self._park()
         clicks = 0
         last_click = time.monotonic()
+        schedule = _MatchSchedule(match_steps or [])
         while True:
             # Both screens matched against **one capture**, rather than polling for the
             # win for `won_poll_click` seconds and then taking a single look for the
@@ -502,21 +578,52 @@ class UnitPlacer:
                 return (
                     OUTCOME_LOST if lost else OUTCOME_WON,
                     f"{'defeat' if lost else 'win'} screen ({match.score:.2f}) "
-                    f"at {match.left},{match.top} — {self._outcome_scores()}",
+                    f"at {match.left},{match.top} — {self._outcome_scores()}"
+                    f"{schedule.trail()}",
                 )
             now = time.monotonic()
             if now >= deadline:
-                return ("", f"no result within {budget:.0f}s ({clicks} keep-alives)")
+                return (
+                    "",
+                    f"no result within {budget:.0f}s ({clicks} keep-alives)"
+                    f"{schedule.trail()}",
+                )
             # Before the keep-alive click, not after: this loop can idle for the whole
             # length of a match, so it decides how long F1 takes to be obeyed. Checking
             # here also means a stop never fires one more click into the game.
             if self._should_stop():
-                return ("", f"stopped by user after {clicks} keep-alives")
+                return (
+                    "",
+                    f"stopped by user after {clicks} keep-alives{schedule.trail()}",
+                )
+            # After the outcome look and the stop check, before the keep-alive: a due step
+            # is real activity, so firing one makes the courtesy click unnecessary.
+            if schedule.run_due(now, self._run_match_step):
+                last_click = time.monotonic()
+                continue
             if now - last_click >= max(1.0, self.won_poll_click):
                 self._click_client(*PARK_CLIENT)
                 clicks += 1
                 last_click = time.monotonic()
             time.sleep(OUTCOME_POLL)
+
+    def _run_match_step(self, step: UnitStep) -> bool:
+        """One pass of a During match step. False means it should stop being scheduled.
+
+        A failure here does **not** end the run. The match is still playable without an
+        ability, and stopping mid-match would abandon a run that was going to win; the step
+        is dropped from the schedule and said once in the log, so a broken template doesn't
+        repeat the same complaint every 200ms for the rest of the match.
+        """
+        if step.is_sequence():
+            ok, message = self.run_sequence(step)
+        else:
+            ok, message = self.place_unit(step)
+        if not ok:
+            self._log(f"During match step {step.step} failed, not repeating it: {message}")
+            return False
+        self._log(f"During match step {step.step}: {message}")
+        return True
 
     def _find_outcome(self):
         """One look for either end-of-match screen. Returns the better match, or None.
@@ -610,10 +717,63 @@ def split_steps(steps: list[UnitStep]) -> tuple[list[UnitStep], list[UnitStep]]:
 
     Pre-placement steps run before the Start Game click, because that gap is the
     only time the wave hasn't started; everything else runs after it.
+
+    **During match steps are in neither list.** They don't become chain steps at all —
+    `wait_for_outcome` repeats them from its own loop, so including them here would run
+    them once at the top of the wave *and* leave them scheduled.
     """
-    pre = [step for step in steps if step.preplacement]
-    during = [step for step in steps if not step.preplacement]
+    chain = [step for step in steps if not step.during_match]
+    pre = [step for step in chain if step.preplacement]
+    during = [step for step in chain if not step.preplacement]
     return (pre, during)
+
+
+class _MatchSchedule:
+    """When each During match step is next due, for `wait_for_outcome`'s loop.
+
+    Per-step clocks rather than one shared tick: a 2s ability and a 30s ultimate in the
+    same plan have nothing to say to each other, and a shared interval would make the
+    slower one dictate the faster.
+
+    One step per pass, in step order. Running the whole list in one pass would send a
+    burst of clicks with no look at the screen between them, which is how a result gets
+    missed for as long as the burst takes.
+    """
+
+    def __init__(self, steps: list[UnitStep]) -> None:
+        # `wait` is the interval for these steps, not a delay before acting. Floored at
+        # OUTCOME_POLL so there is always a look at the screen between two presses —
+        # without it, a step left at 0 fires back-to-back and a result can only be noticed
+        # in the gaps between AHK scripts.
+        self._due: list[tuple[UnitStep, float]] = [
+            (step, max(OUTCOME_POLL, _as_int(step.wait) / 1000.0)) for step in steps
+        ]
+        self._next: dict[int, float] = {}
+        self._ran: dict[int, int] = {}
+        self._dropped: set[int] = set()
+
+    def run_due(self, now: float, run: Callable[[UnitStep], bool]) -> bool:
+        """Run the first step that's due. True if one ran."""
+        for step, interval in self._due:
+            if step.step in self._dropped:
+                continue
+            if now < self._next.get(step.step, 0.0):
+                continue
+            self._next[step.step] = now + interval
+            self._ran[step.step] = self._ran.get(step.step, 0) + 1
+            if not run(step):
+                self._dropped.add(step.step)
+            return True
+        return False
+
+    def trail(self) -> str:
+        """What ran, for the result line. Empty when the plan has no such steps."""
+        if not self._ran:
+            return "" if not self._due else " — no during-match step fired"
+        parts = ", ".join(
+            f"step {number} x{count}" for number, count in sorted(self._ran.items())
+        )
+        return f" — during match: {parts}"
 
 
 def _as_int(value: object, default: int = 0) -> int:
