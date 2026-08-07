@@ -45,6 +45,41 @@ def clean_name(value: str) -> str:
     return safe_component(str(value).strip())[:NAME_MAX].strip()
 
 
+def step_image(map_name: str, act: str, index: int) -> str:
+    """Where a route step's captured template lives. One shape, used by the capture, the
+    rename and the deletion sweep — three spellings of this was how a renamed event kept
+    pointing at files under the old folder."""
+    return f"images/events/{clean_name(map_name)}/{clean_name(act)}_{int(index)}.png"
+
+
+def _reimage(step: dict, old_map: str, new_map: str, old_act: str, new_act: str) -> dict:
+    """A step payload with its `Image` path moved to the new event/act folder.
+
+    Only rewrites a path that actually sits under the old event's own folder. A step
+    pointing at a shared or hand-placed template elsewhere in `images/` is left alone —
+    renaming an event is not a licence to rewrite a path it does not own.
+    """
+    if not isinstance(step, dict):
+        return step
+    image = str(step.get("Image") or "")
+    if not image:
+        return step
+    prefix = f"images/events/{clean_name(old_map)}/"
+    spelled = image.replace("\\", "/")
+    if not spelled.startswith(prefix):
+        return step
+    tail = spelled[len(prefix) :]
+    stem = f"{clean_name(old_act)}_"
+    if not tail.startswith(stem):
+        # Same event folder, another act's file: the folder moves, the name does not.
+        moved = f"images/events/{clean_name(new_map)}/{tail}"
+    else:
+        moved = f"images/events/{clean_name(new_map)}/{clean_name(new_act)}_{tail[len(stem):]}"
+    step = dict(step)
+    step["Image"] = moved
+    return step
+
+
 class RouteStore:
     def __init__(self, app_root: str) -> None:
         self._path = os.path.join(app_root, ROUTES_FILE)
@@ -158,6 +193,69 @@ class RouteStore:
             routes.pop(act, None)
         maps[map_name] = entry
         return self._write(maps)
+
+    def rename_map(self, old: str, new: str) -> str:
+        """Rename an event, keeping its acts, routes and act order. Returns the stored name.
+
+        `""` when the name is unusable or already taken — **rejected, not merged**. Merging
+        two events' acts would silently discard one side's routes, and a name collision is
+        a mistake worth reporting rather than resolving.
+
+        Rewrites each step's `Image` path, because a step's template lives under
+        `images/events/<Event>/`. The files are moved by `route_paths.rename_event`; this is
+        only the record of where they now are, so the two have to be run together.
+        """
+        name = clean_name(new)
+        maps = self._maps()
+        if not name or old not in maps:
+            return ""
+        if name != old and name in maps:
+            return ""
+        # Rebuilt rather than mutated in place: a dict keeps insertion order, and renaming a
+        # key by pop/insert would move the event to the end of the Map dropdown.
+        renamed: dict = {}
+        for key, entry in maps.items():
+            if key != old:
+                renamed[key] = entry
+                continue
+            if isinstance(entry, dict):
+                entry = dict(entry)
+                entry["Routes"] = {
+                    act: [_reimage(step, old, name, act, act) for step in steps]
+                    for act, steps in (entry.get("Routes") or {}).items()
+                    if isinstance(steps, list)
+                }
+            renamed[name] = entry
+        return name if self._write(renamed) else ""
+
+    def rename_act(self, map_name: str, old: str, new: str) -> str:
+        """Rename one act of an event, keeping its position in the act order.
+
+        `""` when unusable, unknown, or already an act of this event — same reason as
+        `rename_map`: two acts merged is one route silently lost.
+        """
+        name = clean_name(new)
+        maps = self._maps()
+        entry = maps.get(map_name)
+        if not name or not isinstance(entry, dict):
+            return ""
+        acts = self.acts(map_name)
+        if old not in acts or (name != old and name in acts):
+            return ""
+        entry = dict(entry)
+        entry["Acts"] = [name if act == old else act for act in acts]
+        routes = entry.get("Routes")
+        if isinstance(routes, dict):
+            entry["Routes"] = {
+                (name if act == old else act): [
+                    _reimage(step, map_name, map_name, old, name) if act == old else step
+                    for step in steps
+                ]
+                for act, steps in routes.items()
+                if isinstance(steps, list)
+            }
+        maps[map_name] = entry
+        return name if self._write(maps) else ""
 
     def set_steps(self, map_name: str, act: str, steps: list[NavStep]) -> bool:
         maps = self._maps()

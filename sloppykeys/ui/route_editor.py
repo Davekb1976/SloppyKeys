@@ -36,6 +36,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from sloppykeys.config import route_paths
 from sloppykeys.config.nav_routes import RouteStore, clean_name
 from sloppykeys.content.nav_images import events_templates_dir
 from sloppykeys.core.image_search import ImageSearchEngine, find_until
@@ -65,6 +66,11 @@ class RouteEditor(QWidget):
     # Run this event/act's route once, now. Driving the game blocks and clicks, so
     # MainWindow runs it on a worker and reports back through `show_note`.
     testRequested = Signal(str, str)  # event, act
+    # Renamed, and the files have already moved. Separate from `changed` because a queued
+    # task stores the name as *data* — rebuilding a dropdown does not fix a slot that still
+    # points at the old event, and the task queue is owned by `MainWindow`, not this editor.
+    eventRenamed = Signal(str, str)  # old, new
+    actRenamed = Signal(str, str, str)  # event, old act, new act
 
     def __init__(
         self,
@@ -116,6 +122,14 @@ class RouteEditor(QWidget):
         self._map.currentIndexChanged.connect(lambda _i: self._on_map_changed())
         map_row.addWidget(self._map, 1)
         map_row.addWidget(self._icon(icons.PLUS, "Add an event", self._add_map))
+        map_row.addWidget(
+            self._icon(
+                icons.RENAME,
+                "Rename this event — moves its step templates, placement backdrops, "
+                "unit configs and any queued task with it",
+                self._rename_map,
+            )
+        )
         map_row.addWidget(self._icon(icons.TRASH, "Delete this event", self._remove_map))
         rows.addLayout(map_row)
 
@@ -126,6 +140,14 @@ class RouteEditor(QWidget):
         self._act.currentIndexChanged.connect(lambda _i: self._on_act_changed())
         act_row.addWidget(self._act, 1)
         act_row.addWidget(self._icon(icons.PLUS, "Add an act", self._add_act))
+        act_row.addWidget(
+            self._icon(
+                icons.RENAME,
+                "Rename this act — moves its step templates, placement backdrop, unit "
+                "config and any queued task with it",
+                self._rename_act,
+            )
+        )
         act_row.addWidget(self._icon(icons.TRASH, "Delete this act", self._remove_act))
         rows.addLayout(act_row)
         return rows
@@ -386,6 +408,56 @@ class RouteEditor(QWidget):
         if self._loading:
             return
         self._load_steps()
+
+    def _rename_map(self) -> None:
+        """Rename an event and everything named after it.
+
+        The name is a folder under `images/events/`, `images/reference/Events/` and
+        `configs/Events/`, a key in `routes.json`, each step's `Image` path, and possibly a
+        queued task. Renaming the label alone would leave a route that still runs while the
+        placement backdrop and unit plan quietly stop being found.
+        """
+        old = self.current_map()
+        if not old:
+            return
+        name, ok = QInputDialog.getText(
+            self, "Rename event", "New event name:", text=old
+        )
+        if not ok:
+            return
+        moved, message = route_paths.rename_event(self._app_root, self._store, old, name)
+        if not moved:
+            self._set_note(f"Couldn't rename {old}: {message}.", bad=True)
+            return
+        stored = clean_name(name)
+        self._log(f"Renamed event {old} to {stored}: {message}.")
+        self.reload()
+        self._map.setCurrentText(stored)
+        # Before `changed`, so the queue is already correct when the Tasks tab rebuilds.
+        self.eventRenamed.emit(old, stored)
+        self.changed.emit()
+        self._set_note(f"{old} is now {stored} — {message}.")
+
+    def _rename_act(self) -> None:
+        """Rename one act, moving its step templates, backdrop and unit config with it."""
+        map_name, old = self.current_map(), self.current_act()
+        if not (map_name and old):
+            return
+        name, ok = QInputDialog.getText(self, "Rename act", "New act name:", text=old)
+        if not ok:
+            return
+        moved, message = route_paths.rename_act(
+            self._app_root, self._store, map_name, old, name
+        )
+        if not moved:
+            self._set_note(f"Couldn't rename {old}: {message}.", bad=True)
+            return
+        stored = clean_name(name)
+        self._log(f"Renamed act {map_name} / {old} to {stored}: {message}.")
+        self._fill_acts(stored)
+        self.actRenamed.emit(map_name, old, stored)
+        self.changed.emit()
+        self._set_note(f"{old} is now {stored} — {message}.")
 
     def _add_map(self) -> None:
         name, ok = QInputDialog.getText(self, "Add event", "Event name (shown in the Map list):")

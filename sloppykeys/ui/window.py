@@ -885,6 +885,10 @@ class MainWindow(QWidget):
         # this ("an act added in Run > Route has to appear here without a restart") and was
         # simply never connected to anything.
         self._route_editor.changed.connect(self._image_manager.refresh)
+        # A rename moves files and rewrites `routes.json`, but a queued task stores the name
+        # as data — a rebuilt dropdown does not repair a slot still pointing at the old one.
+        self._route_editor.eventRenamed.connect(self._on_event_renamed)
+        self._route_editor.actRenamed.connect(self._on_act_renamed)
         self._route_editor.testRequested.connect(self._on_route_test)
         self._task_editor.slotsChanged.connect(self._on_tasks_changed)
         self._task_editor.challengesToggled.connect(self._on_challenges_toggled)
@@ -2218,6 +2222,43 @@ class MainWindow(QWidget):
                     f"{client}{launched} ({message}). Settings > Delays > "
                     f"'Wait for the lobby after re-joining' if this needs longer",
                 )
+
+    def _on_event_renamed(self, old: str, new: str) -> None:
+        """Follow an event rename into the task queue."""
+        self._retarget_tasks(lambda slot: slot.map_name == old, map_name=new)
+
+    def _on_act_renamed(self, event: str, old: str, new: str) -> None:
+        """Follow an act rename into the task queue."""
+        self._retarget_tasks(
+            lambda slot: slot.map_name == event and slot.act == old, act=new
+        )
+
+    def _retarget_tasks(self, matches, *, map_name: str = "", act: str = "") -> None:
+        """Rewrite the Events slots a rename just moved, and only those.
+
+        Saved and re-read rather than edited in place: `TaskStore` owns the shape, and the
+        Tasks tab is rebuilt from the store by the `changed` signal that follows. Silent
+        when nothing matched — a rename with no queued task is the normal case and does not
+        deserve a line in the log.
+        """
+        slots = self._task_store.slots()
+        touched = 0
+        for slot in slots:
+            # `is_custom`, not a name comparison: it is the same predicate that decides a
+            # slot navigates by a route at all, so the two cannot drift apart.
+            if not is_custom(slot.gamemode) or not matches(slot):
+                continue
+            if map_name:
+                slot.map_name = map_name
+            if act:
+                slot.act = act
+            touched += 1
+        if not touched:
+            return
+        self._task_store.save(slots)
+        self._director.slots = self._task_store.slots()
+        self._refresh_queue_view()
+        self._log(f"Task queue: followed the rename in {touched} slot(s).")
 
     def _lobby_rejoin_wait(self) -> float:
         """Seconds to wait for the lobby after the deep link, from Settings > Delays.

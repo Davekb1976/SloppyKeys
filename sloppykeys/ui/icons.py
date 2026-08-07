@@ -24,3 +24,5 @@ UP = "\uE74A"
 DOWN = "\uE74B"
 COPY = "\uE8C8"
 UNDO = "\uE7A7"
+# Segoe Fluent's "Rename" glyph, which is the pencil-over-a-label the Explorer ribbon uses.
+RENAME = "\uE8AC"
