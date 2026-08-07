@@ -20,11 +20,17 @@ import numpy as np  # type: ignore[import-not-found]
 DEFAULT_CONFIDENCE = 0.70
 CONFIDENCE_MIN = 0.50
 CONFIDENCE_MAX = 0.99
-# The floor a *user* may set, deliberately higher than `CONFIDENCE_MIN` (which exists for
-# `best_score`'s accept-anything probe). A global tolerance setting was removed from this
-# project after it drifted to 0.57 and started matching the wrong screens; per-template is
-# narrower, but the same trap is one slider-drag away, so 0.60 is where it stops.
-CONFIDENCE_USER_MIN = 0.60
+# The floor a *user* may set, still above `CONFIDENCE_MIN` (which exists for `best_score`'s
+# accept-anything probe, and must stay below anything a search can demand).
+#
+# The trap this guards is real and measured: a **global** tolerance setting was removed from
+# this project after drifting to 0.57 and matching the wrong screens. Per-template is a much
+# narrower blast radius — one image, not every search — so the floor is the engine's, plus
+# one, rather than a round number chosen out of caution. Where it matters is the *reason* a
+# template scores low: wrong scale costs 0.253 correlation, so a stubborn 0.61 is a bad crop
+# and dropping the threshold to meet it buys a match on the wrong element. Recapture through
+# Settings > Vision before spending the last of this range.
+CONFIDENCE_USER_MIN = 0.51
 
 # Per-template thresholds from Settings > Vision, keyed by the template's relative path with
 # forward slashes. Module-level and read through `confidence_for` for the same reason

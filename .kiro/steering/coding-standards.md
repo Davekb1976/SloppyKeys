@@ -142,7 +142,8 @@ identical rects) · runtime multi-scale matching (~24× cost, and it hides bad t
 (`core/text_locate.py`) · per-gamemode stage search regions (`STAGE_SEARCH_REGIONS`:
 hand-measured, stale after any resize, and a band shorter than its template can't match) ·
 a **global** match-tolerance setting (drifted to 0.57 and matched wrong screens; tolerance is
-per-template now, floor 0.60, `DEFAULT_CONFIDENCE` 0.70, no auto-calibrate).
+per-template now — `DEFAULT_CONFIDENCE` 0.70, bounds `CONFIDENCE_USER_MIN`/`CONFIDENCE_MAX`,
+no auto-calibrate).
 
 ## Python / PySide6
 

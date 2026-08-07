@@ -18,9 +18,11 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sloppykeys.content.nav_images import game_lost_image, game_won_image  # noqa: E402
+from sloppykeys.config.regions import clean_confidence  # noqa: E402
 from sloppykeys.core.image_search import (  # noqa: E402
     CONFIDENCE_MAX,
     CONFIDENCE_MIN,
+    CONFIDENCE_USER_MIN,
     DEFAULT_CONFIDENCE,
     apply_confidence_overrides,
     confidence_for,
@@ -63,6 +65,17 @@ apply_confidence_overrides({WON: 5.0, LOST: -1.0})
 clamped = thresholds()
 assert clamped[WON] == CONFIDENCE_MAX, clamped
 assert clamped[LOST] == CONFIDENCE_MIN, clamped
+
+# # The range a user may set. The engine floor must stay *below* it: `best_score` pins
+# `CONFIDENCE_MIN` to accept anything, and it cannot be a value a search might demand.
+assert CONFIDENCE_MIN < CONFIDENCE_USER_MIN < DEFAULT_CONFIDENCE < CONFIDENCE_MAX < 1.0
+assert CONFIDENCE_USER_MIN == 0.51, CONFIDENCE_USER_MIN
+# A stored value is *rejected*, not clamped, so the file never disagrees with what is in
+# force — and the bounds it enforces are the same ones the spin offers.
+for good in (CONFIDENCE_USER_MIN, DEFAULT_CONFIDENCE, CONFIDENCE_MAX):
+    assert clean_confidence(good) == good, good
+for bad in (CONFIDENCE_MIN, 0.0, 1.0, 5.0, -1.0, "0.8", True, None):
+    assert clean_confidence(bad) is None, bad
 
 # # Clearing an override returns the template to the default rather than pinning the old value
 apply_confidence_overrides({})

@@ -145,11 +145,10 @@ class _OverrideStore:
 def clean_confidence(value: Any) -> float | None:
     """A per-template match threshold, or None. Rejects rather than clamps.
 
-    The floor is `CONFIDENCE_USER_MIN` (0.60), not the engine's 0.50: this project already
-    removed a global tolerance setting after it drifted to 0.57 and started matching the
-    wrong screens. Rejecting a hand-edited 0.2 rather than clamping it keeps the file honest
-    about what is in force — a silently raised value would look like the macro ignoring the
-    setting.
+    The bounds are `CONFIDENCE_USER_MIN` and `CONFIDENCE_MAX`, read from the engine rather
+    than repeated here — quoting the number in prose is what goes stale when it moves.
+    Rejecting a hand-edited 0.2 rather than clamping it keeps the file honest about what is
+    in force: a silently raised value would look like the macro ignoring the setting.
     """
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
