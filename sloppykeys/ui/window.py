@@ -879,6 +879,12 @@ class MainWindow(QWidget):
         # The Tasks tab can queue an Events target, so its Map/Act lists go stale
         # for the same reason the Run strip's do.
         self._route_editor.changed.connect(self._task_editor.refresh_options)
+        # **Settings > Vision too.** Its Events rows — the route's step templates and the
+        # act's placement backdrop — are built from `routes.json`, so a new act had no rows
+        # there until the app was restarted. `ImageManager.refresh` was written for exactly
+        # this ("an act added in Run > Route has to appear here without a restart") and was
+        # simply never connected to anything.
+        self._route_editor.changed.connect(self._image_manager.refresh)
         self._route_editor.testRequested.connect(self._on_route_test)
         self._task_editor.slotsChanged.connect(self._on_tasks_changed)
         self._task_editor.challengesToggled.connect(self._on_challenges_toggled)
