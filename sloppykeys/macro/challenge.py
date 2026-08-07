@@ -63,7 +63,9 @@ RectProvider = Callable[[], "tuple[int, int, int, int] | None"]
 
 # OCR reads small stylised text approximately, so digits get the usual confusions
 # folded back before parsing. Only characters that cannot appear in "9 / 10".
-_DIGIT_FIXES = str.maketrans({"o": "0", "O": "0", "D": "0", "l": "1", "I": "1", "|": "1"})
+# Public because the wave counter needs the same fold — one table, so a confusion fixed
+# for one reader is fixed for both.
+DIGIT_FIXES = str.maketrans({"o": "0", "O": "0", "D": "0", "l": "1", "I": "1", "|": "1"})
 
 
 def parse_limit(text: str) -> tuple[int | None, int | None]:
@@ -81,8 +83,8 @@ def parse_limit(text: str) -> tuple[int | None, int | None]:
         if compact.count(separator) != 1:
             continue
         left, right = compact.split(separator)
-        match = re.search(r"(\d{1,3})\s*$", left.translate(_DIGIT_FIXES))
-        total_match = re.match(r"^\s*(\d{1,3})", right.translate(_DIGIT_FIXES))
+        match = re.search(r"(\d{1,3})\s*$", left.translate(DIGIT_FIXES))
+        total_match = re.match(r"^\s*(\d{1,3})", right.translate(DIGIT_FIXES))
         if not match or not total_match:
             continue
         remaining, total = int(match.group(1)), int(total_match.group(1))

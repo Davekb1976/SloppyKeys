@@ -127,6 +127,11 @@ ACTION_WAIT = "wait"
 # Click where a template is on screen, rather than at a coordinate. For an ability button
 # that moves, or appears more than once: `click_all` presses every instance found.
 ACTION_FIND_CLICK = "findclick"
+# A gate, not an input: OCR the wave counter and only let the rest of the sequence run once
+# the match has reached `wave`. `max_wave` is the map's total, and it is what makes the read
+# trustworthy — a counter that reads "12/25" is checked against it, and a bare "125" is
+# rejected as a misread instead of being taken as wave 125.
+ACTION_WAVE = "wave"
 
 ACTION_TYPES = (
     ACTION_MOVE,
@@ -136,6 +141,7 @@ ACTION_TYPES = (
     ACTION_KEY,
     ACTION_SCROLL,
     ACTION_WAIT,
+    ACTION_WAVE,
 )
 ACTION_LABELS = {
     ACTION_MOVE: "Move",
@@ -145,6 +151,7 @@ ACTION_LABELS = {
     ACTION_KEY: "Key",
     ACTION_SCROLL: "Scroll",
     ACTION_WAIT: "Wait",
+    ACTION_WAVE: "Wait for Wave",
 }
 # Which fields each type actually uses, so the editor shows only what applies.
 ACTION_FIELDS = {
@@ -155,10 +162,18 @@ ACTION_FIELDS = {
     ACTION_KEY: ("key", "hold_ms"),
     ACTION_SCROLL: ("notches",),
     ACTION_WAIT: ("wait_ms",),
+    # `wait_ms` here is how long to keep looking, not a delay: 0 means one look, and the
+    # rest of the sequence is skipped this pass if the wave hasn't arrived.
+    ACTION_WAVE: ("wave", "max_wave", "region", "wait_ms"),
 }
 
 BUTTON_OPTIONS = ["left", "right", "middle"]
 BUTTON_DEFAULT = "left"
+
+# Ceiling for a wave number. No stage in this game runs to three figures, and the bound is
+# what lets a bare OCR read be trusted: "125" from a counter on a 25-wave map is a misread
+# of "12", not wave 125.
+WAVE_MAX = 99
 
 
 @dataclass
@@ -192,6 +207,9 @@ class StepAction:
     region_w: int = 0
     region_h: int = 0
     click_all: bool = False
+    # Wait for Wave only. `wave` is the wave the gate opens on, `max_wave` the map's total.
+    wave: int = 0
+    max_wave: int = 0
 
     def uses(self, field_name: str) -> bool:
         if field_name == "region":
@@ -229,6 +247,10 @@ class StepAction:
         if self.type == ACTION_FIND_CLICK:
             every = "  all" if self.click_all else ""
             return f"{label}  {os.path.basename(self.image) or '?'}  {self.button}{every}"
+        if self.type == ACTION_WAVE:
+            of = f" of {self.max_wave}" if self.max_wave else ""
+            budget = f"  up to {self.wait_ms} ms" if self.wait_ms else "  one look"
+            return f"{label}  {self.wave or '?'}{of}{budget}"
         return label
 
     def as_payload(self) -> dict[str, object]:
@@ -245,6 +267,8 @@ class StepAction:
             "notches": "Notches",
             "wait_ms": "Ms",
             "image": "Image",
+            "wave": "Wave",
+            "max_wave": "MaxWave",
         }
         # Only the fields this type uses get written, so a Wait doesn't carry
         # meaningless coordinates around.
@@ -302,6 +326,8 @@ class StepAction:
             region_w=max(0, rw),
             region_h=max(0, rh),
             click_all=flag("ClickAll"),
+            wave=max(0, min(number("Wave"), WAVE_MAX)),
+            max_wave=max(0, min(number("MaxWave"), WAVE_MAX)),
         )
 
 

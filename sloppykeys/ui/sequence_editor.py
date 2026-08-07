@@ -36,7 +36,9 @@ from sloppykeys.content.units import (
     ACTION_LABELS,
     ACTION_TYPES,
     ACTION_WAIT,
+    ACTION_WAVE,
     BUTTON_OPTIONS,
+    WAVE_MAX,
     StepAction,
 )
 from sloppykeys.core.image_search import ImageSearchEngine
@@ -169,6 +171,31 @@ class SequenceEditor(QWidget):
         for widget in (self._lbl_image, self._image, self._capture, self._region):
             image_row.addWidget(widget)
         grid.addLayout(image_row)
+
+        # # Wait for Wave: which wave to open on, and the map's total to check the read
+        wave_row = QHBoxLayout()
+        wave_row.setSpacing(6)
+        self._wave = self._spin(0, WAVE_MAX, lambda v: self._write("wave", v))
+        self._wave.setToolTip("The rest of this sequence runs once the match reaches it.")
+        self._max_wave = self._spin(0, WAVE_MAX, lambda v: self._write("max_wave", v))
+        self._max_wave.setToolTip(
+            "How many waves this stage has, e.g. 25.\n\n"
+            "It is what makes the read trustworthy: a counter showing '12/25' is checked "
+            "against it, and a bare '125' is rejected as a misread of '12' rather than "
+            "opening the gate 100 waves early. Leave 0 if you don't know it."
+        )
+        self._wave_region = self._text_button("Region", "Box the wave counter for OCR")
+        self._wave_region.clicked.connect(self._pick_region)
+        self._lbl_wave = QLabel("Wave")
+        self._lbl_max_wave = QLabel("of")
+        for widget in (
+            self._lbl_wave, self._wave,
+            self._lbl_max_wave, self._max_wave,
+            self._wave_region,
+        ):
+            wave_row.addWidget(widget)
+        wave_row.addStretch(1)
+        grid.addLayout(wave_row)
 
         all_row = QHBoxLayout()
         all_row.setSpacing(6)
@@ -308,6 +335,10 @@ class SequenceEditor(QWidget):
         # default rather than a silent no-op.
         if new_type == ACTION_WAIT and not action.wait_ms:
             action.wait_ms = 250
+        # Wave 0 is "no wave set", which the gate refuses. Same reasoning as the Wait
+        # above: a freshly retyped action should do something.
+        if new_type == ACTION_WAVE and not action.wave:
+            action.wave = 1
         self._refresh_row_text(row)
         self._show_fields()
         self.changed.emit()
@@ -358,6 +389,8 @@ class SequenceEditor(QWidget):
         action = StepAction(type=action_type)
         if action_type == ACTION_WAIT:
             action.wait_ms = 250  # a bare 0ms wait does nothing useful
+        if action_type == ACTION_WAVE:
+            action.wave = 1  # wave 0 means "unset", which the gate refuses
         return action
 
     def _insert_at(self, index: int) -> None:
@@ -459,8 +492,12 @@ class SequenceEditor(QWidget):
         self._wait.set_ms(action.wait_ms)
         self._image.setText(action.image)
         region = action.region()
-        self._region.setText("Region" if region is None else f"{region[2]}x{region[3]}")
+        label = "Region" if region is None else f"{region[2]}x{region[3]}"
+        self._region.setText(label)
+        self._wave_region.setText(label)
         self._click_all.setChecked(bool(action.click_all))
+        self._wave.setValue(action.wave)
+        self._max_wave.setValue(action.max_wave)
         self._loading = False
         self._apply_field_visibility(action.type)
 
@@ -482,6 +519,14 @@ class SequenceEditor(QWidget):
                 (self._lbl_image, self._image, self._capture, self._region),
             ),
             (("click_all",), (self._click_all,)),
+            (
+                ("wave",),
+                (
+                    self._lbl_wave, self._wave,
+                    self._lbl_max_wave, self._max_wave,
+                    self._wave_region,
+                ),
+            ),
         )
         for names, widgets in groups:
             visible = any(name in used for name in names)
@@ -494,7 +539,7 @@ class SequenceEditor(QWidget):
         region that excludes the greyed overlay is the only way to tell a ready button
         from a disabled one, since matching is grayscale."""
         action = self._current_action()
-        if action is None or action.type != ACTION_FIND_CLICK:
+        if action is None or not action.uses("region"):
             return
 
         def done(result) -> None:

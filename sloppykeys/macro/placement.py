@@ -20,6 +20,7 @@ Sequence steps run their own action list instead of the unit fields.
 
 from __future__ import annotations
 
+import re
 import time
 import os
 from typing import Callable
@@ -34,8 +35,10 @@ from sloppykeys.content.units import (
     ACTION_MOVE,
     ACTION_SCROLL,
     ACTION_WAIT,
+    ACTION_WAVE,
     AUTOUPGRADE_CYCLE,
     PRIORITY_OPTIONS,
+    WAVE_MAX,
     StepAction,
     UnitStep,
     autoupgrade_is_on,
@@ -52,6 +55,9 @@ from sloppykeys.core.image_search import (
     find_until,
 )
 
+from sloppykeys.core.ocr import OcrReader
+
+from .challenge import DIGIT_FIXES, parse_limit
 from .input_scripts import (
     SPREAD_TIGHT,
     SPREAD_WIDE,
@@ -72,6 +78,11 @@ PARK_CLIENT = (8, 8)
 # cost: at 0.2s a win or defeat is reported within a fifth of a second of appearing.
 # The keep-alive click runs on its own, slower schedule (`won_poll_click`).
 OUTCOME_POLL = 0.2
+
+# How often a blocking wave gate re-reads the counter. Slower than the outcome poll on
+# purpose: OCR is 9-20ms against a 17ms template look, and a wave lasts seconds, so there
+# is nothing to gain from looking more often.
+WAVE_POLL = 0.5
 
 # How far the winning result template must beat the losing one before the result is
 # believed. "Game Won!" and "Game Lost!" share the word "Game" and are matched in
@@ -120,6 +131,10 @@ class UnitPlacer:
         self._log = log or (lambda _m: None)
         # See `LobbyNavigator.__init__`: cancels waits, never an AHK script in flight.
         self._should_stop = should_stop or (lambda: False)
+        # Only Wait for Wave needs OCR, and building the engine costs ~1s and loads three
+        # ONNX models — so it is built on first use, like `ChallengeScanner`'s. A plan with
+        # no wave gate never pays for it.
+        self._ocr: OcrReader | None = None
 
         self.search_timeout = 6.0    # how long to wait for an expected image
         # No `self.confidence`: the threshold is per template, resolved in `find_until` by
@@ -144,6 +159,12 @@ class UnitPlacer:
         self.select_first_timeout = 2.0
         self.won_poll_click = 5.0    # seconds between keep-alive clicks while idle
         self.won_timeout = 900.0     # give up waiting for the win screen after this
+
+    @property
+    def ocr(self) -> OcrReader:
+        if self._ocr is None:
+            self._ocr = OcrReader()
+        return self._ocr
 
     def apply_delays(self, delays: dict[str, float]) -> None:
         """Share the Settings > Delays tunables with the lobby navigator."""
@@ -394,12 +415,76 @@ class UnitPlacer:
 
 
     def run_sequence(self, step: UnitStep) -> tuple[bool, str]:
-        """Run a sequence step's raw actions in order."""
+        """Run a sequence step's raw actions in order.
+
+        A Wait for Wave action is a **gate**, so it is handled here rather than in
+        `run_action`: "skip the rest of the sequence" is only meaningful where the rest of
+        the sequence is. A gate that hasn't opened ends the pass successfully — in a During
+        match step that means it is tried again on the next interval, which is how an
+        ability gets timed to a wave without blocking anything.
+        """
         for position, action in enumerate(step.actions, start=1):
+            if action.type == ACTION_WAVE:
+                ok, reached, message = self.wave_gate(action)
+                if not ok:
+                    return (False, f"action {position} (wave): {message}")
+                if not reached:
+                    return (True, f"holding at action {position}: {message}")
+                continue
             ok, message = self.run_action(action)
             if not ok:
                 return (False, f"action {position} ({action.type}): {message}")
         return (True, f"{len(step.actions)} actions")
+
+    def wave_gate(self, action: StepAction) -> tuple[bool, bool, str]:
+        """(ok, reached, message) for a Wait for Wave action.
+
+        `ok` False is a real fault — no region, no OCR — and stops the sequence. `reached`
+        False means the wave simply isn't there yet, which is not a fault.
+
+        `wait_ms` is the budget, not a delay. Zero means one look, and that is the right
+        setting inside a During match step: the schedule is already re-running the step,
+        and a blocking poll here would hold the loop that watches for the result screen.
+        A non-zero budget is for a chain step, where blocking is what's wanted.
+        """
+        target = max(0, int(action.wave))
+        if target <= 0:
+            return (False, False, "no wave set")
+        region = action.region()
+        if region is None:
+            return (False, False, "no region set — the wave counter has to be boxed")
+        ready, note = self.ocr.available()
+        if not ready:
+            return (False, False, note)
+
+        budget = max(0.0, action.wait_ms / 1000.0)
+        deadline = time.monotonic() + budget
+        looks = 0
+        last = "nothing read"
+        while True:
+            looks += 1
+            current, last = self._read_wave(region, action.max_wave)
+            if current is not None and current >= target:
+                return (True, True, f"wave {current} (read '{last}', {looks} look(s))")
+            if time.monotonic() >= deadline or self._should_stop():
+                where = f"wave {current}" if current is not None else f"unreadable '{last}'"
+                return (True, False, f"{where}, waiting for {target}")
+            time.sleep(WAVE_POLL)
+
+    def _read_wave(
+        self, region: tuple[int, int, int, int], max_wave: int
+    ) -> tuple[int | None, str]:
+        """OCR the wave box once. Returns (wave or None, the raw text for the log)."""
+        rect = self._rect()
+        if rect is None:
+            return (None, "Roblox not found")
+        crop = self._engine.capture_bgr(
+            (rect[0] + region[0], rect[1] + region[1], region[2], region[3])
+        )
+        read = self.ocr.read_line(crop)
+        if not read.ok:
+            return (None, read.text or "")
+        return (parse_wave(read.text, max_wave), read.text)
 
     def run_action(self, action: StepAction) -> tuple[bool, str]:
         if action.type == ACTION_WAIT:
@@ -417,6 +502,12 @@ class UnitPlacer:
 
         if action.type == ACTION_FIND_CLICK:
             return self._find_and_click(action)
+
+        if action.type == ACTION_WAVE:
+            # Outside a sequence there is nothing to gate, so this reports the read. The
+            # gating form is `wave_gate`, called from `run_sequence`.
+            ok, reached, message = self.wave_gate(action)
+            return (ok, message if not ok else f"{'reached' if reached else 'not yet'}: {message}")
 
         if action.type == ACTION_DRAG:
             start = self._screen(action.x, action.y)
@@ -774,6 +865,38 @@ class _MatchSchedule:
             f"step {number} x{count}" for number, count in sorted(self._ran.items())
         )
         return f" — during match: {parts}"
+
+
+def parse_wave(text: str, max_wave: int = 0) -> int | None:
+    """The current wave from an OCR'd counter. None when it can't be read confidently.
+
+    Two shapes, because the counter is drawn differently from stage to stage:
+
+    - `"12/25"` — `parse_limit` handles it, digit confusions and separator misreads
+      included. With `max_wave` set, a total that disagrees is a *misread*, not a
+      different map, so the read is refused rather than acted on.
+    - `"12"`, `"Wave 12"` — a bare number, and only safe because `max_wave` bounds it: a
+      counter on a 25-wave map cannot say 125, so that reading is rejected instead of
+      opening a gate 100 waves early.
+
+    Refuses rather than guesses, for the same reason `parse_limit` does — this decides
+    when an ability fires, and a wrong number is worse than no number.
+    """
+    current, total = parse_limit(text)
+    if current is not None:
+        if max_wave > 0 and total != max_wave:
+            return None
+        return current if current > 0 else None
+
+    compact = re.sub(r"[^0-9a-zA-Z|]+", "", text or "").translate(DIGIT_FIXES)
+    numbers = re.findall(r"\d{1,3}", compact)
+    if len(numbers) != 1:
+        return None
+    value = int(numbers[0])
+    ceiling = max_wave if max_wave > 0 else WAVE_MAX
+    if not 1 <= value <= ceiling:
+        return None
+    return value
 
 
 def _as_int(value: object, default: int = 0) -> int:

@@ -36,7 +36,11 @@ from sloppykeys.core.image_search import (  # noqa: E402
     ImageSearchEngine,
     SearchRegion,
 )
-from sloppykeys.macro.placement import _MatchSchedule, split_steps  # noqa: E402
+from sloppykeys.macro.placement import (  # noqa: E402
+    _MatchSchedule,
+    parse_wave,
+    split_steps,
+)
 
 RECT = (0, 0, 400, 300)
 ICON = 20
@@ -205,6 +209,44 @@ floored = _MatchSchedule([step_at(1, 0)])
 assert floored.run_due(0.0, lambda _s: True)
 assert not floored.run_due(0.05, lambda _s: True), "0ms must not mean back-to-back"
 
+# # Reading the wave counter — refuse rather than guess, it decides when an ability fires
+assert parse_wave("12/25", 25) == 12
+assert parse_wave("12 / 25", 25) == 12
+# Digit confusions folded, separator misreads included: "|" is both a plausible slash and
+# a plausible 1, which is why the separator is resolved first.
+assert parse_wave("l2/25", 25) == 12
+assert parse_wave("9|10", 10) == 9
+# A total that disagrees with the stage is a misread of the whole thing, not a new map.
+assert parse_wave("12/26", 25) is None
+assert parse_wave("12/25", 0) == 12, "no max set still reads a well-formed counter"
+
+# A bare number is only safe because max_wave bounds it.
+assert parse_wave("12", 25) == 12
+assert parse_wave("Wave 12", 25) == 12
+assert parse_wave("125", 25) is None, "a 25-wave stage cannot be on wave 125"
+assert parse_wave("125", 0) is None, "above WAVE_MAX with no stage total to trust"
+assert parse_wave("26", 25) is None
+assert parse_wave("0", 25) is None, "wave 0 does not exist"
+assert parse_wave("", 25) is None
+assert parse_wave("~~~", 25) is None
+assert parse_wave("12 of 3 things 25", 25) is None, "two numbers is ambiguous"
+
+# A Wait for Wave action survives the round trip, and its ceiling is enforced on read.
+gate = StepAction(
+    type="wave", wave=12, max_wave=25, wait_ms=3000,
+    region_x=500, region_y=10, region_w=90, region_h=24,
+)
+gate_back = StepAction.from_payload(gate.as_payload())
+assert (gate_back.wave, gate_back.max_wave) == (12, 25), gate_back
+assert gate_back.region() == (500, 10, 90, 24), gate_back.region()
+assert gate_back.wait_ms == 3000, gate_back.wait_ms
+assert StepAction.from_payload({"Type": "wave", "Wave": 10**6}).wave == 99
+assert StepAction.from_payload({"Type": "wave", "Wave": -5}).wave == 0
+# The summary says which mode it is in, because a 0 budget means "one look" and that is
+# the difference between gating a chain step and gating a repeating one.
+assert "one look" in StepAction(type="wave", wave=3).summary()
+assert "up to 3000 ms" in gate.summary()
+
 # # The editor: the toggle has to leave the step in a state that works
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
 os.environ["QT_ENABLE_HIGHDPI_SCALING"] = "0"
@@ -227,6 +269,7 @@ labels = [
     for index in range(detail._sequence._type_picker.count())
 ]
 assert "Find + Click" in labels, labels
+assert "Wait for Wave" in labels, labels
 detail._sequence._apply_field_visibility(ACTION_FIND_CLICK)
 for widget in (
     detail._sequence._image,
@@ -269,5 +312,28 @@ detail.load(both)
 detail._during_match.setChecked(True)
 assert both.during_match and not both.preplacement, (both.during_match, both.preplacement)
 assert not detail._preplacement.isChecked()
+
+# A Wave action shows its own fields and nothing else's, and a fresh one is not left on the
+# wave number the gate refuses.
+detail._sequence._apply_field_visibility("wave")
+for widget in (
+    detail._sequence._wave,
+    detail._sequence._max_wave,
+    detail._sequence._wave_region,
+    detail._sequence._wait,
+):
+    assert not widget.isHidden(), widget
+for widget in (detail._sequence._image, detail._sequence._click_all, detail._sequence._x):
+    assert widget.isHidden(), widget
+
+waved = UnitStep(step=4, kind=KIND_SEQUENCE)
+waved.actions = [StepAction(type=ACTION_FIND_CLICK, image="images/actions/c.png")]
+detail.load(waved)
+detail._sequence._list.setCurrentRow(0)
+detail._sequence._type_picker.setCurrentIndex(
+    detail._sequence._type_picker.findData("wave")
+)
+assert waved.actions[0].type == "wave", waved.actions[0].type
+assert waved.actions[0].wave == 1, waved.actions[0].wave
 
 print("find click: OK")
