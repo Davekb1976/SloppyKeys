@@ -24,7 +24,10 @@ from sloppykeys.core.image_search import (  # noqa: E402
     CONFIDENCE_MIN,
     CONFIDENCE_USER_MIN,
     DEFAULT_CONFIDENCE,
+    ImageMatch,
     apply_confidence_overrides,
+    best_match,
+    best_score,
     confidence_for,
     confidence_key,
 )
@@ -34,10 +37,19 @@ WON, LOST = game_won_image(), game_lost_image()
 
 
 class _Engine:
-    """Enough of `ImageSearchEngine` for the profile builder: it only resolves paths."""
+    """Enough of `ImageSearchEngine` for the profile builder and `best_match`: it resolves
+    paths and hands back one canned hit, so nothing is captured or matched."""
+
+    hit: ImageMatch | None = None
 
     def to_absolute_path(self, rel_path: str) -> str:
         return os.path.join("C:\\images", rel_path)
+
+    def find_all(self, profiles, _rect, confidence=None):
+        # `best_match` must ask for everything, or a bad score is reported as "no capture".
+        assert confidence == 0.0, confidence
+        self.asked = [(p.name, p.confidence) for p in profiles]
+        return [] if self.hit is None else [self.hit]
 
 
 def thresholds() -> dict[str, float]:
@@ -81,5 +93,28 @@ for bad in (CONFIDENCE_MIN, 0.0, 1.0, 5.0, -1.0, "0.8", True, None):
 apply_confidence_overrides({})
 assert thresholds() == {WON: DEFAULT_CONFIDENCE, LOST: DEFAULT_CONFIDENCE}
 assert confidence_for("images/lobby/play.png") == DEFAULT_CONFIDENCE
+
+# # The diagnostic reports *where*, not only how well
+# Settings > Vision moves the cursor to this point, which is the only thing that separates a
+# marginal hit on the right button from a confident hit on the wrong one.
+engine = _Engine()
+rect = lambda: (0, 0, 1152, 756)  # noqa: E731 - a stub provider, not logic
+
+engine.hit = ImageMatch(
+    profile_name=WON, score=0.63, center_x=576, center_y=809, left=556, top=801,
+    width=40, height=16,
+)
+found = best_match(engine, rect, WON)
+assert (found.center_x, found.center_y) == (576, 809), found
+# A failing score still comes back with its position rather than as "nothing captured".
+assert found.score == 0.63 and found.score < DEFAULT_CONFIDENCE
+# `best_score` is now derived from it and must not have changed its answer.
+assert best_score(engine, rect, WON) == 0.63
+
+engine.hit = None
+assert best_match(engine, rect, WON) is None
+assert best_score(engine, rect, WON) is None
+# No rect (Roblox closed) is "nothing captured", not a zero score.
+assert best_match(engine, lambda: None, WON) is None
 
 print("template tolerance: OK")

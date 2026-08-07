@@ -735,6 +735,7 @@ class MainWindow(QWidget):
             routes=self._routes,
             points=self._point_store,
             confidence=self._confidence_store,
+            move_cursor=self._move_cursor,
         )
         self._stats_page = StatsPage()
         self._settings_page = SettingsPage(
@@ -2906,6 +2907,21 @@ class MainWindow(QWidget):
         if is_custom(gamemode):
             return self._routes.acts(map_name) if map_name else []
         return targets_for(gamemode, map_name)
+
+    def _move_cursor(self, x: int, y: int) -> tuple[bool, str]:
+        """Put the cursor on a screen point, for Settings > Vision's template test.
+
+        Through AHK like every other cursor move — Python never moves the mouse itself
+        (`coding-standards.md`). A move and nothing else: no click, no key, so this commits
+        nothing in the game even though the point is usually a button.
+
+        Called from the UI thread on a button press. `wait=True` with a short timeout
+        because the script is one `MouseMove` and the note that follows should describe a
+        cursor that has already arrived.
+        """
+        if not self._ahk.available():
+            return (False, "AutoHotkey v2 not found")
+        return self._ahk.run(input_scripts.move_script(int(x), int(y)), wait=True, timeout=5)
 
     def _roblox_rect(self) -> tuple[int, int, int, int] | None:
         """Roblox client area in screen coordinates, for image capture/search."""

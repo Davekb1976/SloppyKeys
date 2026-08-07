@@ -362,18 +362,18 @@ def find_until(
         time.sleep(max(0.01, poll))
 
 
-def best_score(
+def best_match(
     engine: ImageSearchEngine,
     rect_provider: Callable[[], "tuple[int, int, int, int] | None"],
     rel_path: str,
     region: tuple[int, int, int, int] | None = None,
-) -> float | None:
-    """The best correlation for this template right now, whatever the threshold.
+) -> ImageMatch | None:
+    """The best hit for this template right now, whatever the threshold — score *and* where.
 
-    The instrument a failed search was missing. "Play not found" says nothing about
-    *why*: 0.68 means the crop is right and the tolerance is too tight, 0.10 means the
-    screen isn't the one anybody thought it was. Guessing between those two has cost
-    this project several rounds. Costs one extra match, and only on failure.
+    The position is half the diagnosis and a log line carrying only the number cannot show
+    it: a passing score in the wrong place and a failing score on the right element read
+    identically. Measured case — the Events button matched `1.00` at 307,585 and `0.63` at
+    576,809 in the same session, and only the coordinates say which of those is the button.
     """
     rect = rect_provider()
     if rect is None:
@@ -387,4 +387,21 @@ def best_score(
     # confidence=0.0 accepts anything, so find_all returns the best hit rather than
     # filtering it away.
     matches = engine.find_all([profile], rect, confidence=0.0)
-    return matches[0].score if matches else None
+    return matches[0] if matches else None
+
+
+def best_score(
+    engine: ImageSearchEngine,
+    rect_provider: Callable[[], "tuple[int, int, int, int] | None"],
+    rel_path: str,
+    region: tuple[int, int, int, int] | None = None,
+) -> float | None:
+    """The best correlation for this template right now, whatever the threshold.
+
+    The instrument a failed search was missing. "Play not found" says nothing about
+    *why*: 0.68 means the crop is right and the tolerance is too tight, 0.10 means the
+    screen isn't the one anybody thought it was. Guessing between those two has cost
+    this project several rounds. Costs one extra match, and only on failure.
+    """
+    match = best_match(engine, rect_provider, rel_path, region=region)
+    return match.score if match is not None else None

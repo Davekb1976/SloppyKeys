@@ -41,7 +41,7 @@ from sloppykeys.core.image_search import (
     CONFIDENCE_USER_MIN,
     DEFAULT_CONFIDENCE,
     apply_confidence_overrides,
-    best_score,
+    best_match,
     confidence_for,
     confidence_key,
 )
@@ -288,8 +288,11 @@ class TemplateRow(QFrame):
             self._test.setFixedSize(BUTTON_W - 59, 22)
             self._test.setStyleSheet(f"font-family: '{theme.ICON_FAMILY}'; padding: 0px;")
             self._test.setToolTip(
-                "Match this template against the Roblox window right now and report the "
-                "best score — the number to set the threshold against."
+                "Match this template against the Roblox window right now: reports the best "
+                "score — the number to set the threshold against — and moves the cursor to "
+                "where it matched.\n\nWatch where the cursor lands. A good score in the "
+                "wrong place is worse than a low score on the right button, and only the "
+                "position tells them apart. Moves the mouse; never clicks."
             )
             self._test.clicked.connect(lambda: self.testRequested.emit(entry))
             tune.addWidget(self._threshold)
@@ -446,12 +449,17 @@ class ImageManager(QWidget):
         routes=None,
         points=None,
         confidence=None,
+        # Injected like `get_rect` and `log` rather than handing this page an AhkBridge:
+        # moving the cursor is output, and output belongs to whoever owns AHK. Optional so
+        # the page still builds (and tests) without one.
+        move_cursor: Callable[[int, int], tuple[bool, str]] | None = None,
     ) -> None:
         super().__init__()
         self._app_root = app_root
         self._get_rect = get_rect
         self._engine = engine
         self._log = log
+        self._move_cursor = move_cursor
         self._regions = regions
         self._routes = routes
         self._points = points
@@ -589,11 +597,20 @@ class ImageManager(QWidget):
         apply_confidence_overrides(self._confidence.all())
 
     def _test_template(self, entry: TemplateEntry) -> None:
-        """Report this template's best score against the live screen.
+        """Report this template's best score against the live screen, and point at it.
 
         The point of the button: a threshold picked without a measurement is the failure
-        mode that got the old global tolerance setting deleted. `best_score` accepts
+        mode that got the old global tolerance setting deleted. `best_match` accepts
         anything, so it reports what the screen actually offers, pass or fail.
+
+        **The cursor is moved to the hit**, which is the other half of the measurement. A
+        score alone cannot tell a marginal match on the right button from a confident match
+        on the wrong thing, and the second is far worse: the Events button was seen scoring
+        `1.00` at 307,585 and `0.63` at 576,809 in one session, and a threshold set between
+        them passed the wrong place. Now you can see which one the number belongs to.
+
+        A move, never a click — so nothing is committed in the game, and this stays inside
+        the "output goes through AHK" rule (`coding-standards.md`).
         """
         if not self._exists(entry):
             self._set_note(f"{entry.path} isn't on disk yet — capture it first.", bad=True)
@@ -601,15 +618,25 @@ class ImageManager(QWidget):
         if self._get_rect() is None:
             self._set_note("Roblox not found — start it and attach first.", bad=True)
             return
-        score = best_score(self._engine, self._get_rect, entry.path)
+        match = best_match(self._engine, self._get_rect, entry.path)
         needed = confidence_for(entry.path)
-        if score is None:
+        if match is None:
             self._set_note(f"{entry.name}: nothing captured — is Roblox visible?", bad=True)
             return
+        score = match.score
         verdict = "matches" if score >= needed else "does NOT match"
-        self._log(f"Template test: {entry.path} best {score:.3f} vs {needed:.2f}")
+        where = f"{match.center_x},{match.center_y}"
+        self._log(f"Template test: {entry.path} best {score:.3f} vs {needed:.2f} at {where}")
+        moved = ""
+        if self._move_cursor is not None:
+            ok, message = self._move_cursor(match.center_x, match.center_y)
+            # Reported, not fatal: the score is still the answer if AHK is missing.
+            moved = " Cursor is on it." if ok else f" Couldn't move the cursor: {message}."
+            if not ok:
+                self._log(f"  cursor move failed: {message}")
         self._set_note(
-            f"{entry.name}: best {score:.3f} against {needed:.2f} — {verdict} right now.",
+            f"{entry.name}: best {score:.3f} against {needed:.2f} at {where} — "
+            f"{verdict} right now.{moved}",
             bad=score < needed,
         )
 
