@@ -92,6 +92,10 @@ Source: "{#Payload}\_internal\*"; DestDir: "{app}\_internal"; Flags: ignoreversi
 Source: "{#Payload}\images\*"; DestDir: "{app}\images"; Flags: onlyifdoesntexist uninsneveruninstall recursesubdirs createallsubdirs skipifsourcedoesntexist
 Source: "{#Payload}\configs\*"; DestDir: "{app}\configs"; Flags: onlyifdoesntexist uninsneveruninstall recursesubdirs createallsubdirs skipifsourcedoesntexist
 Source: "{#Payload}\routes.json"; DestDir: "{app}"; Flags: onlyifdoesntexist uninsneveruninstall skipifsourcedoesntexist
+; Not user data: the build's own copy of routes.json, replaced on every upgrade so the app
+; can offer routes a new version ships (nav_routes.RouteStore.merge_shipped). `routes.json`
+; itself must keep `onlyifdoesntexist` — it is the user's events.
+Source: "{#Payload}\routes.default.json"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "{#Payload}\settings.json"; DestDir: "{app}"; Flags: onlyifdoesntexist uninsneveruninstall skipifsourcedoesntexist
 
 [Icons]

@@ -32,6 +32,11 @@ DEFAULT_DEST = os.path.join(os.path.dirname(os.path.dirname(HERE)), "SLOPPYKEYS"
 # Copied beside the exe. Folders the user's work lives in, plus the route data.
 DATA_DIRS = ("images", "configs")
 DATA_FILES = ("routes.json",)
+# `routes.json` again under a second name. The installer writes `routes.json` only if it is
+# missing (it is the user's own events once they have any) but always replaces this copy, so
+# it is the only way a route shipped with a new version reaches an existing install —
+# `nav_routes.RouteStore.merge_shipped` reads it at startup.
+SHIPPED_ROUTES = ("routes.json", "routes.default.json")
 # Never copied wholesale: settings.json holds the private-server link and the Discord
 # webhook. A filtered one is written instead — see `shipped_settings` and
 # `SHIPPED_SETTINGS_KEYS`, which carry the tuning forward and leave the secrets behind.
@@ -176,6 +181,11 @@ def copy_data(dest: str, keep_settings: bool) -> list[str]:
         if os.path.isfile(source):
             shutil.copy2(source, os.path.join(dest, name))
             done.append(name)
+
+    source = os.path.join(HERE, SHIPPED_ROUTES[0])
+    if os.path.isfile(source):
+        shutil.copy2(source, os.path.join(dest, SHIPPED_ROUTES[1]))
+        done.append(SHIPPED_ROUTES[1])
 
     settings_path = os.path.join(dest, SECRET_FILES[0])
     if keep_settings and os.path.isfile(settings_path):

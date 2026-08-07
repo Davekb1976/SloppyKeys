@@ -583,6 +583,9 @@ class MainWindow(QWidget):
         )
         # Events navigation is data the user authors (routes.json), not a table.
         self._routes = RouteStore(app_root)
+        # Before `_build_ui`, so a route arriving with an upgrade is in the Map and Act
+        # dropdowns this launch rather than the next. Logged after the panel exists.
+        self._merged_routes = self._routes.merge_shipped()
         self._delays_store = DelaysStore(app_root)
         self._delays = self._delays_store.all()
         self._position_store = StartPositionStore(app_root)
@@ -630,6 +633,8 @@ class MainWindow(QWidget):
         # Launch on the gamemode selector.
         self._show_page("selector")
         self._log("Macro ready. F1 toggles start/stop, F3 reloads.")
+        if self._merged_routes:
+            self._log(f"Added routes from this build: {', '.join(self._merged_routes)}.")
         # Said at launch, not at the first click. AHK is a separate install the packaged
         # build cannot provide, so without this a new user's first run just fails on its
         # first click with a line buried in the log.

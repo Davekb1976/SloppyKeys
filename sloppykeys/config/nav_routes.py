@@ -16,6 +16,9 @@ On-disk shape:
       }
     }
 
+`Shipped` is the other top-level key: the `"<Map>/<Act>"` names this install has already
+been offered by a build (see `merge_shipped`).
+
 A map always carries at least one act (`DEFAULT_ACT`) so the rest of the app sees
 the same Gamemode / Map / Act shape it already handles — an event with no act
 divisions is just one act called Main. That keeps `configs/Events/<Map>/<Act>.json`
@@ -31,10 +34,15 @@ import os
 
 from sloppykeys.content.nav_route import NavStep
 
-from .store import read_json, write_json
+from .store import read_json, update_json
 from .unit_configs import safe_component
 
 ROUTES_FILE = "routes.json"
+# The build's own copy of ROUTES_FILE, written beside it by `build_exe.py`. The installer
+# replaces this one on every upgrade and leaves `routes.json` alone, which is what makes
+# `merge_shipped` possible: `routes.json` *is* the user's file the moment they have one, so
+# a shipped route has nowhere else to arrive from.
+SHIPPED_FILE = "routes.default.json"
 SCHEMA_VERSION = 1
 DEFAULT_ACT = "Main"
 NAME_MAX = 40
@@ -146,7 +154,105 @@ class RouteStore:
 
     # # Writes
     def _write(self, maps: dict) -> bool:
-        return write_json(self._path, {"Schema": SCHEMA_VERSION, "Maps": maps})
+        """Replace `Maps`, keeping every other top-level key — `Shipped` is one."""
+
+        def mutate(payload: dict) -> None:
+            payload["Schema"] = SCHEMA_VERSION
+            payload["Maps"] = maps
+
+        return update_json(self._path, mutate)
+
+    def merge_shipped(self) -> list[str]:
+        """Add routes a new build ships that this install has never been offered.
+
+        Returns the `"<Map> / <Act>"` names added, for the log.
+
+        An upgrade can't overwrite `routes.json` — it holds the user's own events — so a
+        route shipped with a new version would otherwise never reach anyone but a fresh
+        install, while its unit config and images (new paths) arrive normally and sit there
+        orphaned.
+
+        **The `Shipped` ledger is what makes this safe to run every launch.** A name is
+        recorded the first time it is seen whether or not anything was added, so an act the
+        user deletes stays deleted instead of coming back on the next start. An act they
+        already have is never touched: their steps are theirs, even under a shipped name.
+        """
+        shipped = read_json(os.path.join(os.path.dirname(self._path), SHIPPED_FILE))
+        shipped_maps = shipped.get("Maps")
+        if not isinstance(shipped_maps, dict):
+            return []
+        # Nothing new means no write at all. `update_json` writes whatever the callback
+        # leaves behind, so without this every launch would rewrite `routes.json`.
+        if not self._unseen(shipped_maps):
+            return []
+
+        added: list[str] = []
+
+        def mutate(payload: dict) -> None:
+            maps = payload.get("Maps")
+            maps = maps if isinstance(maps, dict) else {}
+            raw_seen = payload.get("Shipped")
+            seen = [str(key) for key in raw_seen] if isinstance(raw_seen, list) else []
+            known = set(seen)
+
+            for raw_map, entry in shipped_maps.items():
+                # Names off disk become path segments downstream, so they are cleaned here
+                # rather than trusted, same as any name the user types.
+                map_name = clean_name(raw_map)
+                if not map_name or not isinstance(entry, dict):
+                    continue
+                routes = entry.get("Routes")
+                routes = routes if isinstance(routes, dict) else {}
+                raw_acts = entry.get("Acts")
+                acts = raw_acts if isinstance(raw_acts, list) else []
+                for raw_act in acts:
+                    act = clean_name(raw_act)
+                    if not act:
+                        continue
+                    key = f"{map_name}/{act}"
+                    if key in known:
+                        continue
+                    known.add(key)
+                    seen.append(key)
+                    target = maps.get(map_name)
+                    if not isinstance(target, dict):
+                        target = {"Acts": [], "Routes": {}}
+                    mine = target.get("Acts")
+                    mine = [str(name) for name in mine] if isinstance(mine, list) else []
+                    if act in mine:
+                        continue
+                    mine.append(act)
+                    target["Acts"] = mine
+                    steps = routes.get(raw_act)
+                    if isinstance(steps, list):
+                        own = target.get("Routes")
+                        own = own if isinstance(own, dict) else {}
+                        own[act] = [item for item in steps if isinstance(item, dict)]
+                        target["Routes"] = own
+                    maps[map_name] = target
+                    added.append(f"{map_name} / {act}")
+
+            payload["Schema"] = SCHEMA_VERSION
+            payload["Maps"] = maps
+            payload["Shipped"] = seen
+
+        update_json(self._path, mutate)
+        return added
+
+    def _unseen(self, shipped_maps: dict) -> bool:
+        """Does the shipped file name a `"<Map>/<Act>"` this install hasn't been offered?"""
+        raw_seen = self._payload().get("Shipped")
+        known = {str(key) for key in raw_seen} if isinstance(raw_seen, list) else set()
+        for raw_map, entry in shipped_maps.items():
+            map_name = clean_name(raw_map)
+            if not map_name or not isinstance(entry, dict):
+                continue
+            raw_acts = entry.get("Acts")
+            for raw_act in raw_acts if isinstance(raw_acts, list) else []:
+                act = clean_name(raw_act)
+                if act and f"{map_name}/{act}" not in known:
+                    return True
+        return False
 
     def add_map(self, map_name: str) -> str:
         """Create a map with one default act. Returns the stored name, or ""."""
