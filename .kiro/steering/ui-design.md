@@ -145,8 +145,9 @@ by making every container in the chain `height: 100%`:
 If the content inside is shorter than the screen, the container still fills to the bottom
 and its `border-right` stays continuous. Panels inside fill their parent with `flex: 1` so
 they never shrink-wrap to their content — a panel with one item and a panel with twenty
-both touch the bottom edge. Scrolling happens inside the panel body, never on the
-outer container.
+both touch the bottom edge. Scrolling happens inside the `.panel-body` (which has
+`overflow-y: auto`), never on the split container itself. The split containers do NOT
+scroll — they are fixed-height frames. Only the panel body scrolls when content overflows.
 
 ## Interactions
 

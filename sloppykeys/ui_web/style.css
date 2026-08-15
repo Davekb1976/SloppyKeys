@@ -266,9 +266,9 @@ input:focus, select:focus {
 
 /* Split layouts — BOTH sides fill 100% height, always */
 .fullpage-split { display: flex; flex: 1; min-height: 0; height: 100%; }
-.split-left { display: flex; flex-direction: column; width: 50%; min-width: 0; padding: 12px; padding-bottom: 12px; border-right: 1px solid var(--border); overflow-y: auto; height: 100%; }
-.split-right { display: flex; flex-direction: column; width: 50%; min-width: 0; padding: 12px; padding-bottom: 12px; overflow-y: auto; height: 100%; }
-.split-main { display: flex; flex-direction: column; flex: 1; min-width: 0; padding: 12px; overflow-y: auto; height: 100%; }
+.split-left { display: flex; flex-direction: column; width: 50%; min-width: 0; padding: 12px; padding-bottom: 12px; border-right: 1px solid var(--border); height: 100%; box-sizing: border-box; }
+.split-right { display: flex; flex-direction: column; width: 50%; min-width: 0; padding: 12px; padding-bottom: 12px; height: 100%; box-sizing: border-box; }
+.split-main { display: flex; flex-direction: column; flex: 1; min-width: 0; padding: 12px; height: 100%; box-sizing: border-box; overflow-y: auto; }
 
 /* Palette (left rail in Macro Manager) */
 .palette-panel {
@@ -290,7 +290,7 @@ input:focus, select:focus {
 .panel {
   display: flex; flex-direction: column; flex: 1; min-height: 0;
   border: 1px solid var(--border); background: var(--surface-panel);
-  margin-bottom: 12px;
+  overflow: hidden;
 }
 .panel-header {
   display: flex; align-items: center; gap: 8px;
@@ -314,6 +314,7 @@ input:focus, select:focus {
 .task-list {
   flex: 1; overflow-y: auto; min-height: 0;
   display: flex; flex-direction: column; gap: 4px;
+  padding-bottom: 8px;
 }
 .task-card {
   display: flex; align-items: center; gap: var(--space-3);
