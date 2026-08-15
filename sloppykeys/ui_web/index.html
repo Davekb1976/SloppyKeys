@@ -74,6 +74,15 @@
       <!-- Left: game + log -->
       <div class="dash-left">
         <div id="game-slot" class="game-slot"></div>
+        <!-- Compact strip: only visible in compact mode -->
+        <div class="compact-strip" id="compact-strip">
+          <span class="compact-status" id="compact-action">Idle</span>
+          <div class="compact-btns">
+            <button class="compact-btn compact-start" id="cs-start" title="Start">▶</button>
+            <button class="compact-btn compact-pause" id="cs-pause" title="Pause" disabled>⏸</button>
+            <button class="compact-btn compact-stop" id="cs-stop" title="Stop" disabled>⏹</button>
+          </div>
+        </div>
         <div class="dash-log">
           <div class="log-header">
             <span class="log-title">Process Log</span>

@@ -96,13 +96,21 @@
     btnPause.disabled = !running;
     btnStop.disabled = !running;
     macroPaused = phase === "paused";
-    btnPause.querySelector("svg + *") || null;
     // Update pause button label
     const pauseText = btnPause.lastChild;
     if (pauseText && pauseText.nodeType === 3) pauseText.textContent = macroPaused ? " Resume" : " Pause";
     statAction.textContent = running ? (macroPaused ? "Paused" : phase) : "Idle";
     statGamemode.textContent = target || "—";
     statCycle.textContent = String(cycle);
+    // Sync compact strip
+    const csAction = document.getElementById("compact-action");
+    if (csAction) csAction.textContent = running ? (macroPaused ? "Paused" : target || phase) : "Idle";
+    const csStart = document.getElementById("cs-start");
+    const csPause = document.getElementById("cs-pause");
+    const csStop = document.getElementById("cs-stop");
+    if (csStart) csStart.disabled = running;
+    if (csPause) csPause.disabled = !running;
+    if (csStop) csStop.disabled = !running;
   };
 
   // ---- Game slot geometry ----
@@ -126,6 +134,19 @@
       pywebview.api.exit_compact();
     }
   };
+
+  // Compact strip buttons
+  document.getElementById("cs-start").addEventListener("click", () => {
+    if (window.pywebview && pywebview.api) pywebview.api.start_macro();
+  });
+  document.getElementById("cs-pause").addEventListener("click", () => {
+    if (!window.pywebview || !pywebview.api) return;
+    if (macroPaused) pywebview.api.resume_macro();
+    else pywebview.api.pause_macro();
+  });
+  document.getElementById("cs-stop").addEventListener("click", () => {
+    if (window.pywebview && pywebview.api) pywebview.api.stop_macro();
+  });
 
   function reportSlot() {
     if (!slotEl || !window.pywebview || !pywebview.api) return;

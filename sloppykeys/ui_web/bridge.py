@@ -122,19 +122,21 @@ class Api:
             self._window.destroy()
 
     def enter_compact(self) -> None:
-        """Compact mode: shrink window to just game + a thin strip."""
+        """Compact mode: shrink window to game + strip, drop the side panel."""
         hwnd = self._host_hwnd()
-        if hwnd:
-            # Game (1152) wide, titlebar (38) + game (756) + strip (50) tall
-            from sloppykeys.core.win32.frameless import move_to
-            from sloppykeys.core.win32.roblox_window import window_rect
-
-            rect = window_rect(hwnd)
-            if rect:
-                user32.SetWindowPos(hwnd, 0, rect[0], rect[1], VIEWPORT_W, TITLEBAR_H + VIEWPORT_H + 50, 0x0010)
+        if not hwnd:
+            return
+        compact_w = VIEWPORT_W
+        compact_h = TITLEBAR_H + VIEWPORT_H + 50
+        # Keep the window at its current top-left, just resize it.
+        from sloppykeys.core.win32.roblox_window import window_rect as _wr
+        rect = _wr(hwnd)
+        if rect:
+            user32.SetWindowPos(hwnd, 0, rect[0], rect[1], compact_w, compact_h,
+                                0x0004 | 0x0010)  # SWP_NOZORDER | SWP_NOACTIVATE
 
     def exit_compact(self) -> None:
-        """Exit compact mode: restore full window size."""
+        """Exit compact mode: restore full window size, centered."""
         hwnd = self._host_hwnd()
         if hwnd:
             fit_and_centre(hwnd, WANT_W, WANT_H)
@@ -650,14 +652,16 @@ class Api:
                 self._key_down["stop"] = stop_down
 
                 # F6 — Image Manager (rising edge)
-                f6_down = is_key_down(0x75)  # VK_F6
+                im_kb = keybinds.get("image_manager")
+                f6_down = kb_pressed(im_kb)
                 if f6_down and not self._key_down.get("f6", False):
                     if self._window:
                         self._window.evaluate_js("window.openImageManager && window.openImageManager();")
                 self._key_down["f6"] = f6_down
 
                 # F7 — Compact mode toggle (rising edge)
-                f7_down = is_key_down(0x76)  # VK_F7
+                compact_kb = keybinds.get("compact_mode")
+                f7_down = kb_pressed(compact_kb)
                 if f7_down and not self._key_down.get("f7", False):
                     if self._window:
                         self._window.evaluate_js("window.toggleCompact && window.toggleCompact();")
