@@ -121,6 +121,24 @@ class Api:
         if self._window:
             self._window.destroy()
 
+    def enter_compact(self) -> None:
+        """Compact mode: shrink window to just game + a thin strip."""
+        hwnd = self._host_hwnd()
+        if hwnd:
+            # Game (1152) wide, titlebar (38) + game (756) + strip (50) tall
+            from sloppykeys.core.win32.frameless import move_to
+            from sloppykeys.core.win32.roblox_window import window_rect
+
+            rect = window_rect(hwnd)
+            if rect:
+                user32.SetWindowPos(hwnd, 0, rect[0], rect[1], VIEWPORT_W, TITLEBAR_H + VIEWPORT_H + 50, 0x0010)
+
+    def exit_compact(self) -> None:
+        """Exit compact mode: restore full window size."""
+        hwnd = self._host_hwnd()
+        if hwnd:
+            fit_and_centre(hwnd, WANT_W, WANT_H)
+
     def begin_drag(self) -> None:
         """Start dragging the window. Returns at once; the loop runs on a thread.
 
@@ -558,7 +576,7 @@ class Api:
             "running": self._ctrl.is_running,
             "cycle": self._ctrl.cycle,
             "target": target,
-            "phase": "running" if self._ctrl.is_running else "idle",
+            "phase": "paused" if (self._ctrl.is_running and self._ctrl._paused) else ("running" if self._ctrl.is_running else "idle"),
         }
 
     def _macro_run_loop(self) -> None:
@@ -637,6 +655,13 @@ class Api:
                     if self._window:
                         self._window.evaluate_js("window.openImageManager && window.openImageManager();")
                 self._key_down["f6"] = f6_down
+
+                # F7 — Compact mode toggle (rising edge)
+                f7_down = is_key_down(0x76)  # VK_F7
+                if f7_down and not self._key_down.get("f7", False):
+                    if self._window:
+                        self._window.evaluate_js("window.toggleCompact && window.toggleCompact();")
+                self._key_down["f7"] = f7_down
             except Exception:
                 pass
             time.sleep(HOTKEY_INTERVAL)

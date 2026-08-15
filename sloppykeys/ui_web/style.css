@@ -145,6 +145,13 @@ input:focus, select:focus {
 /* ---- Dashboard ---- */
 .dash-layout { display: flex; flex: 1; min-height: 0; max-height: 100%; }
 .dash-left { display: flex; flex-direction: column; width: 1152px; flex-shrink: 0; }
+
+/* Compact mode: hide everything except game + a slim status strip */
+.compact-mode .dash-right,
+.compact-mode .dash-log,
+.compact-mode .titlebar-nav,
+.compact-mode .titlebar-clocks { display: none !important; }
+.compact-mode .dash-left { width: 100%; }
 .game-slot { width: 1152px; height: 756px; flex-shrink: 0; background: var(--surface-sunken); }
 .dash-log {
   display: flex; flex-direction: column;

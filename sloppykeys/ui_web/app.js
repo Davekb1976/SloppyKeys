@@ -62,17 +62,27 @@
 
   // ---- Macro controls ----
   const btnStart = document.getElementById("btn-start");
+  const btnPause = document.getElementById("btn-pause");
   const btnStop = document.getElementById("btn-stop");
   const statAction = document.getElementById("stat-action");
   const statGamemode = document.getElementById("stat-gamemode");
   const statCycle = document.getElementById("stat-cycle");
+  let macroPaused = false;
 
   btnStart.addEventListener("click", () => {
     if (!window.pywebview || !pywebview.api) return;
-    // Start runs the task queue — no selector needed.
-    pywebview.api.start_macro("", "", "", "").then((r) => {
+    pywebview.api.start_macro().then((r) => {
       if (!r.ok) window.addLog("Start blocked: " + r.error);
     });
+  });
+
+  btnPause.addEventListener("click", () => {
+    if (!window.pywebview || !pywebview.api) return;
+    if (macroPaused) {
+      pywebview.api.resume_macro();
+    } else {
+      pywebview.api.pause_macro();
+    }
   });
 
   btnStop.addEventListener("click", () => {
@@ -83,8 +93,14 @@
   // Called from Python when macro state changes.
   window.onMacroStatus = function (running, cycle, target, phase) {
     btnStart.disabled = running;
+    btnPause.disabled = !running;
     btnStop.disabled = !running;
-    statAction.textContent = running ? phase : "Idle";
+    macroPaused = phase === "paused";
+    btnPause.querySelector("svg + *") || null;
+    // Update pause button label
+    const pauseText = btnPause.lastChild;
+    if (pauseText && pauseText.nodeType === 3) pauseText.textContent = macroPaused ? " Resume" : " Pause";
+    statAction.textContent = running ? (macroPaused ? "Paused" : phase) : "Idle";
     statGamemode.textContent = target || "—";
     statCycle.textContent = String(cycle);
   };
@@ -94,6 +110,22 @@
   // come from where the slot actually rendered rather than a duplicated
   // constant that can drift out of step with the stylesheet.
   const slotEl = document.getElementById("game-slot");
+
+  // ---- Compact mode (F7) ----
+  let compactMode = false;
+  window.toggleCompact = function () {
+    if (!window.pywebview || !pywebview.api) return;
+    if (!compactMode) {
+      switchScreen("dashboard");
+      compactMode = true;
+      document.body.classList.add("compact-mode");
+      pywebview.api.enter_compact();
+    } else {
+      compactMode = false;
+      document.body.classList.remove("compact-mode");
+      pywebview.api.exit_compact();
+    }
+  };
 
   function reportSlot() {
     if (!slotEl || !window.pywebview || !pywebview.api) return;
