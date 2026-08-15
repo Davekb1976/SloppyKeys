@@ -63,12 +63,13 @@ VIEWPORT_H = 756
 
 TITLEBAR_H = 38
 PANEL_W = 384
-LOG_H = 220
+LOG_MIN_H = 80
 
-# What the layout wants. fit_and_centre clamps it to the work area and reports
-# what it actually got, so a short screen shrinks the log rather than clipping it.
+# The window should fill the work area height so the log gets all remaining
+# space via flex: 1. A hardcoded LOG_H created an empty gap when the window
+# was taller than needed, and clipped the log when shorter. Now the window
+# simply asks for the full work area and the CSS flex layout distributes space.
 WANT_W = VIEWPORT_W + PANEL_W
-WANT_H = TITLEBAR_H + VIEWPORT_H + LOG_H
 
 # Fallback slot in CSS pixels until the page reports its own rect. Measured
 # against the DOM: at 100% display scaling CSS pixels are window pixels.
@@ -97,9 +98,9 @@ class Api:
     # ---- Window chrome ----
 
     def minimize_window(self) -> None:
-        # Drop the game out of the topmost band first, or it stays floating over
-        # the desktop with the UI it belongs to gone.
-        self._set_game_topmost(False)
+        # Release the game fully (frame + z-order) while we're away; the follow
+        # loop re-docks automatically when we restore.
+        self._release_game()
         if self._window:
             self._window.minimize()
 
@@ -128,12 +129,22 @@ class Api:
     def set_game_visible(self, visible: bool) -> None:
         """Only the Dashboard shows the game.
 
-        Elsewhere the game is demoted out of the topmost band so our own
-        content covers it. It is never moved or hidden, so coming back to the
-        Dashboard costs one z-order change and cannot flicker.
+        Hiding it with ShowWindow(SW_HIDE) is the only reliable way to keep it
+        from showing through on other screens: the game is topmost and our
+        window is in the normal band, so demoting alone doesn't cover it when
+        nothing else sits between them. ShowWindow is outside-the-window only.
         """
         self._game_visible = bool(visible)
-        self._set_game_topmost(self._game_visible)
+        if not self._docked or not is_window(self._game_hwnd) or self._game_hwnd is None:
+            return
+        SW_HIDE = 0
+        SW_SHOWNOACTIVATE = 4
+        if visible:
+            user32.ShowWindow(self._game_hwnd, SW_SHOWNOACTIVATE)
+            set_topmost(self._game_hwnd, True)
+        else:
+            set_topmost(self._game_hwnd, False)
+            user32.ShowWindow(self._game_hwnd, SW_HIDE)
 
     def report_slot(self, x: float, y: float, w: float, h: float) -> None:
         """The page tells us where the game slot actually rendered."""
@@ -169,10 +180,6 @@ class Api:
         x, y, w, h = self._slot
         return (rect[0] + x, rect[1] + y, w, h)
 
-    def _set_game_topmost(self, on: bool) -> None:
-        if self._docked and is_window(self._game_hwnd) and self._game_hwnd:
-            set_topmost(self._game_hwnd, on)
-
     def _dock(self, game_hwnd: int) -> bool:
         """Float the game over the slot, frame stripped, without stealing focus."""
         target = self._slot_on_screen()
@@ -188,7 +195,14 @@ class Api:
 
         if not position_window_to_client_rect(game_hwnd, *target):
             return False
-        set_topmost(game_hwnd, self._game_visible)
+
+        SW_SHOWNOACTIVATE = 4
+        if self._game_visible:
+            user32.ShowWindow(game_hwnd, SW_SHOWNOACTIVATE)
+            set_topmost(game_hwnd, True)
+        else:
+            set_topmost(game_hwnd, False)
+            user32.ShowWindow(game_hwnd, 0)  # SW_HIDE
         return True
 
     def _release_game(self) -> None:
@@ -271,9 +285,10 @@ class Api:
 
                 host = self._host_hwnd()
                 if not host or is_minimized(host):
-                    # A minimized window reports coordinates near -32000; docking
-                    # against that would fling the game off screen.
-                    self._set_game_topmost(False)
+                    # Minimized: release the game so it regains its toolbar.
+                    # The loop will re-dock when we restore.
+                    if self._docked:
+                        self._release_game()
                     self._last_rect = None
                     time.sleep(SEARCH_INTERVAL)
                     continue
@@ -299,8 +314,8 @@ def main() -> None:
         title=WINDOW_TITLE,
         url=html_path,
         width=WANT_W,
-        height=WANT_H,
-        min_size=(WANT_W, TITLEBAR_H + VIEWPORT_H),
+        height=TITLEBAR_H + VIEWPORT_H + LOG_MIN_H,
+        min_size=(WANT_W, TITLEBAR_H + VIEWPORT_H + LOG_MIN_H),
         frameless=True,
         easy_drag=False,
         js_api=api,
@@ -310,10 +325,11 @@ def main() -> None:
     def on_loaded() -> None:
         hwnd = api._host_hwnd()
         if hwnd:
-            # pywebview sizes the Form before the frame comes off, so the client
-            # area lands short of what was asked for -- set the real size here,
-            # where the window rect and the client rect are the same thing.
-            fit_and_centre(hwnd, WANT_W, WANT_H)
+            # Size the window to fill the work area height so the log gets all
+            # remaining space via flex: 1. The width is fixed to the layout.
+            from sloppykeys.core.win32.frameless import work_area
+            _, _, _, area_h = work_area()
+            fit_and_centre(hwnd, WANT_W, area_h)
         window.evaluate_js(
             'document.getElementById("version-badge").textContent = '
             f'"v{api.get_version()}";'
