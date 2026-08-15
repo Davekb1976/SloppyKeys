@@ -170,3 +170,95 @@ images/                       shipped with the build, user-editable
 - Settings import/export + reset keybinds to defaults
 - Atomic file writes (tmp → fsync → replace)
 - Walk path recording/replay system
+
+## Module Audit — Keep / Rework / Remove
+
+### `config/` (data stores)
+
+| Module | Verdict | Notes |
+|--------|---------|-------|
+| `store.py` | **Keep + improve** | Add atomic writes (tmp → fsync → replace). Already has `update_json` with RLock. |
+| `settings.py` | **Rework** | Consolidate all scattered stores into one `settings.json`. Remove `ImageProfileStore` (replaced by Image Manager). Drop the manual `ensure_json` defaults pattern — read returns defaults merged at runtime. |
+| `keybinds.py` | **Merge into settings.json** | One `"hotkeys"` key. Add `reset_hotkeys()` endpoint. |
+| `delays.py` | **Merge into settings.json** | One `"delays"` key. |
+| `regions.py` | **Merge into settings.json** | `"confidence"` overrides move to `"image_thresholds"`. Points/regions stay. |
+| `start_position.py` | **Merge into settings.json** | One `"walk_paths"` or `"start_position"` key. |
+| `stats.py` | **Keep** | Stays in settings.json under `"stats"`. |
+| `tasks.py` | **Rework** | Tasks move to `settings.json["tasks"]`. Remove `TaskStore` class — read/write through the generic store. |
+| `unit_configs.py` | **Remove** | Replaced by operations. Migration reads old configs and converts to operation format on first launch. |
+| `nav_routes.py` | **Keep** | Routes stay as their own file (`routes.json`). Events navigation is route-driven. |
+
+### `content/` (game schema / tables)
+
+| Module | Verdict | Notes |
+|--------|---------|-------|
+| `gamemodes.py` | **Keep** | Drives the task builder's Mode/Map/Stage dropdowns. |
+| `acts.py` | **Keep** | Coordinate tables for lobby navigation. |
+| `start_stage.py` | **Keep** | Start/difficulty coordinates. |
+| `challenge.py` | **Keep** | Challenge panel geometry. |
+| `nav_images.py` | **Keep** | Image path resolution for lobby navigation. |
+| `nav_route.py` | **Keep** | NavStep dataclass, route validation. |
+| `start_position.py` | **Keep** | Walk preset definitions. |
+| `units.py` | **Rework** | `UnitStep`/`UnitPlan` become the block executor's internal types, not the user-facing config format. |
+
+### `core/` (services)
+
+| Module | Verdict | Notes |
+|--------|---------|-------|
+| `image_search.py` | **Rework** | Add folder-per-name variant loading. Remove `ImageProfile`/`SearchRegion` from here — they become settings.json data. Keep the engine + match logic. |
+| `ahk.py` | **Keep** | Unchanged. |
+| `ocr.py` | **Keep** | Unchanged. |
+| `updates.py` | **Keep** | Add auto-reopen Roblox deep-link launch. |
+| `webhook.py` | **Keep** | Unchanged. |
+| `win32/` | **Keep** | All helpers stay. Add walk-path recording (keyboard/mouse polling). |
+
+### `macro/` (runner + logic)
+
+| Module | Verdict | Notes |
+|--------|---------|-------|
+| `runner.py` | **Rework** | The state machine stays, but `tick()` now advances one BLOCK per call (not one step). Add loop-phase tracking. |
+| `controller.py` | **Rewrite** | Reads task queue, iterates tasks, loads operations, calls phase runners. Replaces the step-chain builder. |
+| `lobby.py` | **Keep** | LobbyNavigator stays for lobby navigation. |
+| `placement.py` | **Rework** | `UnitPlacer` methods become block executors (`run_place_unit`, `run_upgrade`, `run_sell`, etc.). `wait_for_outcome` stays. |
+| `camera.py` | **Keep** | Unchanged. |
+| `challenge.py` | **Keep** | Challenge scanner stays. |
+| `tasks.py` | **Rework** | `TaskDirector`/`TaskDecision` simplified — the queue IS the decision now, no priority/rotation logic needed. |
+| `input_scripts.py` | **Keep** | AHK script generators unchanged. |
+
+### `ui/` (PySide6 — to be removed)
+
+| Module | Verdict |
+|--------|---------|
+| `window.py` | **Remove** (after migration) |
+| `pages/` | **Remove** |
+| `sequence_editor.py` | **Remove** (replaced by block editor in Macro Manager) |
+| `position_editor.py` | **Remove** (replaced by Position Picker modal) |
+| `route_editor.py` | **Remove** (replaced by Route screen in webview) |
+| `task_editor.py` | **Remove** (replaced by Task Builder in webview) |
+| `theme.py` | **Remove** (CSS handles it now) |
+| `icons.py` | **Remove** (SVG in HTML) |
+| `glow.py`, `widgets.py`, `viewport.py`, `placement_overlay.py` | **Remove** |
+| `image_manager.py` | **Remove** (replaced by Image Manager modal in webview) |
+| `macro_tester.py` | **Remove** (Debug section in Settings handles this) |
+
+### `ui_web/` (new pywebview UI)
+
+| Module | Status |
+|--------|--------|
+| `bridge.py` | Active — will grow to host all API methods |
+| `app.js` | Active — screen switching, macro controls, selectors |
+| `index.html` | Active — all screens |
+| `style.css` | Active — design system |
+
+## Implementation Order
+
+1. **Settings consolidation** — merge all stores into one settings.json, atomic writes, auto-save API
+2. **Task Queue screen** — ordered list + builder, wired to settings.json
+3. **Macro Manager screen** — block palette, four phases, drag-drop, inline editors
+4. **Position Picker modal** — map thumbnails + Roblox capture + click-to-place
+5. **Controller rewrite** — reads queue, loads operations, runs phases with block executors
+6. **Image Manager modal** — folder-per-name variant grid, threshold sliders, capture+crop
+7. **Settings screen** — categories, search, import/export, reset
+8. **Dashboard cleanup** — remove selector, wire to queue-driven start
+9. **PySide6 removal** — delete `ui/` once everything is covered
+10. **Polish** — auto-reopen, compact mode, walk recording
