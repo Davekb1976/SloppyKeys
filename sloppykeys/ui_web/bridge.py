@@ -70,7 +70,7 @@ VIEWPORT_H = 756
 
 TITLEBAR_H = 38
 PANEL_W = 384
-LOG_H = 90
+LOG_H = 156
 
 # Fixed window size: just enough for titlebar + game + a compact log.
 WANT_W = VIEWPORT_W + PANEL_W
