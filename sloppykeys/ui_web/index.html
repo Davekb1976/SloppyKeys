@@ -295,83 +295,111 @@
   <div class="screen" id="screen-settings">
     <div class="settings-layout">
       <nav class="settings-nav">
-        <button class="settings-nav-btn active" data-cat="general">General</button>
-        <button class="settings-nav-btn" data-cat="keybinds">Keybinds</button>
+        <input type="text" class="settings-search" id="settings-search" placeholder="Search...">
+        <button class="settings-nav-btn active" data-cat="all">All</button>
+        <button class="settings-nav-btn" data-cat="general">General</button>
+        <button class="settings-nav-btn" data-cat="hotkeys">Hotkeys</button>
         <button class="settings-nav-btn" data-cat="delays">Delays</button>
-        <button class="settings-nav-btn" data-cat="vision">Vision</button>
-        <button class="settings-nav-btn" data-cat="position">Position</button>
+        <button class="settings-nav-btn" data-cat="webhook">Webhook</button>
         <button class="settings-nav-btn" data-cat="debug">Debug</button>
       </nav>
-      <div class="settings-content">
-        <div class="settings-category active" data-cat="general">
-          <div class="page-header">
-            <span class="page-title">General</span>
-            <span class="page-subtitle">Connection, updates, and macro behaviour</span>
-          </div>
+      <div class="settings-content" id="settings-content">
+        <!-- General -->
+        <div class="settings-category" data-cat="general">
+          <div class="page-header"><span class="page-title">General</span></div>
           <div class="setting-group">
             <div class="setting-row full">
               <div class="setting-info">
                 <span class="setting-name">Private Server Link</span>
-                <span class="setting-desc">The deep link used to join your server</span>
+                <span class="setting-desc">Deep link used to join your server</span>
               </div>
-              <input type="text" class="setting-input" placeholder="https://www.roblox.com/share?code=...">
-            </div>
-            <div class="setting-row full">
-              <div class="setting-info">
-                <span class="setting-name">Discord Webhook</span>
-                <span class="setting-desc">Posts win/loss notifications to your channel</span>
-              </div>
-              <input type="text" class="setting-input" placeholder="https://discord.com/api/webhooks/...">
+              <input type="text" class="setting-input" id="s-private-server" placeholder="https://www.roblox.com/share?code=..." data-key="private_server_link">
             </div>
             <div class="setting-row">
               <div class="setting-info">
                 <span class="setting-name">Check for updates on startup</span>
-                <span class="setting-desc">Asks GitHub once per launch</span>
               </div>
-              <label class="toggle"><input type="checkbox" checked><span class="toggle-track"></span></label>
+              <label class="toggle"><input type="checkbox" id="s-auto-update" data-key="auto_update"><span class="toggle-track"></span></label>
             </div>
             <div class="setting-row">
               <div class="setting-info">
                 <span class="setting-name">Hard Mode (Story only)</span>
-                <span class="setting-desc">Enables the hard mode toggle before starting</span>
               </div>
-              <label class="toggle"><input type="checkbox"><span class="toggle-track"></span></label>
+              <label class="toggle"><input type="checkbox" id="s-hard-mode" data-key="hard_mode"><span class="toggle-track"></span></label>
             </div>
             <div class="setting-row">
               <div class="setting-info">
                 <span class="setting-name">Camera once per session</span>
                 <span class="setting-desc">Skip the camera setup on repeat matches</span>
               </div>
-              <label class="toggle"><input type="checkbox"><span class="toggle-track"></span></label>
+              <label class="toggle"><input type="checkbox" id="s-camera-once" data-key="camera_once_per_session"><span class="toggle-track"></span></label>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info">
+                <span class="setting-name">Auto-reopen Roblox</span>
+                <span class="setting-desc">Relaunch the game if it crashes mid-run</span>
+              </div>
+              <label class="toggle"><input type="checkbox" id="s-auto-reopen" data-key="auto_reopen_roblox"><span class="toggle-track"></span></label>
             </div>
             <div class="setting-row">
               <div class="setting-info">
                 <span class="setting-name">Expedition Difficulty</span>
-                <span class="setting-desc">1–3, higher is harder</span>
               </div>
-              <select class="setting-select"><option>1</option><option>2</option><option>3</option></select>
+              <select class="setting-select" id="s-exp-diff" data-key="expedition_difficulty" style="width:60px;">
+                <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+              </select>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info">
+                <span class="setting-name">Action Delay (ms)</span>
+                <span class="setting-desc">Extra pause after every click — slows the macro for slower PCs</span>
+              </div>
+              <input type="number" class="setting-input" id="s-action-delay" data-key="action_delay_ms" min="0" max="2000" value="0" style="width:80px;">
             </div>
           </div>
         </div>
-        <div class="settings-category" data-cat="keybinds">
-          <div class="page-header"><span class="page-title">Keybinds</span></div>
-          <div class="placeholder-body">Hotkey capture buttons for each action</div>
+
+        <!-- Hotkeys -->
+        <div class="settings-category" data-cat="hotkeys">
+          <div class="page-header" style="display:flex; align-items:center; justify-content:space-between;">
+            <span class="page-title">Hotkeys</span>
+            <button class="btn btn--sm" id="btn-reset-hotkeys">Reset to Defaults</button>
+          </div>
+          <div class="setting-group" id="hotkeys-list"></div>
         </div>
+
+        <!-- Delays -->
         <div class="settings-category" data-cat="delays">
           <div class="page-header"><span class="page-title">Delays</span></div>
-          <div class="placeholder-body">Tunable timing values from DELAY_SPEC</div>
+          <div class="setting-group" id="delays-list"></div>
         </div>
-        <div class="settings-category" data-cat="vision">
-          <div class="page-header"><span class="page-title">Vision</span></div>
-          <div class="placeholder-body">Per-template tolerance, test buttons, image list</div>
+
+        <!-- Webhook -->
+        <div class="settings-category" data-cat="webhook">
+          <div class="page-header"><span class="page-title">Webhook</span></div>
+          <div class="setting-group">
+            <div class="setting-row full">
+              <div class="setting-info">
+                <span class="setting-name">Discord Webhook URL</span>
+                <span class="setting-desc">Posts win/loss notifications to your channel</span>
+              </div>
+              <input type="text" class="setting-input" id="s-webhook" placeholder="https://discord.com/api/webhooks/..." data-key="discord_webhook">
+            </div>
+          </div>
         </div>
-        <div class="settings-category" data-cat="position">
-          <div class="page-header"><span class="page-title">Start Position</span></div>
-          <div class="placeholder-body">Per-target walk paths</div>
-        </div>
+
+        <!-- Debug -->
         <div class="settings-category" data-cat="debug">
           <div class="page-header"><span class="page-title">Debug</span></div>
-          <div class="placeholder-body">Template tester, geometry report, macro tester</div>
+          <div class="setting-group">
+            <div class="setting-row">
+              <div class="setting-info">
+                <span class="setting-name">Debug Screenshots</span>
+                <span class="setting-desc">Save screenshots on each lobby step</span>
+              </div>
+              <label class="toggle"><input type="checkbox" id="s-debug-screenshots" data-key="debug_screenshots"><span class="toggle-track"></span></label>
+            </div>
+          </div>
         </div>
       </div>
     </div>

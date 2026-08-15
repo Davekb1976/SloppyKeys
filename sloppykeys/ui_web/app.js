@@ -22,19 +22,6 @@
     btn.addEventListener("click", () => switchScreen(btn.dataset.screen));
   });
 
-  // ---- Settings category navigation ----
-  const catButtons = document.querySelectorAll(".settings-nav-btn[data-cat]");
-  const categories = document.querySelectorAll(".settings-category[data-cat]");
-
-  function switchCategory(cat) {
-    categories.forEach((el) => el.classList.toggle("active", el.dataset.cat === cat));
-    catButtons.forEach((btn) => btn.classList.toggle("active", btn.dataset.cat === cat));
-  }
-
-  catButtons.forEach((btn) => {
-    btn.addEventListener("click", () => switchCategory(btn.dataset.cat));
-  });
-
   // ---- Window dragging ----
   // One call on mousedown; the backend then tracks the cursor itself until the
   // button comes up. Sending a delta per mousemove instead put a bridge round
@@ -285,6 +272,7 @@
   // Populate gamemodes in the task builder mode dropdown + load queue
   window.addEventListener("pywebviewready", () => {
     loadTasks();
+    loadSettings();
     if (window.pywebview && pywebview.api && pywebview.api.get_gamemodes) {
       pywebview.api.get_gamemodes().then((modes) => {
         tbMode.innerHTML = modes.map((m) => `<option value="${m}">${m}</option>`).join("");
@@ -437,6 +425,96 @@
     renderPhases();
     opLoad.value = "";
   });
+
+  // ---- Settings screen ----
+  const settingsContent = document.getElementById("settings-content");
+
+  // Category switching
+  const catButtons = document.querySelectorAll(".settings-nav-btn[data-cat]");
+  const categories = document.querySelectorAll(".settings-category[data-cat]");
+
+  function switchSettingsCategory(cat) {
+    categories.forEach((el) => el.style.display = (cat === "all" || el.dataset.cat === cat) ? "" : "none");
+    catButtons.forEach((btn) => btn.classList.toggle("active", btn.dataset.cat === cat));
+  }
+
+  catButtons.forEach((btn) => {
+    btn.addEventListener("click", () => switchSettingsCategory(btn.dataset.cat));
+  });
+
+  // Search
+  document.getElementById("settings-search").addEventListener("input", (e) => {
+    const q = e.target.value.trim().toLowerCase();
+    if (q) switchSettingsCategory("all");
+    settingsContent.querySelectorAll(".setting-row").forEach((row) => {
+      const text = row.textContent.toLowerCase();
+      row.style.display = (!q || text.includes(q)) ? "" : "none";
+    });
+  });
+
+  // Auto-save: every input/checkbox/select with data-key saves immediately
+  function wireAutoSave() {
+    settingsContent.querySelectorAll("[data-key]").forEach((el) => {
+      const key = el.dataset.key;
+      const event = el.type === "checkbox" ? "change" : "change";
+      el.addEventListener(event, () => {
+        if (!window.pywebview || !pywebview.api) return;
+        let val;
+        if (el.type === "checkbox") val = el.checked;
+        else if (el.type === "number") val = Number(el.value);
+        else val = el.value;
+        pywebview.api.set_setting(key, val);
+      });
+      // Also save text inputs on blur (in case user doesn't press Enter)
+      if (el.type === "text") {
+        el.addEventListener("blur", () => {
+          if (!window.pywebview || !pywebview.api) return;
+          pywebview.api.set_setting(key, el.value);
+        });
+      }
+    });
+  }
+
+  async function loadSettings() {
+    if (!window.pywebview || !pywebview.api) return;
+    const s = await pywebview.api.get_settings();
+    // Populate general fields
+    const fields = settingsContent.querySelectorAll("[data-key]");
+    fields.forEach((el) => {
+      const val = s[el.dataset.key];
+      if (val === undefined) return;
+      if (el.type === "checkbox") el.checked = !!val;
+      else el.value = val;
+    });
+
+    // Hotkeys
+    const hk = await pywebview.api.get_hotkeys();
+    const hkList = document.getElementById("hotkeys-list");
+    hkList.innerHTML = Object.entries(hk).map(([action, display]) =>
+      `<div class="setting-row"><div class="setting-info"><span class="setting-name">${action.replace(/_/g, " ")}</span></div><span class="setting-value">${display}</span></div>`
+    ).join("");
+
+    // Delays
+    const delays = await pywebview.api.get_delays();
+    const dList = document.getElementById("delays-list");
+    dList.innerHTML = Object.entries(delays).map(([key, val]) =>
+      `<div class="setting-row"><div class="setting-info"><span class="setting-name">${key.replace(/_/g, " ")}</span></div><input type="number" class="setting-input" value="${val}" step="0.1" style="width:80px;" data-delay-key="${key}"></div>`
+    ).join("");
+    dList.querySelectorAll("[data-delay-key]").forEach((inp) => {
+      inp.addEventListener("change", () => {
+        if (!window.pywebview || !pywebview.api) return;
+        pywebview.api.set_delay(inp.dataset.delayKey, parseFloat(inp.value) || 0);
+      });
+    });
+  }
+
+  document.getElementById("btn-reset-hotkeys").addEventListener("click", async () => {
+    if (!window.pywebview || !pywebview.api) return;
+    const r = await pywebview.api.reset_hotkeys();
+    if (r.ok) { loadSettings(); window.addLog("Hotkeys reset to defaults."); }
+  });
+
+  wireAutoSave();
 
   // ---- Position Picker Modal ----
   let posTarget = null; // {phase, idx} — which block we're setting coords for
