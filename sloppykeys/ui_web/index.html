@@ -215,60 +215,73 @@
   <div class="screen" id="screen-queue">
     <div class="fullpage-split">
       <div class="split-left">
-        <div class="page-header">
-          <span class="page-title">Task Queue</span>
-          <span class="page-subtitle" id="queue-count">0 tasks</span>
-          <div class="page-actions">
-            <button class="btn btn--sm" id="btn-add-task">+ Add Task</button>
-            <button class="btn btn--sm btn--danger" id="btn-clear-tasks">Clear All</button>
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-tag tag-accent">Macro</span>
+            <span class="panel-title">Task Queue</span>
+            <span class="panel-badge" id="queue-count">0 tasks</span>
           </div>
-        </div>
-        <div class="task-list" id="task-list">
-          <div class="empty-state">No tasks yet — add one to get started</div>
+          <div class="panel-toolbar">
+            <button class="btn btn--sm" id="btn-add-task">+ Add Task</button>
+            <button class="btn btn--sm">Import</button>
+            <button class="btn btn--sm">Export</button>
+            <button class="btn btn--sm btn--danger" id="btn-clear-tasks" style="margin-left:auto;">Clear All</button>
+          </div>
+          <div class="panel-body">
+            <div class="task-list" id="task-list">
+              <div class="empty-state">No tasks yet — add one to get started</div>
+            </div>
+          </div>
         </div>
       </div>
       <div class="split-right">
-        <div class="page-header">
-          <span class="page-title">Task Builder</span>
-        </div>
-        <div id="task-builder" class="task-builder" style="display:none;">
-          <div class="setting-group">
-            <div class="setting-row">
-              <div class="setting-info"><span class="setting-name">Mode</span></div>
-              <select class="setting-select" id="tb-mode"></select>
-            </div>
-            <div class="setting-row">
-              <div class="setting-info"><span class="setting-name">Map</span></div>
-              <select class="setting-select" id="tb-map"><option value="">—</option></select>
-            </div>
-            <div class="setting-row">
-              <div class="setting-info"><span class="setting-name">Stage</span></div>
-              <select class="setting-select" id="tb-stage"><option value="">—</option></select>
-            </div>
-            <div class="setting-row">
-              <div class="setting-info"><span class="setting-name">Difficulty</span></div>
-              <select class="setting-select" id="tb-difficulty">
-                <option value="Normal">Normal</option>
-                <option value="Hard">Hard</option>
-              </select>
-            </div>
-            <div class="setting-row">
-              <div class="setting-info"><span class="setting-name">Repeat</span></div>
-              <input type="number" class="setting-input" id="tb-repeat" min="1" max="999" value="1" style="width:80px;">
-            </div>
-            <div class="setting-row">
-              <div class="setting-info">
-                <span class="setting-name">Macro Operation</span>
-                <span class="setting-desc">The block routine to run for this task</span>
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-tag tag-accent">Editor</span>
+            <span class="panel-title">Task Builder</span>
+          </div>
+          <div class="panel-body">
+            <div id="task-builder" class="task-builder" style="display:none;">
+              <div class="setting-group">
+                <div class="setting-row">
+                  <div class="setting-info"><span class="setting-label">Mode</span></div>
+                  <select class="setting-select" id="tb-mode"></select>
+                </div>
+                <div class="setting-row">
+                  <div class="setting-info"><span class="setting-label">Map</span></div>
+                  <select class="setting-select" id="tb-map"><option value="">—</option></select>
+                </div>
+                <div class="setting-row">
+                  <div class="setting-info"><span class="setting-label">Stage</span></div>
+                  <select class="setting-select" id="tb-stage"><option value="">—</option></select>
+                </div>
+                <div class="setting-row">
+                  <div class="setting-info"><span class="setting-label">Difficulty</span></div>
+                  <select class="setting-select" id="tb-difficulty">
+                    <option value="Normal">Normal</option>
+                    <option value="Hard">Hard</option>
+                  </select>
+                </div>
+                <div class="setting-row">
+                  <div class="setting-info"><span class="setting-label">Repeat</span></div>
+                  <input type="number" class="setting-input" id="tb-repeat" min="1" max="999" value="1" style="width:70px;">
+                </div>
+                <div class="setting-row">
+                  <div class="setting-info">
+                    <span class="setting-label">Macro Operation</span>
+                    <span class="setting-desc">The macro's Team Loadout comes from its template (Macro Manager tab).</span>
+                  </div>
+                  <select class="setting-select" id="tb-macro"><option value="">No Macro</option></select>
+                </div>
               </div>
-              <select class="setting-select" id="tb-macro"><option value="">No Macro</option></select>
+              <div class="task-builder-actions">
+                <button class="btn btn--sm" id="btn-clone-task">Clone Task</button>
+                <button class="btn btn--sm btn--danger" id="btn-remove-task" style="margin-left:auto;">Remove Task</button>
+              </div>
             </div>
-          </div>
-          <div class="task-builder-actions">
-            <button class="btn btn--sm btn--danger" id="btn-remove-task">Remove Task</button>
+            <div id="task-builder-empty" class="empty-state">Select a task to edit</div>
           </div>
         </div>
-        <div id="task-builder-empty" class="placeholder-body">Select a task to edit</div>
       </div>
     </div>
   </div>
