@@ -261,4 +261,81 @@ images/                       shipped with the build, user-editable
 7. **Settings screen** — categories, search, import/export, reset
 8. **Dashboard cleanup** — remove selector, wire to queue-driven start
 9. **PySide6 removal** — delete `ui/` once everything is covered
-10. **Polish** — auto-reopen, compact mode, walk recording
+10. **Polish** — auto-reopen, compact mode, walk recording, pause/resume
+
+## Features to Adopt
+
+### Compact Strip Mode (F7)
+- Window shrinks to just game + a 50px control strip (Start/Pause/Stop + action text + status dot)
+- Drops the side panel and log — for when the macro is running fine and the full UI is clutter
+- F7 toggles back to full. Game stays docked, macro keeps running unchanged
+- Our version: strip the right panel + log, resize window to 1152×(38+756+50)=844
+
+### Pause/Resume (F5)
+- A third state between running and stopped. The runner thread stays alive, parked at its current step
+- `_checkpoint()` blocks in a spin-sleep while paused, resumes exactly where it left off
+- Stop always clears pause (a paused thread doesn't sit forever)
+- Dashboard shows Pause button that relabels to "Resume" when paused, with a pulsing dot
+
+### Run History
+- Stored in settings.json under `run_history` (list, newest-first, capped at 50)
+- Each entry: `{result: "win"|"loss", map, duration, at: epoch}`
+- Session wins/losses are in-memory only. All-time persists
+- Runs-per-hour from a rolling 1-hour window
+- Dashboard panel renders colored W/L rows
+
+### Action Delay (Macro Speed)
+- Single global ms delay injected after every click/keypress
+- Settings slider, 0–2000ms, 0 is default (original speed)
+- Live update — takes effect on the very next click without restart
+- Lets users slow the macro for lower-end PCs where clicks arrive before the game processed the last one
+
+### Walk Path Recording
+- Polls WASD + I/O keys at 30ms on a background thread
+- Only state transitions logged with timestamps
+- Stored in `paths/` as JSON
+- Replayed by sleeping between events to reproduce original timing
+- Default paths shipped with the build; user recordings override by name
+
+### Input Recording (Record block)
+- Full mouse + keyboard via global hooks (not polling)
+- Coords converted to 1152×756 reference space at capture time
+- Events outside game bounds dropped automatically
+- Replayed with 1ms timer resolution for precision
+- Stored in `recordings/` folder
+
+### Share via Code
+- Compress template JSON with DEFLATE + preset dictionary → base64 → `SLOPPY:v1:<code>` string
+- Import accepts: code string, raw JSON, or URL
+- Bundles walk paths + input recordings alongside blocks
+- Preview before importing (shows template names + block counts)
+- Bounded decompression (5MB cap) to prevent malicious input
+
+### Webhook Enhancements
+- Per-match result embed: title, color, duration, map/stage/difficulty, session stats, all-time stats
+- Result screenshot attached (captured while Victory/Defeat screen is up)
+- Status card image (rendered — win/loss activity grid like a GitHub contribution graph)
+- @mention option + silent mode (no push notification)
+- Session elapsed time + runs/hour in the embed
+
+### Debug Tools
+- **Test Pre Start / Test Battle**: run a Macro Operation's blocks against live Roblox without lobby nav
+- **Health Check**: verify display scale, elevation, assets, OCR, critical images
+- **Log pop-out**: separate window with the full log stream
+- **Debug screenshot** (F3): numbered PNGs to a debug folder
+
+### Auto-Reopen Roblox
+- If the game closes/crashes mid-run, relaunch via deep link (private server URL)
+- Throttled to one attempt per 60s
+- The dock watchdog detects the window vanishing and drives the relaunch
+- The runner picks up the new HWND and resumes from the lobby
+
+### Onboarding
+- First-run modal with a checklist (display scale 100%, elevation matching, etc.)
+- Dismissible — never reappears after "Get Started"
+- Optional subscribe prompt chains after (one-time, either dismissal kills it)
+
+### Theme System
+- Base theme (dark variants: Dark, Black, Slate, etc.)
+- Accent color (purple, teal, amber, rose, etc.) independent of base
+- Applied via CSS variables, persisted in settings
