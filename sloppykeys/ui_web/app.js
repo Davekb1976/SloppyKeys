@@ -80,53 +80,11 @@
   const statGamemode = document.getElementById("stat-gamemode");
   const statCycle = document.getElementById("stat-cycle");
 
-  // ---- Gamemode selector ----
-  const selGamemode = document.getElementById("sel-gamemode");
-  const selMap = document.getElementById("sel-map");
-  const selTarget = document.getElementById("sel-target");
-
-  function fillSelect(el, items, placeholder) {
-    el.innerHTML = '<option value="">' + (placeholder || "—") + "</option>";
-    items.forEach((item) => {
-      const opt = document.createElement("option");
-      opt.value = item;
-      opt.textContent = item;
-      el.appendChild(opt);
-    });
-  }
-
-  function loadGamemodes() {
-    if (!window.pywebview || !pywebview.api) return;
-    pywebview.api.get_gamemodes().then((modes) => fillSelect(selGamemode, modes, "—"));
-  }
-
-  selGamemode.addEventListener("change", () => {
-    selMap.innerHTML = '<option value="">—</option>';
-    selTarget.innerHTML = '<option value="">—</option>';
-    if (!selGamemode.value || !window.pywebview) return;
-    pywebview.api.get_maps(selGamemode.value).then((maps) => fillSelect(selMap, maps, "—"));
-  });
-
-  selMap.addEventListener("change", () => {
-    selTarget.innerHTML = '<option value="">—</option>';
-    if (!selGamemode.value || !selMap.value || !window.pywebview) return;
-    pywebview.api.get_targets(selGamemode.value, selMap.value).then((targets) => {
-      if (targets.length > 0) fillSelect(selTarget, targets, "—");
-    });
-  });
-
-  window.addEventListener("pywebviewready", loadGamemodes);
-
   btnStart.addEventListener("click", () => {
     if (!window.pywebview || !pywebview.api) return;
-    const gm = selGamemode.value;
-    const map = selMap.value;
-    const tgt = selTarget.value;
-    // Ask the backend for the config path, then start.
-    pywebview.api.get_config_path(gm, map, tgt).then((path) => {
-      pywebview.api.start_macro(gm, map, tgt, path).then((r) => {
-        if (!r.ok) window.addLog("Start blocked: " + r.error);
-      });
+    // Start runs the task queue — no selector needed.
+    pywebview.api.start_macro("", "", "", "").then((r) => {
+      if (!r.ok) window.addLog("Start blocked: " + r.error);
     });
   });
 
@@ -324,14 +282,161 @@
     });
   });
 
-  // Populate gamemodes in the task builder mode dropdown
+  // Populate gamemodes in the task builder mode dropdown + load queue
   window.addEventListener("pywebviewready", () => {
-    loadGamemodes();
     loadTasks();
-    if (pywebview.api.get_gamemodes) {
+    if (window.pywebview && pywebview.api && pywebview.api.get_gamemodes) {
       pywebview.api.get_gamemodes().then((modes) => {
         tbMode.innerHTML = modes.map((m) => `<option value="${m}">${m}</option>`).join("");
       });
     }
+    loadOperationList();
   });
+
+  // ---- Macro Manager ----
+  const PHASES = ["pre_start", "battle", "loop_a", "loop_b"];
+  let opPhases = { pre_start: [], battle: [], loop_a: [], loop_b: [] };
+  let opDirty = false;
+
+  function renderPhases() {
+    PHASES.forEach((phase) => {
+      const zone = document.getElementById("zone-" + phase);
+      const count = document.getElementById("count-" + phase);
+      const blocks = opPhases[phase] || [];
+      count.textContent = blocks.length;
+      if (!blocks.length) {
+        zone.innerHTML = '<div class="phase-placeholder">Drag blocks here</div>';
+        return;
+      }
+      zone.innerHTML = blocks.map((b, i) => {
+        let fields = "";
+        if (b.type === "place_unit") fields = `<input placeholder="name" value="${b.params?.name || ""}" data-field="params.name"><input placeholder="x" value="${b.params?.x || 0}" data-field="params.x" type="number"><input placeholder="y" value="${b.params?.y || 0}" data-field="params.y" type="number">`;
+        else if (b.type === "wait_ms") fields = `<input placeholder="ms" value="${b.params?.ms || 500}" data-field="params.ms" type="number">`;
+        else if (b.type === "wait_wave") fields = `<input placeholder="wave" value="${b.params?.wave || 1}" data-field="params.wave" type="number">`;
+        else if (b.type === "leave_at_minute") fields = `<input placeholder="min" value="${b.params?.minutes || 10}" data-field="params.minutes" type="number">`;
+        else if (b.type === "click") fields = `<input placeholder="x" value="${b.params?.x || 0}" data-field="params.x" type="number"><input placeholder="y" value="${b.params?.y || 0}" data-field="params.y" type="number">`;
+        else if (b.type === "send_key") fields = `<input placeholder="key" value="${b.key || ""}" data-field="key" style="width:40px;"><input placeholder="hold ms" value="${b.params?.hold_ms || 0}" data-field="params.hold_ms" type="number">`;
+        else if (b.type === "upgrade_unit" || b.type === "sell_unit" || b.type === "target_priority") fields = `<input placeholder="#" value="${b.params?.index || 1}" data-field="params.index" type="number" style="width:40px;">`;
+        return `<div class="block-row" data-phase="${phase}" data-idx="${i}">
+          <span class="block-type">${b.type.replace(/_/g, " ")}</span>
+          <span class="block-fields">${fields}</span>
+          <span class="block-remove" data-phase="${phase}" data-idx="${i}">&times;</span>
+        </div>`;
+      }).join("");
+
+      // Wire inline field edits
+      zone.querySelectorAll("input[data-field]").forEach((inp) => {
+        inp.addEventListener("change", (e) => {
+          const row = e.target.closest(".block-row");
+          const ph = row.dataset.phase;
+          const idx = parseInt(row.dataset.idx);
+          const field = e.target.dataset.field;
+          const val = e.target.type === "number" ? Number(e.target.value) : e.target.value;
+          if (field.startsWith("params.")) {
+            const key = field.split(".")[1];
+            opPhases[ph][idx].params = opPhases[ph][idx].params || {};
+            opPhases[ph][idx].params[key] = val;
+          } else {
+            opPhases[ph][idx][field] = val;
+          }
+          opDirty = true;
+        });
+      });
+
+      // Wire remove buttons
+      zone.querySelectorAll(".block-remove").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const ph = btn.dataset.phase;
+          const idx = parseInt(btn.dataset.idx);
+          opPhases[ph].splice(idx, 1);
+          opDirty = true;
+          renderPhases();
+        });
+      });
+    });
+  }
+
+  // Drag and drop from palette to phases
+  document.querySelectorAll(".palette-block").forEach((el) => {
+    el.addEventListener("dragstart", (e) => {
+      e.dataTransfer.setData("text/plain", el.dataset.type);
+    });
+  });
+
+  PHASES.forEach((phase) => {
+    const zone = document.getElementById("zone-" + phase);
+    zone.addEventListener("dragover", (e) => { e.preventDefault(); zone.classList.add("drag-over"); });
+    zone.addEventListener("dragleave", () => { zone.classList.remove("drag-over"); });
+    zone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      zone.classList.remove("drag-over");
+      const type = e.dataTransfer.getData("text/plain");
+      if (!type) return;
+      const block = { type, params: {} };
+      if (type === "place_unit") block.params = { name: "", x: 0, y: 0 };
+      else if (type === "wait_ms") block.params = { ms: 500 };
+      else if (type === "wait_wave") block.params = { wave: 1 };
+      else if (type === "leave_at_minute") block.params = { minutes: 10 };
+      else if (type === "click") block.params = { x: 0, y: 0 };
+      else if (type === "send_key") { block.key = ""; block.params = { hold_ms: 0 }; }
+      else if (type === "upgrade_unit" || type === "sell_unit" || type === "target_priority") block.params = { index: 1 };
+      opPhases[phase].push(block);
+      opDirty = true;
+      renderPhases();
+    });
+  });
+
+  // Save / Load / New / Delete
+  const opName = document.getElementById("op-name");
+  const opLoad = document.getElementById("op-load");
+
+  async function loadOperationList() {
+    if (!window.pywebview || !pywebview.api) return;
+    const names = await pywebview.api.list_operations();
+    opLoad.innerHTML = '<option value="">Load...</option>' + names.map((n) => `<option value="${n}">${n}</option>`).join("");
+    // Also populate the task builder's macro dropdown
+    tbMacro.innerHTML = '<option value="">No Macro</option>' + names.map((n) => `<option value="${n}">${n}</option>`).join("");
+  }
+
+  document.getElementById("btn-op-save").addEventListener("click", async () => {
+    const name = opName.value.trim();
+    if (!name || !window.pywebview || !pywebview.api) return;
+    await pywebview.api.save_operation(name, opPhases);
+    opDirty = false;
+    window.addLog("Saved operation: " + name);
+    loadOperationList();
+  });
+
+  document.getElementById("btn-op-new").addEventListener("click", () => {
+    opName.value = "";
+    opPhases = { pre_start: [], battle: [], loop_a: [], loop_b: [] };
+    opDirty = false;
+    renderPhases();
+  });
+
+  document.getElementById("btn-op-delete").addEventListener("click", async () => {
+    const name = opName.value.trim();
+    if (!name || !window.pywebview || !pywebview.api) return;
+    await pywebview.api.delete_operation(name);
+    opName.value = "";
+    opPhases = { pre_start: [], battle: [], loop_a: [], loop_b: [] };
+    opDirty = false;
+    renderPhases();
+    loadOperationList();
+    window.addLog("Deleted operation: " + name);
+  });
+
+  opLoad.addEventListener("change", async () => {
+    const name = opLoad.value;
+    if (!name || !window.pywebview || !pywebview.api) return;
+    const data = await pywebview.api.load_operation(name);
+    opName.value = data.name || name;
+    opPhases = data.phases || { pre_start: [], battle: [], loop_a: [], loop_b: [] };
+    opDirty = false;
+    renderPhases();
+    opLoad.value = "";
+  });
+
+  renderPhases();
 })();

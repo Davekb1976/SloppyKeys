@@ -87,25 +87,6 @@
 
       <!-- Right: status + controls + stats -->
       <div class="dash-right">
-        <!-- Selection -->
-        <div class="dash-section">
-          <div class="dash-section-title">Selection</div>
-          <div class="status-grid">
-            <div class="status-row">
-              <span class="status-label">Gamemode</span>
-              <select class="setting-select" id="sel-gamemode"><option value="">—</option></select>
-            </div>
-            <div class="status-row">
-              <span class="status-label">Map</span>
-              <select class="setting-select" id="sel-map"><option value="">—</option></select>
-            </div>
-            <div class="status-row">
-              <span class="status-label">Act</span>
-              <select class="setting-select" id="sel-target"><option value="">—</option></select>
-            </div>
-          </div>
-        </div>
-
         <!-- Status -->
         <div class="dash-section">
           <div class="dash-section-title">Status</div>
@@ -165,21 +146,66 @@
     </div>
   </div>
 
-  <!-- ============ PLANNER (full page) ============ -->
+  <!-- ============ PLANNER → MACRO MANAGER (full page) ============ -->
   <div class="screen" id="screen-planner">
     <div class="fullpage-split">
-      <div class="split-left">
-        <div class="page-header">
-          <span class="page-title">Unit Planner</span>
-          <span class="page-subtitle">Place and configure units for each stage</span>
+      <div class="split-left" style="flex:1; min-width:0;">
+        <div class="page-header" style="display:flex; align-items:center; gap:8px;">
+          <span class="page-title">Macro Manager</span>
+          <input type="text" class="setting-input" id="op-name" placeholder="Operation name" style="width:180px; margin-left:auto;">
+          <button class="btn btn--sm" id="btn-op-save">Save</button>
+          <button class="btn btn--sm" id="btn-op-new">New</button>
+          <button class="btn btn--sm btn--danger" id="btn-op-delete">Delete</button>
+          <select class="setting-select" id="op-load" style="width:160px;"><option value="">Load...</option></select>
         </div>
-        <div class="placeholder-body">Step grid and chip selector will go here</div>
+
+        <!-- Phases -->
+        <div class="phases-container" id="phases-container">
+          <div class="phase-section" data-phase="pre_start">
+            <div class="phase-header"><span class="phase-tag tag-setup">Setup</span><span class="phase-label">Pre Start</span><span class="phase-count" id="count-pre_start">0</span></div>
+            <div class="phase-dropzone" id="zone-pre_start">
+              <div class="phase-placeholder">Drag blocks here — walk, place starter units, settings</div>
+            </div>
+          </div>
+          <div class="phase-section" data-phase="battle">
+            <div class="phase-header"><span class="phase-tag tag-combat">Combat</span><span class="phase-label">Battle</span><span class="phase-count" id="count-battle">0</span></div>
+            <div class="phase-dropzone" id="zone-battle">
+              <div class="phase-placeholder">Drag blocks here — upgrades, sells, waits, clicks</div>
+            </div>
+          </div>
+          <div class="phase-section" data-phase="loop_a">
+            <div class="phase-header"><span class="phase-tag tag-loop">Repeats</span><span class="phase-label">Loop A</span><span class="phase-count" id="count-loop_a">0</span></div>
+            <div class="phase-dropzone" id="zone-loop_a">
+              <div class="phase-placeholder">Repeats during the match — detect→act cycles</div>
+            </div>
+          </div>
+          <div class="phase-section" data-phase="loop_b">
+            <div class="phase-header"><span class="phase-tag tag-loop">Repeats</span><span class="phase-label">Loop B</span><span class="phase-count" id="count-loop_b">0</span></div>
+            <div class="phase-dropzone" id="zone-loop_b">
+              <div class="phase-placeholder">Second independent repeat loop</div>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="split-right">
-        <div class="page-header">
-          <span class="page-title">Step Detail</span>
-        </div>
-        <div class="placeholder-body">Selected step's fields, sequence editor, coordinate picker</div>
+
+      <!-- Block palette (right) -->
+      <div class="split-right" style="width:160px; flex-shrink:0; padding:8px; overflow-y:auto; border-left:1px solid var(--border);">
+        <div class="palette-group-label">Units</div>
+        <div class="palette-block" data-type="place_unit" draggable="true">Place Unit</div>
+        <div class="palette-block" data-type="upgrade_unit" draggable="true">Upgrade Unit</div>
+        <div class="palette-block" data-type="sell_unit" draggable="true">Sell Unit</div>
+        <div class="palette-block" data-type="target_priority" draggable="true">Target Priority</div>
+        <div class="palette-group-label">Pathing</div>
+        <div class="palette-block" data-type="walk" draggable="true">Walk</div>
+        <div class="palette-group-label">Timing</div>
+        <div class="palette-block" data-type="wait_ms" draggable="true">Wait (ms)</div>
+        <div class="palette-block" data-type="wait_wave" draggable="true">Wait for Wave</div>
+        <div class="palette-block" data-type="leave_at_minute" draggable="true">Leave at Minute</div>
+        <div class="palette-group-label">Setup</div>
+        <div class="palette-block" data-type="click" draggable="true">Click</div>
+        <div class="palette-block" data-type="send_key" draggable="true">Send Key</div>
+        <div class="palette-group-label">Logic</div>
+        <div class="palette-block" data-type="detect" draggable="true">Detect</div>
       </div>
     </div>
   </div>

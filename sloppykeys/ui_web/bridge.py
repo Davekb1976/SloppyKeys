@@ -313,6 +313,42 @@ class Api:
             return {"ok": False}
         return {"ok": UnifiedSettings(self._app_root).set_tasks([])}
 
+    # ---- Macro Operations ----
+
+    def list_operations(self) -> list:
+        """Names of all saved macro operations."""
+        if not self._app_root:
+            return []
+        from sloppykeys.config.operations import list_operations
+
+        return list_operations(self._app_root)
+
+    def load_operation(self, name: str) -> dict:
+        """Load a macro operation by name."""
+        if not self._app_root:
+            return {"name": "", "phases": {}}
+        from sloppykeys.config.operations import load_operation
+
+        return load_operation(self._app_root, name)
+
+    def save_operation(self, name: str, phases: dict) -> dict:
+        """Save a macro operation."""
+        if not self._app_root:
+            return {"ok": False}
+        from sloppykeys.config.operations import save_operation
+
+        ok = save_operation(self._app_root, name, phases)
+        return {"ok": ok}
+
+    def delete_operation(self, name: str) -> dict:
+        """Delete a macro operation."""
+        if not self._app_root:
+            return {"ok": False}
+        from sloppykeys.config.operations import delete_operation
+
+        ok = delete_operation(self._app_root, name)
+        return {"ok": ok}
+
     # ---- Macro control ----
 
     def start_macro(self, gamemode: str, map_name: str, target: str, config_path: str) -> dict:
