@@ -225,7 +225,7 @@ input:focus, select:focus {
   box-shadow: var(--bevel);
 }
 .btn--danger:hover { background: var(--rose); color: var(--text); box-shadow: none; }
-.btn--sm { height: var(--control-sm); padding: 0 var(--space-2); font-size: 11px; }
+.btn--sm { height: var(--control-md); padding: 0 var(--space-3); font-size: 12px; }
 .btn--lg { height: var(--control-lg); padding: 0 var(--space-4); font-size: 13px; }
 
 /* Controls row (Dashboard) */
@@ -272,7 +272,7 @@ input:focus, select:focus {
 
 /* Palette (left rail in Macro Manager) */
 .palette-panel {
-  width: 120px; flex-shrink: 0; padding: 10px 8px;
+  width: 140px; flex-shrink: 0; padding: 12px 10px;
   border-right: 1px solid var(--border); overflow-y: auto;
 }
 .palette-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 8px; }
@@ -293,21 +293,21 @@ input:focus, select:focus {
 }
 .panel-header {
   display: flex; align-items: center; gap: 8px;
-  padding: 8px 12px; border-bottom: 1px solid var(--border);
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
 }
 .panel-tag {
   font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
-  padding: 2px 8px;
+  padding: 3px 8px;
 }
 .tag-accent { background: var(--accent-soft); color: var(--accent); }
-.panel-title { font-size: 13px; font-weight: 600; color: var(--text); }
-.panel-badge { font-size: 11px; color: var(--text-faint); margin-left: auto; }
+.panel-title { font-size: 14px; font-weight: 600; color: var(--text); }
+.panel-badge { font-size: 12px; color: var(--text-faint); margin-left: auto; }
 .panel-toolbar {
   display: flex; align-items: center; gap: 6px;
-  padding: 6px 12px; border-bottom: 1px solid var(--border);
+  padding: 8px 14px; border-bottom: 1px solid var(--border);
 }
-.panel-body { flex: 1; padding: 10px 12px; overflow-y: auto; min-height: 0; }
-.setting-label { font-size: 12px; font-weight: 600; color: var(--text); }
+.panel-body { flex: 1; padding: 12px 14px; overflow-y: auto; min-height: 0; }
+.setting-label { font-size: 13px; font-weight: 600; color: var(--text); }
 
 /* ---- Task Queue ---- */
 .task-list {
@@ -349,7 +349,7 @@ input:focus, select:focus {
 .phase-label { font-size: 12px; font-weight: 600; color: var(--text); }
 .phase-count { font-size: 10px; color: var(--text-faint); margin-left: auto; }
 .phase-dropzone {
-  min-height: 48px; padding: 6px; display: flex; flex-direction: column; gap: 4px;
+  min-height: 70px; padding: 8px; display: flex; flex-direction: column; gap: 4px;
 }
 .phase-dropzone.drag-over { background: var(--accent-soft); }
 .phase-placeholder { font-size: 11px; color: var(--text-faint); text-align: center; padding: 12px; }
@@ -367,7 +367,7 @@ input:focus, select:focus {
 /* Palette */
 .palette-group-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-faint); margin: 8px 0 4px; }
 .palette-block {
-  padding: 6px 8px; font-size: 11px; font-weight: 600; color: var(--text);
+  padding: 8px 10px; font-size: 12px; font-weight: 600; color: var(--text);
   background: var(--surface-panel); border: 1px solid var(--border);
   margin-bottom: 4px; cursor: grab; transition: border-color 0.12s;
 }
