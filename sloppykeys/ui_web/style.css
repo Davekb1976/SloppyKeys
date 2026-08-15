@@ -459,7 +459,10 @@ input:focus, select:focus {
 }
 
 .settings-content { flex: 1; overflow-y: auto; padding: 16px 20px; }
-.settings-category { margin-bottom: 20px; }
+.settings-category {
+  margin-bottom: 16px; border: 1px solid var(--border); background: var(--surface-panel); padding: 14px 16px;
+}
+.settings-category .page-header { margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
 
 /* Setting rows — two-column grid */
 .setting-group { display: grid; grid-template-columns: 1fr 1fr; gap: 0 var(--space-5); }

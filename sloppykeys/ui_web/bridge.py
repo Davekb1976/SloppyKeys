@@ -618,6 +618,13 @@ class Api:
                         self._log_to_ui("Stop requested; finishing current step.")
                         self._push_status()
                 self._key_down["stop"] = stop_down
+
+                # F6 — Image Manager (rising edge)
+                f6_down = is_key_down(0x75)  # VK_F6
+                if f6_down and not self._key_down.get("f6", False):
+                    if self._window:
+                        self._window.evaluate_js("window.openImageManager && window.openImageManager();")
+                self._key_down["f6"] = f6_down
             except Exception:
                 pass
             time.sleep(HOTKEY_INTERVAL)

@@ -446,9 +446,22 @@
   document.getElementById("settings-search").addEventListener("input", (e) => {
     const q = e.target.value.trim().toLowerCase();
     if (q) switchSettingsCategory("all");
-    settingsContent.querySelectorAll(".setting-row").forEach((row) => {
-      const text = row.textContent.toLowerCase();
-      row.style.display = (!q || text.includes(q)) ? "" : "none";
+    settingsContent.querySelectorAll(".settings-category").forEach((cat) => {
+      let hasMatch = false;
+      cat.querySelectorAll(".setting-row").forEach((row) => {
+        const text = row.textContent.toLowerCase();
+        const match = !q || text.includes(q);
+        row.style.display = match ? "" : "none";
+        if (match) hasMatch = true;
+      });
+      // Hide the entire section header if no rows match
+      const header = cat.querySelector(".page-header");
+      if (q) {
+        cat.style.display = hasMatch ? "" : "none";
+      } else {
+        cat.style.display = "";
+        cat.querySelectorAll(".setting-row").forEach((row) => { row.style.display = ""; });
+      }
     });
   });
 
@@ -477,35 +490,45 @@
 
   async function loadSettings() {
     if (!window.pywebview || !pywebview.api) return;
-    const s = await pywebview.api.get_settings();
-    // Populate general fields
-    const fields = settingsContent.querySelectorAll("[data-key]");
-    fields.forEach((el) => {
-      const val = s[el.dataset.key];
-      if (val === undefined) return;
-      if (el.type === "checkbox") el.checked = !!val;
-      else el.value = val;
-    });
+    try {
+      const s = await pywebview.api.get_settings();
+      // Populate general fields
+      const fields = settingsContent.querySelectorAll("[data-key]");
+      fields.forEach((el) => {
+        const val = s[el.dataset.key];
+        if (val === undefined) return;
+        if (el.type === "checkbox") el.checked = !!val;
+        else el.value = val;
+      });
+    } catch (e) {}
 
     // Hotkeys
-    const hk = await pywebview.api.get_hotkeys();
-    const hkList = document.getElementById("hotkeys-list");
-    hkList.innerHTML = Object.entries(hk).map(([action, display]) =>
-      `<div class="setting-row"><div class="setting-info"><span class="setting-name">${action.replace(/_/g, " ")}</span></div><span class="setting-value">${display}</span></div>`
-    ).join("");
+    try {
+      const hk = await pywebview.api.get_hotkeys();
+      const hkList = document.getElementById("hotkeys-list");
+      if (hk && Object.keys(hk).length) {
+        hkList.innerHTML = Object.entries(hk).map(([action, display]) =>
+          `<div class="setting-row"><div class="setting-info"><span class="setting-name">${action.replace(/_/g, " ")}</span></div><span class="setting-value" style="font-size:12px; color:var(--text-muted); font-weight:600; padding:4px 10px; border:1px solid var(--border);">${display || "Unbound"}</span></div>`
+        ).join("");
+      }
+    } catch (e) {}
 
     // Delays
-    const delays = await pywebview.api.get_delays();
-    const dList = document.getElementById("delays-list");
-    dList.innerHTML = Object.entries(delays).map(([key, val]) =>
-      `<div class="setting-row"><div class="setting-info"><span class="setting-name">${key.replace(/_/g, " ")}</span></div><input type="number" class="setting-input" value="${val}" step="0.1" style="width:80px;" data-delay-key="${key}"></div>`
-    ).join("");
-    dList.querySelectorAll("[data-delay-key]").forEach((inp) => {
-      inp.addEventListener("change", () => {
-        if (!window.pywebview || !pywebview.api) return;
-        pywebview.api.set_delay(inp.dataset.delayKey, parseFloat(inp.value) || 0);
-      });
-    });
+    try {
+      const delays = await pywebview.api.get_delays();
+      const dList = document.getElementById("delays-list");
+      if (delays && Object.keys(delays).length) {
+        dList.innerHTML = Object.entries(delays).map(([key, val]) =>
+          `<div class="setting-row"><div class="setting-info"><span class="setting-name">${key.replace(/_/g, " ")}</span></div><input type="number" class="setting-input" value="${val}" step="0.1" style="width:80px;" data-delay-key="${key}"></div>`
+        ).join("");
+        dList.querySelectorAll("[data-delay-key]").forEach((inp) => {
+          inp.addEventListener("change", () => {
+            if (!window.pywebview || !pywebview.api) return;
+            pywebview.api.set_delay(inp.dataset.delayKey, parseFloat(inp.value) || 0);
+          });
+        });
+      }
+    } catch (e) {}
   }
 
   document.getElementById("btn-reset-hotkeys").addEventListener("click", async () => {
