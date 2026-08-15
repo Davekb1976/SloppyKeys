@@ -27,6 +27,7 @@ from ctypes import wintypes
 import webview  # type: ignore[import-untyped]
 
 from sloppykeys.core.win32.bindings import (
+    HWND_NOTOPMOST,
     SWP_NOACTIVATE,
     SWP_NOMOVE,
     SWP_NOSIZE,
@@ -108,9 +109,13 @@ class Api:
 
         Roblox is never moved or hidden for this -- covering it is enough, and
         leaving it where it is means going back to the Dashboard cannot flicker.
+        Going solid does occlude it, so coming back re-runs the dock to nudge it
+        into presenting frames again.
         """
         self._game_visible = bool(visible)
         self._apply_mask()
+        if self._game_visible:
+            self._last_rect = None
 
     def report_slot(self, x: float, y: float, w: float, h: float) -> None:
         """The page tells us where the game slot actually rendered."""
@@ -170,15 +175,31 @@ class Api:
         target = self._slot_on_screen()
         if target is None:
             return False
+
+        # Cut the hole before the game window moves under it. A window whose
+        # client area is entirely covered is reported occluded and stops
+        # presenting frames until something disturbs it, which reads as a game
+        # that only appears once it has been clicked.
+        if not self._docked:
+            self._docked = True
+            self._apply_mask()
+
         if not position_window_to_client_rect(game_hwnd, *target):
             return False
-        host = self._host_hwnd()
-        if host:
-            # Insert Roblox right after us in z-order so it sits under the hole
-            # rather than under whatever else happens to be on the desktop.
-            user32.SetWindowPos(
-                game_hwnd, host, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
-            )
+
+        # Front of the *normal* band, never "after us": inserting a non-topmost
+        # window behind a topmost one promotes it into the topmost band, and a
+        # topmost game window rises over our UI the moment it is clicked
+        # (measured: WS_EX_TOPMOST set on the Roblox window).
+        user32.SetWindowPos(
+            game_hwnd,
+            HWND_NOTOPMOST,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+        )
         return True
 
     def _release_game(self) -> None:
@@ -264,11 +285,9 @@ class Api:
                 if rect is not None and (rect != self._last_rect or not self._docked):
                     if self._dock(self._game_hwnd):
                         self._last_rect = rect
-                        if not self._docked:
-                            self._docked = True
-                            self._apply_mask()
-                    else:
+                    elif self._docked:
                         self._docked = False
+                        self._apply_mask()
             except OSError as exc:  # a window vanishing mid-call
                 print(f"Failed to sync the game window: {exc}", file=sys.stderr)
                 self._docked = False
