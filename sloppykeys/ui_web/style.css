@@ -120,7 +120,8 @@ input:focus, select:focus {
 .clock-label { font-size: 8px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-faint); }
 .clock-value { font-size: 12px; font-weight: 600; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 
-/* Window buttons — square, traffic-light style */
+/* Window buttons — square, traffic-light style, side by side */
+.win-btns { display: flex; gap: var(--space-1); }
 .titlebar-btn {
   width: 14px; height: 14px; border-radius: 0; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
