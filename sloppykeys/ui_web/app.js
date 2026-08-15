@@ -631,6 +631,15 @@
   const imFilter = document.getElementById("im-filter");
 
   window.openImageManager = async function () {
+    // Toggle: if already open, close it
+    if (imModal.style.display === "flex") {
+      imModal.style.display = "none";
+      // Restore game if on dashboard
+      if (window.pywebview && pywebview.api) pywebview.api.set_game_visible(true);
+      return;
+    }
+    // Hide the game so the modal isn't behind it
+    if (window.pywebview && pywebview.api) pywebview.api.set_game_visible(false);
     imModal.style.display = "flex";
     if (!window.pywebview || !pywebview.api) return;
     const result = await pywebview.api.list_vision_templates();
@@ -640,7 +649,11 @@
     renderImGrid();
   };
 
-  document.getElementById("im-close").addEventListener("click", () => { imModal.style.display = "none"; });
+  document.getElementById("im-close").addEventListener("click", () => {
+    imModal.style.display = "none";
+    // Restore game visibility
+    if (window.pywebview && pywebview.api) pywebview.api.set_game_visible(true);
+  });
   document.getElementById("im-capture").addEventListener("click", async () => {
     if (!window.pywebview || !pywebview.api) return;
     const r = await pywebview.api.get_roblox_snapshot();
@@ -719,6 +732,8 @@
     posTarget = { phase, idx };
     const block = opPhases[phase][idx];
     posReadout.textContent = (block.params?.x && block.params?.y) ? `X ${block.params.x}, Y ${block.params.y}` : "Not set";
+    // Hide the game so the modal isn't behind it
+    if (window.pywebview && pywebview.api) pywebview.api.set_game_visible(false);
     posModal.style.display = "flex";
     posGrid.style.display = "";
     posCanvasWrap.style.display = "none";
@@ -730,7 +745,10 @@
     if (posCategories.length) selectPosCategory(posCategories[0]);
   };
 
-  document.getElementById("pos-close").addEventListener("click", () => { posModal.style.display = "none"; });
+  document.getElementById("pos-close").addEventListener("click", () => {
+    posModal.style.display = "none";
+    if (window.pywebview && pywebview.api) pywebview.api.set_game_visible(true);
+  });
   document.getElementById("pos-back").addEventListener("click", () => {
     posGrid.style.display = "";
     posCanvasWrap.style.display = "none";

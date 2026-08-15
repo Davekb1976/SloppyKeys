@@ -133,6 +133,13 @@ the gutter is **8px** everywhere in the dashboard:
   must end at the same distance from the window edge. The last section in `.dash-right`
   uses `flex: 1` to stretch and fill remaining height so both columns end flush.
 
+## Modal Rule
+
+The game window is topmost — it paints over all DOM content. Any modal overlay that opens
+while on the Dashboard MUST hide the game first (`set_game_visible(false)`), and restore it
+when closed (`set_game_visible(true)`). F6 toggles: if the modal is already open, close it
+and restore the game.
+
 ## Full-Height Rule
 
 Every screen that shows two or more columns (Task Queue, Macro Manager, Settings) has a
