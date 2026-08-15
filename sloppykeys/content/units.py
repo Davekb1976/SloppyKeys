@@ -162,9 +162,10 @@ ACTION_FIELDS = {
     ACTION_KEY: ("key", "hold_ms"),
     ACTION_SCROLL: ("notches",),
     ACTION_WAIT: ("wait_ms",),
-    # `wait_ms` here is how long to keep looking, not a delay: 0 means one look, and the
-    # rest of the sequence is skipped this pass if the wave hasn't arrived.
-    ACTION_WAVE: ("wave", "max_wave", "region", "wait_ms"),
+    # No delay and no budget of its own: the gate takes one look, and repeating it is the
+    # step's `During match` interval. A poll here would block the loop that watches for the
+    # result screen for as long as the wave takes to arrive.
+    ACTION_WAVE: ("wave", "max_wave", "region"),
 }
 
 BUTTON_OPTIONS = ["left", "right", "middle"]
@@ -249,8 +250,8 @@ class StepAction:
             return f"{label}  {os.path.basename(self.image) or '?'}  {self.button}{every}"
         if self.type == ACTION_WAVE:
             of = f" of {self.max_wave}" if self.max_wave else ""
-            budget = f"  up to {self.wait_ms} ms" if self.wait_ms else "  one look"
-            return f"{label}  {self.wave or '?'}{of}{budget}"
+            boxed = "" if self.region() is not None else "  no region"
+            return f"{label}  {self.wave or '?'}{of}{boxed}"
         return label
 
     def as_payload(self) -> dict[str, object]:

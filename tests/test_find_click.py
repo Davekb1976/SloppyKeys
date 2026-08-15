@@ -233,19 +233,22 @@ assert parse_wave("12 of 3 things 25", 25) is None, "two numbers is ambiguous"
 
 # A Wait for Wave action survives the round trip, and its ceiling is enforced on read.
 gate = StepAction(
-    type="wave", wave=12, max_wave=25, wait_ms=3000,
+    type="wave", wave=12, max_wave=25,
     region_x=500, region_y=10, region_w=90, region_h=24,
 )
 gate_back = StepAction.from_payload(gate.as_payload())
 assert (gate_back.wave, gate_back.max_wave) == (12, 25), gate_back
 assert gate_back.region() == (500, 10, 90, 24), gate_back.region()
-assert gate_back.wait_ms == 3000, gate_back.wait_ms
 assert StepAction.from_payload({"Type": "wave", "Wave": 10**6}).wave == 99
 assert StepAction.from_payload({"Type": "wave", "Wave": -5}).wave == 0
-# The summary says which mode it is in, because a 0 budget means "one look" and that is
-# the difference between gating a chain step and gating a repeating one.
-assert "one look" in StepAction(type="wave", wave=3).summary()
-assert "up to 3000 ms" in gate.summary()
+
+# The gate has **no** timing field of its own: it takes one look, and repeating it is the
+# step's During match interval. A poll here would hold the loop watching for the result.
+assert not StepAction(type="wave").uses("wait_ms")
+assert "Ms" not in gate.as_payload(), gate.as_payload()
+# An unboxed gate says so in the list, since it can only ever fault at run time.
+assert "no region" in StepAction(type="wave", wave=3).summary()
+assert "no region" not in gate.summary(), gate.summary()
 
 # # The editor: the toggle has to leave the step in a state that works
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
@@ -320,10 +323,12 @@ for widget in (
     detail._sequence._wave,
     detail._sequence._max_wave,
     detail._sequence._wave_region,
-    detail._sequence._wait,
 ):
     assert not widget.isHidden(), widget
-for widget in (detail._sequence._image, detail._sequence._click_all, detail._sequence._x):
+for widget in (
+    detail._sequence._image, detail._sequence._click_all,
+    detail._sequence._x, detail._sequence._wait,
+):
     assert widget.isHidden(), widget
 
 waved = UnitStep(step=4, kind=KIND_SEQUENCE)

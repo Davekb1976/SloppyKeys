@@ -79,11 +79,6 @@ PARK_CLIENT = (8, 8)
 # The keep-alive click runs on its own, slower schedule (`won_poll_click`).
 OUTCOME_POLL = 0.2
 
-# How often a blocking wave gate re-reads the counter. Slower than the outcome poll on
-# purpose: OCR is 9-20ms against a 17ms template look, and a wave lasts seconds, so there
-# is nothing to gain from looking more often.
-WAVE_POLL = 0.5
-
 # How far the winning result template must beat the losing one before the result is
 # believed. "Game Won!" and "Game Lost!" share the word "Game" and are matched in
 # grayscale, so a crop carrying that prefix scores nearly the same on both screens — and
@@ -437,15 +432,13 @@ class UnitPlacer:
         return (True, f"{len(step.actions)} actions")
 
     def wave_gate(self, action: StepAction) -> tuple[bool, bool, str]:
-        """(ok, reached, message) for a Wait for Wave action.
+        """(ok, reached, message) for a Wait for Wave action. **One look, never a poll.**
 
-        `ok` False is a real fault — no region, no OCR — and stops the sequence. `reached`
-        False means the wave simply isn't there yet, which is not a fault.
-
-        `wait_ms` is the budget, not a delay. Zero means one look, and that is the right
-        setting inside a During match step: the schedule is already re-running the step,
-        and a blocking poll here would hold the loop that watches for the result screen.
-        A non-zero budget is for a chain step, where blocking is what's wanted.
+        `ok` False is a real fault — no wave set, no region, no OCR — and stops the
+        sequence. `reached` False means the wave simply isn't there yet, which is not a
+        fault: the step is re-run on its `During match` interval, and that is where
+        repetition belongs. Polling here would hold the loop that watches for the result
+        screen for as long as the wave took to arrive.
         """
         target = max(0, int(action.wave))
         if target <= 0:
@@ -457,19 +450,11 @@ class UnitPlacer:
         if not ready:
             return (False, False, note)
 
-        budget = max(0.0, action.wait_ms / 1000.0)
-        deadline = time.monotonic() + budget
-        looks = 0
-        last = "nothing read"
-        while True:
-            looks += 1
-            current, last = self._read_wave(region, action.max_wave)
-            if current is not None and current >= target:
-                return (True, True, f"wave {current} (read '{last}', {looks} look(s))")
-            if time.monotonic() >= deadline or self._should_stop():
-                where = f"wave {current}" if current is not None else f"unreadable '{last}'"
-                return (True, False, f"{where}, waiting for {target}")
-            time.sleep(WAVE_POLL)
+        current, text = self._read_wave(region, action.max_wave)
+        if current is not None and current >= target:
+            return (True, True, f"wave {current} (read '{text}')")
+        where = f"wave {current}" if current is not None else f"unreadable '{text}'"
+        return (True, False, f"{where}, waiting for {target}")
 
     def _read_wave(
         self, region: tuple[int, int, int, int], max_wave: int

@@ -176,7 +176,11 @@ class SequenceEditor(QWidget):
         wave_row = QHBoxLayout()
         wave_row.setSpacing(6)
         self._wave = self._spin(0, WAVE_MAX, lambda v: self._write("wave", v))
-        self._wave.setToolTip("The rest of this sequence runs once the match reaches it.")
+        self._wave.setToolTip(
+            "The rest of this sequence runs once the match has reached this wave.\n\n"
+            "One look each time the step runs — it does not wait. Turn on During match so "
+            "the step repeats and the gate gets re-checked until the wave arrives."
+        )
         self._max_wave = self._spin(0, WAVE_MAX, lambda v: self._write("max_wave", v))
         self._max_wave.setToolTip(
             "How many waves this stage has, e.g. 25.\n\n"
@@ -300,6 +304,15 @@ class SequenceEditor(QWidget):
         """Bind to a step's action list (by reference — edits write through)."""
         self._actions = actions
         self._refresh_list(select=0 if actions else -1)
+
+    def has_wave_gate(self) -> bool:
+        """Does this sequence gate on the wave counter?
+
+        The detail card asks, because a gate in a step that isn't During match takes its one
+        look at the start of the wave, sees wave 1, and skips everything after it — the
+        sequence looks broken rather than early.
+        """
+        return any(action.type == ACTION_WAVE for action in self._actions)
 
     def current_row(self) -> int:
         return self._list.currentRow()

@@ -387,6 +387,15 @@ class DetailEditor(QWidget):
         self._during_match.toggled.connect(self._on_during_match)
         fields.addWidget(self._during_match)
 
+        # A wave gate in a step that runs once takes its one look at the start of the wave,
+        # reads wave 1, and skips everything after it. That looks like a broken sequence
+        # rather than an early one, so it is said here instead of only in the log.
+        self._wave_note = QLabel("")
+        self._wave_note.setWordWrap(True)
+        self._wave_note.setStyleSheet(f"color: {theme.BAD}; font-size: 10px;")
+        self._wave_note.hide()
+        fields.addWidget(self._wave_note)
+
         self._sell = QCheckBox("Sell this unit instead of keeping it")
         self._sell.toggled.connect(lambda on: self._set("sell", bool(on)))
         fields.addWidget(self._sell)
@@ -453,6 +462,7 @@ class DetailEditor(QWidget):
         self._stack.setCurrentIndex(1 if kind == KIND_SEQUENCE else 0)
 
     def _on_sequence_changed(self) -> None:
+        self._refresh_wave_note()
         if self._step is not None:
             self.stepChanged.emit(self._step.step)
 
@@ -519,6 +529,24 @@ class DetailEditor(QWidget):
         self._sequence.load(step.actions)
         self._coord_note.setText("")
         self._step = step
+        self._refresh_wave_note()
+
+    def _refresh_wave_note(self) -> None:
+        """Warn when a wave gate can never open, which is a silent failure otherwise."""
+        step = self._step
+        show = (
+            step is not None
+            and step.is_sequence()
+            and not step.during_match
+            and self._sequence.has_wave_gate()
+        )
+        if show:
+            self._wave_note.setText(
+                "This sequence waits for a wave, but the step runs once — at the start of "
+                "the wave, so the gate reads wave 1 and skips everything after it. Turn on "
+                "During match."
+            )
+        self._wave_note.setVisible(bool(show))
 
     def _on_during_match(self, on: bool) -> None:
         """Turning this on gives the step a usable interval if it hasn't got one.
@@ -540,6 +568,7 @@ class DetailEditor(QWidget):
                 self._preplacement.setChecked(False)
                 self._preplacement.blockSignals(False)
         self._set("during_match", bool(on))
+        self._refresh_wave_note()
 
     def _set(self, attr: str, value) -> None:
         if self._step is None:
