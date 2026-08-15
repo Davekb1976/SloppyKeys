@@ -123,20 +123,34 @@ class Api:
 
     def enter_compact(self) -> None:
         """Compact mode: shrink window to game + strip, drop the side panel."""
-        hwnd = self._host_hwnd()
-        if not hwnd:
+        if not self._window:
             return
         compact_w = VIEWPORT_W
         compact_h = TITLEBAR_H + VIEWPORT_H + 50
-        # Keep the window at its current top-left, just resize it.
-        from sloppykeys.core.win32.roblox_window import window_rect as _wr
-        rect = _wr(hwnd)
-        if rect:
-            user32.SetWindowPos(hwnd, 0, rect[0], rect[1], compact_w, compact_h,
-                                0x0004 | 0x0010)  # SWP_NOZORDER | SWP_NOACTIVATE
+        # pywebview's resize() is the only path that actually takes on WinForms.
+        # SetWindowPos alone gets overridden by the Form's layout engine.
+        self._window.restore()
+        import time as _t
+        _t.sleep(0.1)
+        self._window.resize(compact_w, compact_h)
+        _t.sleep(0.2)
+        # Verify it took, fall back to native if not.
+        hwnd = self._host_hwnd()
+        if hwnd:
+            from sloppykeys.core.win32.roblox_window import window_rect as _wr
+            rect = _wr(hwnd)
+            if rect and (rect[2] - rect[0], rect[3] - rect[1]) != (compact_w, compact_h):
+                user32.SetWindowPos(hwnd, 0, rect[0], rect[1], compact_w, compact_h, 0x0004)
 
     def exit_compact(self) -> None:
-        """Exit compact mode: restore full window size, centered."""
+        """Exit compact mode: restore full window size."""
+        if not self._window:
+            return
+        self._window.restore()
+        import time as _t
+        _t.sleep(0.1)
+        self._window.resize(WANT_W, WANT_H)
+        _t.sleep(0.2)
         hwnd = self._host_hwnd()
         if hwnd:
             fit_and_centre(hwnd, WANT_W, WANT_H)
