@@ -35,6 +35,19 @@
     btn.addEventListener("click", () => switchCategory(btn.dataset.cat));
   });
 
+  // ---- Window dragging ----
+  // One call on mousedown hands the window to the OS move loop; there is no
+  // per-frame message, which is what keeps the drag (and the docked game
+  // window following it) smooth. pywebview's own drag handler is not used.
+  const dragEl = document.getElementById("drag-handle");
+  if (dragEl) {
+    dragEl.addEventListener("mousedown", (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      if (window.pywebview && pywebview.api) pywebview.api.begin_drag();
+    });
+  }
+
   // ---- Window controls ----
   document.getElementById("btn-minimize").addEventListener("click", () => {
     if (window.pywebview && pywebview.api) pywebview.api.minimize_window();
@@ -59,6 +72,21 @@
   document.getElementById("btn-clear-log").addEventListener("click", () => {
     logList.innerHTML = "";
   });
+
+  // ---- Game slot geometry ----
+  // The backend cuts a hole in the window over this rect, so the rect has to
+  // come from where the slot actually rendered rather than a duplicated
+  // constant that can drift out of step with the stylesheet.
+  const slotEl = document.getElementById("game-slot");
+
+  function reportSlot() {
+    if (!slotEl || !window.pywebview || !pywebview.api) return;
+    const r = slotEl.getBoundingClientRect();
+    pywebview.api.report_slot(r.left, r.top, r.width, r.height);
+  }
+
+  window.addEventListener("pywebviewready", reportSlot);
+  window.addEventListener("resize", reportSlot);
 
   // ---- Session clock ----
   const clockEl = document.getElementById("session-clock");

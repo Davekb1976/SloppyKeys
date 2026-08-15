@@ -8,10 +8,10 @@
 <body>
 
   <!-- Titlebar -->
-  <header id="titlebar" class="titlebar drag-region">
-    <div class="titlebar-left">
+  <header id="titlebar" class="titlebar">
+    <div class="titlebar-left no-drag">
       <span class="titlebar-brand">SloppyKeys</span>
-      <span class="titlebar-version no-drag" id="version-badge">v0.1.2</span>
+      <span class="titlebar-version" id="version-badge">v0.1.2</span>
     </div>
 
     <nav class="titlebar-nav no-drag">
@@ -44,6 +44,11 @@
         </svg>
       </button>
     </nav>
+
+    <!-- This empty div is the drag handle. JS mousedown/mousemove calls our
+         own move_window API because pywebview 6.x's built-in handler crashes.
+         No pywebview-drag-region class — that activates the broken handler. -->
+    <div class="titlebar-drag" id="drag-handle"></div>
 
     <div class="titlebar-right no-drag">
       <div class="titlebar-clocks">

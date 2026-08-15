@@ -87,8 +87,8 @@ input:focus, select:focus {
   background: var(--surface-base); border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
-.drag-region { -webkit-app-region: drag; }
 .no-drag { -webkit-app-region: no-drag; }
+.titlebar-drag { flex: 1; height: 100%; cursor: grab; }
 
 .titlebar-left { display: flex; align-items: center; gap: var(--space-2); }
 .titlebar-brand { font-size: 13px; font-weight: 500; color: var(--text); }

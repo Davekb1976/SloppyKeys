@@ -9,7 +9,21 @@ from __future__ import annotations
 import ctypes
 from ctypes import wintypes
 
-from .bindings import SW_MINIMIZE, SWP_FRAMECHANGED, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, user32
+from .bindings import (
+    HTCAPTION,
+    HWND_NOTOPMOST,
+    HWND_TOPMOST,
+    RGN_DIFF,
+    SW_MINIMIZE,
+    SWP_FRAMECHANGED,
+    SWP_NOACTIVATE,
+    SWP_NOMOVE,
+    SWP_NOSIZE,
+    SWP_NOZORDER,
+    WM_NCLBUTTONDOWN,
+    gdi32,
+    user32,
+)
 
 GWL_STYLE = -16
 
@@ -95,3 +109,78 @@ def make_frameless(hwnd: int) -> bool:
 
 def minimize(hwnd: int) -> None:
     user32.ShowWindow(hwnd, SW_MINIMIZE)
+
+
+def find_window_by_title(title: str) -> int | None:
+    """Top-level window with this exact caption, or None."""
+    hwnd = user32.FindWindowW(None, title)
+    return int(hwnd) if hwnd else None
+
+
+def set_topmost(hwnd: int, on: bool) -> bool:
+    """Pin the window above the normal z-order band, or release it."""
+    return bool(
+        user32.SetWindowPos(
+            hwnd,
+            HWND_TOPMOST if on else HWND_NOTOPMOST,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+        )
+    )
+
+
+def set_cutout_mask(
+    hwnd: int,
+    width: int,
+    height: int,
+    hole: tuple[int, int, int, int] | None,
+) -> bool:
+    """Shape the window to `width`x`height` minus `hole` (x, y, w, h), or clear it.
+
+    Region coordinates are relative to the window's upper-left. The window is
+    frameless, so its window rect equals its client rect (measured: identical
+    origin and size) and CSS pixels map straight through at 100% scaling — the
+    hole rect can be handed over exactly as the DOM reports it.
+
+    Pixels inside the hole leave the window entirely: whatever sits behind
+    renders there and takes the clicks. Passing None restores a solid window.
+    """
+    if hole is None:
+        return user32.SetWindowRgn(hwnd, None, True) != 0
+
+    x, y, w, h = (int(v) for v in hole)
+    if w <= 0 or h <= 0:
+        return user32.SetWindowRgn(hwnd, None, True) != 0
+
+    outer = gdi32.CreateRectRgn(0, 0, int(width), int(height))
+    inner = gdi32.CreateRectRgn(x, y, x + w, y + h)
+    if not outer or not inner:
+        # Nothing was handed to the window, so both handles are still ours.
+        gdi32.DeleteObject(outer)
+        gdi32.DeleteObject(inner)
+        return False
+
+    gdi32.CombineRgn(outer, outer, inner, RGN_DIFF)
+    gdi32.DeleteObject(inner)
+
+    # SetWindowRgn takes ownership of `outer` on success — deleting it here
+    # would leave the window pointing at a freed region.
+    if user32.SetWindowRgn(hwnd, outer, True) == 0:
+        gdi32.DeleteObject(outer)
+        return False
+    return True
+
+
+def begin_caption_drag(hwnd: int) -> None:
+    """Hand the window to the OS move loop as if the caption had been grabbed.
+
+    The mouse button is already physically down when this is called from the
+    titlebar's mousedown, so DefWindowProc's modal loop tracks the cursor and
+    ends on the real button release. Dragging then costs zero round trips per
+    frame, which is the difference between smooth and stuttering.
+    """
+    user32.ReleaseCapture()
+    user32.SendMessageW(hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0)

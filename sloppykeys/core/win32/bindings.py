@@ -22,6 +22,18 @@ SWP_NOACTIVATE = 0x0010
 SWP_FRAMECHANGED = 0x0020
 SWP_NOOWNERZORDER = 0x0200
 
+# # SetWindowPos z-order targets
+HWND_TOPMOST = -1
+HWND_NOTOPMOST = -2
+
+# # Region combine modes (CombineRgn)
+RGN_DIFF = 4
+
+# # Caption-drag: hand the move loop to the OS instead of stepping the window
+# # ourselves, so a drag costs no per-frame round trip.
+WM_NCLBUTTONDOWN = 0x00A1
+HTCAPTION = 2
+
 # # ShowWindow commands
 SW_MINIMIZE = 6
 SW_RESTORE = 9
@@ -39,6 +51,7 @@ KEY_DOWN_MASK = 0x8000
 
 user32 = ctypes.windll.user32
 kernel32 = ctypes.windll.kernel32
+gdi32 = ctypes.windll.gdi32
 
 WNDENUMPROC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
 
@@ -82,6 +95,26 @@ _set_sig(
     ctypes.c_int,
     ctypes.c_uint,
 )
+
+_set_sig(user32.FindWindowW, wintypes.HWND, wintypes.LPCWSTR, wintypes.LPCWSTR)
+_set_sig(user32.SetWindowRgn, ctypes.c_int, wintypes.HWND, wintypes.HRGN, wintypes.BOOL)
+_set_sig(user32.ReleaseCapture, wintypes.BOOL)
+_set_sig(
+    user32.SendMessageW,
+    ctypes.c_ssize_t,
+    wintypes.HWND,
+    wintypes.UINT,
+    ctypes.c_size_t,
+    ctypes.c_ssize_t,
+)
+
+_set_sig(
+    gdi32.CreateRectRgn, wintypes.HRGN, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int
+)
+_set_sig(
+    gdi32.CombineRgn, ctypes.c_int, wintypes.HRGN, wintypes.HRGN, wintypes.HRGN, ctypes.c_int
+)
+_set_sig(gdi32.DeleteObject, wintypes.BOOL, wintypes.HGDIOBJ)
 
 _set_sig(kernel32.OpenProcess, wintypes.HANDLE, wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
 _set_sig(
