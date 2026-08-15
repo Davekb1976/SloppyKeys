@@ -134,8 +134,19 @@ minus the viewport) so rendering and hit-testing fall through, and move Roblox b
   desktop.
 - The window opens centred on the **primary** screen; a shorter secondary would clip it.
 
+**The hole is a Qt-only technique.** The pywebview window (`ui_web/`) cannot use it:
+`SetWindowRgn` is accepted — `GetWindowRgnBox` reports the hole — but WebView2 composites
+through DirectComposition, which ignores GDI window regions, so the page keeps painting over
+the slot. That window inverts the layering instead: Roblox rides the **topmost** band,
+frame stripped, positioned on the slot, above our normal-band window. Nothing is parented,
+so quitting can't take the game down; the frame is restored on the way out, and a screen
+switch only demotes the game out of the topmost band so our content covers it.
+
 **Dead ends — measured, do not retry:** reparenting via `SetParent` (DPI/focus flakiness,
-child dies with parent) · colour-key transparency `LWA_COLORKEY` · the Tauri 2 / WebView2
+child dies with parent) · colour-key transparency `LWA_COLORKEY` · `SetWindowRgn` over
+WebView2 (above) · handing the frameless window to the OS caption-drag loop with
+`WM_NCLBUTTONDOWN` (WebView2 holds the mouse capture in its own process, so the move loop
+never sees a mouse move) · the Tauri 2 / WebView2
 stack (DirectComposition can't host the window) · process DPI-awareness variants (byte-
 identical rects) · runtime multi-scale matching (~24× cost, and it hides bad templates) ·
 `RegionMemory`/`image_regions.json` auto-learned regions · the OCR-template fallback

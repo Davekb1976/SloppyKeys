@@ -2,34 +2,35 @@
 
 Launch with: .venv\\Scripts\\python.exe -m sloppykeys.ui_web
 
-Roblox stays its own top-level window. We sit above it (topmost) with a hole cut
-out of our shape over the game slot, so its pixels show through and take the
-clicks, and we move it so its *client* area lands exactly on that hole -- its
-caption ends up above the hole, hidden behind us, never removed. Nothing about
-the Roblox window is modified, so closing us cannot take it down and its
-toolbar is back the moment we are gone.
+Docking is inverted layering, not embedding. Roblox stays its own top-level
+window and rides the topmost band, sized and positioned exactly over the game
+slot; our window sits in the normal band underneath. Visually the game is inside
+the UI, but nothing is ever parented, so closing the macro cannot take Roblox
+down with it. Its frame is stripped while docked -- it floats above us, so there
+is nothing to hide a caption behind -- and restored on the way out.
 
-Reparenting with SetParent was tried and abandoned: the child dies with the
-parent, which is the whole bug this layout avoids. Handing the window move to
-the OS caption loop was tried too and does nothing -- WebView2 owns the mouse
-capture from another process -- so the drag is tracked here in `_drag_loop`.
+Two other layouts were measured and rejected on this stack:
+
+* SetParent. Windows destroys child windows with their parent, so quitting the
+  macro killed the game.
+* A literal hole cut with SetWindowRgn, which is how the PySide6 window does it.
+  The region is accepted -- GetWindowRgnBox reports the hole -- but WebView2
+  composites through DirectComposition and ignores GDI window regions, so the
+  page keeps painting over the slot.
 """
 
 from __future__ import annotations
 
-import ctypes
 import os
 import sys
 import threading
 import time
-from ctypes import wintypes
 
 import webview  # type: ignore[import-untyped]
 
 from sloppykeys.core.win32.bindings import (
-    HWND_NOTOPMOST,
+    SW_RESTORE,
     SWP_NOACTIVATE,
-    SWP_NOMOVE,
     SWP_NOSIZE,
     VK_LBUTTON,
     get_cursor_pos,
@@ -38,26 +39,42 @@ from sloppykeys.core.win32.bindings import (
 )
 from sloppykeys.core.win32.frameless import (
     find_window_by_title,
+    fit_and_centre,
     move_to,
-    set_cutout_mask,
     set_topmost,
 )
 from sloppykeys.core.win32.roblox_window import (
+    activate_window,
     find_roblox_window,
     is_minimized,
     is_window,
     position_window_to_client_rect,
+    restore_frame,
+    strip_frame,
     window_rect,
 )
 
 WINDOW_TITLE = "SloppyKeys"
 
-# Fallback game slot in CSS pixels, used until the page reports its own rect.
-# Measured against the DOM: the slot renders at (0, 38) sized 1152x756, and at
-# 100% display scaling CSS pixels equal window pixels one-for-one.
-DEFAULT_SLOT = (0, 38, 1152, 756)
+# The viewport is pinned at this size: every coordinate, template and config in
+# the project was captured against it. See coding-standards.md.
+VIEWPORT_W = 1152
+VIEWPORT_H = 756
 
-FOLLOW_INTERVAL = 0.016  # ~60Hz; the follower is the only thing carrying Roblox.
+TITLEBAR_H = 38
+PANEL_W = 384
+LOG_H = 220
+
+# What the layout wants. fit_and_centre clamps it to the work area and reports
+# what it actually got, so a short screen shrinks the log rather than clipping it.
+WANT_W = VIEWPORT_W + PANEL_W
+WANT_H = TITLEBAR_H + VIEWPORT_H + LOG_H
+
+# Fallback slot in CSS pixels until the page reports its own rect. Measured
+# against the DOM: at 100% display scaling CSS pixels are window pixels.
+DEFAULT_SLOT = (0, TITLEBAR_H, VIEWPORT_W, VIEWPORT_H)
+
+FOLLOW_INTERVAL = 0.016  # ~60Hz
 SEARCH_INTERVAL = 1.0
 DRAG_INTERVAL = 0.008  # ~125Hz, so a drag never misses a displayed frame.
 
@@ -69,6 +86,7 @@ class Api:
         self._window: webview.Window | None = None
         self._hwnd: int | None = None
         self._game_hwnd: int | None = None
+        self._game_style: int | None = None
         self._slot = DEFAULT_SLOT
         self._game_visible = True
         self._docked = False
@@ -79,6 +97,9 @@ class Api:
     # ---- Window chrome ----
 
     def minimize_window(self) -> None:
+        # Drop the game out of the topmost band first, or it stays floating over
+        # the desktop with the UI it belongs to gone.
+        self._set_game_topmost(False)
         if self._window:
             self._window.minimize()
 
@@ -105,17 +126,14 @@ class Api:
     # ---- Screens ----
 
     def set_game_visible(self, visible: bool) -> None:
-        """Only the Dashboard shows the game; elsewhere we go solid over it.
+        """Only the Dashboard shows the game.
 
-        Roblox is never moved or hidden for this -- covering it is enough, and
-        leaving it where it is means going back to the Dashboard cannot flicker.
-        Going solid does occlude it, so coming back re-runs the dock to nudge it
-        into presenting frames again.
+        Elsewhere the game is demoted out of the topmost band so our own
+        content covers it. It is never moved or hidden, so coming back to the
+        Dashboard costs one z-order change and cannot flicker.
         """
         self._game_visible = bool(visible)
-        self._apply_mask()
-        if self._game_visible:
-            self._last_rect = None
+        self._set_game_topmost(self._game_visible)
 
     def report_slot(self, x: float, y: float, w: float, h: float) -> None:
         """The page tells us where the game slot actually rendered."""
@@ -124,7 +142,6 @@ class Api:
             return
         self._slot = slot
         self._last_rect = None  # force a reposition against the new slot
-        self._apply_mask()
 
     def get_version(self) -> str:
         from sloppykeys.version import VERSION
@@ -141,24 +158,6 @@ class Api:
         self._hwnd = find_window_by_title(self._window.title)
         return self._hwnd
 
-    def _host_client_size(self) -> tuple[int, int] | None:
-        hwnd = self._host_hwnd()
-        if not hwnd:
-            return None
-        rect = wintypes.RECT()
-        if not user32.GetClientRect(hwnd, ctypes.byref(rect)):
-            return None
-        return (rect.right - rect.left, rect.bottom - rect.top)
-
-    def _apply_mask(self) -> None:
-        """Cut the game slot out of our shape, or go solid again."""
-        hwnd = self._host_hwnd()
-        size = self._host_client_size()
-        if not hwnd or not size:
-            return
-        show_game = self._game_visible and self._docked
-        set_cutout_mask(hwnd, size[0], size[1], self._slot if show_game else None)
-
     def _slot_on_screen(self) -> tuple[int, int, int, int] | None:
         """The slot in screen coordinates, or None if we cannot be measured."""
         hwnd = self._host_hwnd()
@@ -170,54 +169,49 @@ class Api:
         x, y, w, h = self._slot
         return (rect[0] + x, rect[1] + y, w, h)
 
+    def _set_game_topmost(self, on: bool) -> None:
+        if self._docked and is_window(self._game_hwnd) and self._game_hwnd:
+            set_topmost(self._game_hwnd, on)
+
     def _dock(self, game_hwnd: int) -> bool:
-        """Put Roblox's client area on the slot, directly beneath our window."""
+        """Float the game over the slot, frame stripped, without stealing focus."""
         target = self._slot_on_screen()
         if target is None:
             return False
 
-        # Cut the hole before the game window moves under it. A window whose
-        # client area is entirely covered is reported occluded and stops
-        # presenting frames until something disturbs it, which reads as a game
-        # that only appears once it has been clicked.
         if not self._docked:
+            style = strip_frame(game_hwnd)
+            if style is None:
+                return False
+            self._game_style = style
             self._docked = True
-            self._apply_mask()
 
         if not position_window_to_client_rect(game_hwnd, *target):
             return False
-
-        # Front of the *normal* band, never "after us": inserting a non-topmost
-        # window behind a topmost one promotes it into the topmost band, and a
-        # topmost game window rises over our UI the moment it is clicked
-        # (measured: WS_EX_TOPMOST set on the Roblox window).
-        user32.SetWindowPos(
-            game_hwnd,
-            HWND_NOTOPMOST,
-            0,
-            0,
-            0,
-            0,
-            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
-        )
+        set_topmost(game_hwnd, self._game_visible)
         return True
 
     def _release_game(self) -> None:
-        """Leave Roblox usable on its own: caption fully on screen.
+        """Hand the game window back: frame on, out of the topmost band, usable.
 
-        Its style was never touched, so there is nothing to restore -- but the
-        caption sits above the slot, which can be off the top of the screen if
-        our window was dragged up there.
+        Nothing was ever parented, so there is no detach to confirm -- only the
+        frame and the z-order to undo.
         """
         hwnd = self._game_hwnd
-        if not is_window(hwnd) or hwnd is None:
+        if hwnd is None or not is_window(hwnd):
             return
+        set_topmost(hwnd, False)
+        if self._game_style is not None:
+            restore_frame(hwnd, self._game_style, VIEWPORT_W, VIEWPORT_H)
+            self._game_style = None
         rect = window_rect(hwnd)
-        if rect is None:
-            return
-        if rect[1] >= 0:
-            return
-        user32.SetWindowPos(hwnd, 0, rect[0], 0, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE)
+        if rect is not None and rect[1] < 0:
+            # The caption sat above the slot; keep it on screen.
+            user32.SetWindowPos(hwnd, 0, rect[0], 0, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE)
+        if is_minimized(hwnd):
+            user32.ShowWindow(hwnd, SW_RESTORE)
+        activate_window(hwnd)
+        self._docked = False
 
     def _drag_loop(self) -> None:
         """Track the cursor until the button comes up, moving both windows.
@@ -254,11 +248,10 @@ class Api:
             self._last_rect = window_rect(self._hwnd) if self._hwnd else None
 
     def _follow_loop(self) -> None:
-        """Find Roblox, dock it, and keep it under the hole as we move.
+        """Find the game, dock it, and keep it over the slot as we move.
 
         Dragging is handled by `_drag_loop`; this catches every other way the
-        window can move (minimise/restore, a shell arrangement) and the initial
-        dock once Roblox appears.
+        window can move and the initial dock once the game appears.
         """
         while self._running:
             try:
@@ -270,14 +263,18 @@ class Api:
 
                 if not is_window(self._game_hwnd):
                     self._docked = False
+                    self._game_style = None
                     self._game_hwnd = find_roblox_window()
                     if not self._game_hwnd:
-                        self._apply_mask()
                         time.sleep(SEARCH_INTERVAL)
                         continue
 
                 host = self._host_hwnd()
                 if not host or is_minimized(host):
+                    # A minimized window reports coordinates near -32000; docking
+                    # against that would fling the game off screen.
+                    self._set_game_topmost(False)
+                    self._last_rect = None
                     time.sleep(SEARCH_INTERVAL)
                     continue
 
@@ -285,9 +282,8 @@ class Api:
                 if rect is not None and (rect != self._last_rect or not self._docked):
                     if self._dock(self._game_hwnd):
                         self._last_rect = rect
-                    elif self._docked:
+                    else:
                         self._docked = False
-                        self._apply_mask()
             except OSError as exc:  # a window vanishing mid-call
                 print(f"Failed to sync the game window: {exc}", file=sys.stderr)
                 self._docked = False
@@ -302,12 +298,11 @@ def main() -> None:
     window = webview.create_window(
         title=WINDOW_TITLE,
         url=html_path,
-        width=1552,
-        height=900,
-        min_size=(1200, 700),
+        width=WANT_W,
+        height=WANT_H,
+        min_size=(WANT_W, TITLEBAR_H + VIEWPORT_H),
         frameless=True,
         easy_drag=False,
-        on_top=True,
         js_api=api,
     )
     api._window = window
@@ -315,7 +310,10 @@ def main() -> None:
     def on_loaded() -> None:
         hwnd = api._host_hwnd()
         if hwnd:
-            set_topmost(hwnd, True)
+            # pywebview sizes the Form before the frame comes off, so the client
+            # area lands short of what was asked for -- set the real size here,
+            # where the window rect and the client rect are the same thing.
+            fit_and_centre(hwnd, WANT_W, WANT_H)
         window.evaluate_js(
             'document.getElementById("version-badge").textContent = '
             f'"v{api.get_version()}";'

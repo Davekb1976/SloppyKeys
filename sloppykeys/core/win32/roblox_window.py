@@ -10,8 +10,11 @@ from .bindings import (
     IMAGE_PATH_BUFFER_SIZE,
     PROCESS_QUERY_LIMITED_INFORMATION,
     SW_RESTORE,
+    SWP_FRAMECHANGED,
     SWP_NOACTIVATE,
+    SWP_NOMOVE,
     SWP_NOOWNERZORDER,
+    SWP_NOSIZE,
     SWP_NOZORDER,
     WINDOW_CLASS_BUFFER_SIZE,
     WNDENUMPROC,
@@ -21,6 +24,10 @@ from .bindings import (
 
 ROBLOX_PROCESS_NAMES = {"robloxplayerbeta.exe", "robloxplayerlauncher.exe"}
 ROBLOX_WINDOW_CLASS = "windowsclient"
+
+GWL_STYLE = -16
+WS_CAPTION = 0x00C00000
+WS_THICKFRAME = 0x00040000
 
 
 def get_process_exe_name(pid: int) -> str:
@@ -151,6 +158,42 @@ def position_window_to_client_rect(
             SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER,
         )
     )
+
+
+def strip_frame(hwnd: int) -> int | None:
+    """Drop the caption and resize border. Returns the style to restore, or None.
+
+    Only the window's own frame is touched -- nothing is injected, hooked or
+    read from the game process. Needed when the game floats *above* our window:
+    there is nothing left to hide its caption behind.
+    """
+    style = user32.GetWindowLongW(hwnd, GWL_STYLE)
+    if not style:
+        return None
+    stripped = style & ~WS_CAPTION & ~WS_THICKFRAME
+    if stripped == style:
+        return style
+    user32.SetWindowLongW(hwnd, GWL_STYLE, stripped)
+    user32.SetWindowPos(
+        hwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED
+    )
+    return style
+
+
+def restore_frame(hwnd: int, style: int, client_w: int, client_h: int) -> bool:
+    """Put the frame back and resize so the client area keeps its size.
+
+    Restoring the caption without growing the window would shrink the client
+    area by the frame thickness, which reads as a clipped game.
+    """
+    user32.SetWindowLongW(hwnd, GWL_STYLE, style)
+    user32.SetWindowPos(
+        hwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED
+    )
+    rect = window_rect(hwnd)
+    if rect is None:
+        return False
+    return position_window_to_client_rect(hwnd, rect[0], rect[1], client_w, client_h)
 
 
 def activate_window(hwnd: int) -> bool:

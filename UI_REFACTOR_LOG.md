@@ -14,7 +14,9 @@ Tracks the migration from PySide6 to pywebview + HTML/CSS/JS.
 | 2026-08-15 | Docking rebuilt on a window mask instead of reparenting | A reparented game window dies with ours on close; masking leaves it untouched, so its caption returns intact | done |
 | 2026-08-15 | Window move handed to the OS caption-drag loop | Removes the per-frame IPC that made dragging stutter while the game window followed | replaced |
 | 2026-08-15 | Drag tracked by a backend cursor loop instead | The OS loop never moved the window: WebView2 holds the mouse capture in its own process | done |
-| 2026-08-15 | Game window pinned to the front of the normal z-order band | It had been promoted to topmost, so clicking the game raised it over the UI | done |
-| 2026-08-15 | Cutout applied before the game window is moved under it | A fully covered client reads as occluded and stops presenting until clicked | done |
+| 2026-08-15 | Game window pinned to the front of the normal z-order band | It had been promoted to topmost, so clicking the game raised it over the UI | replaced |
+| 2026-08-15 | Cutout applied before the game window is moved under it | A fully covered client reads as occluded and stops presenting until clicked | replaced |
+| 2026-08-15 | Cutout dropped: game floats topmost over the slot instead | WebView2 composites via DirectComposition and ignores GDI window regions, so the hole never showed | done |
+| 2026-08-15 | Window sized from Win32 to 1536x1014, clamped to the work area | pywebview sized the Form with its frame still on, leaving the client 39px short and clipping the log | done |
 | 2026-08-15 | Game slot rect reported from the DOM to the backend | The cutout is measured where the slot rendered rather than duplicated as a constant | done |
 | | Wire macro controls (Start/Stop) to the existing runner | Clicking Start in the new UI should start a run the same as F1 does | next |

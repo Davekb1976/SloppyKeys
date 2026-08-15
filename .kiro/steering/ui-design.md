@@ -41,9 +41,16 @@ Python-only and communicate with the UI through pywebview's `js_api` bridge.
 └──────────────────────────────────────────┴────────────────────────┘
 ```
 
-- The viewport is a native child HWND positioned over the WebView by Python at exact
-  pixel coordinates. The DOM reserves a `<div>` as a placeholder; the WebView paints
-  nothing there. Modals that overlap the game region must hide the game first.
+- The viewport is the game's own top-level window, floated in the topmost band over the
+  slot by Python at exact pixel coordinates — not a child, never reparented. The DOM
+  reserves a `<div>` as a placeholder and reports its `getBoundingClientRect()` to the
+  backend, which is where the position comes from. Because the game is *above* the page,
+  anything that must appear over the slot — a modal, an overlay — has to demote the game
+  out of the topmost band first. See `coding-standards.md` for why a cut-out hole cannot
+  work here.
+- Window size is set from Win32 after the frame comes off, clamped to the work area:
+  pywebview sizes the Form while it still has a frame, so the client area lands short of
+  what was asked for and the log gets clipped.
 - Navigation is icon buttons (30×30px) in the titlebar, not a sidebar rail.
 - Right panel content swaps per screen: Run, Units, Tasks, Route, Settings.
 - The process log sits below the viewport (not in the right panel) and scrolls

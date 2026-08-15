@@ -12,14 +12,13 @@ from ctypes import wintypes
 from .bindings import (
     HWND_NOTOPMOST,
     HWND_TOPMOST,
-    RGN_DIFF,
+    SPI_GETWORKAREA,
     SW_MINIMIZE,
     SWP_FRAMECHANGED,
     SWP_NOACTIVATE,
     SWP_NOMOVE,
     SWP_NOSIZE,
     SWP_NOZORDER,
-    gdi32,
     user32,
 )
 
@@ -130,46 +129,32 @@ def set_topmost(hwnd: int, on: bool) -> bool:
     )
 
 
-def set_cutout_mask(
-    hwnd: int,
-    width: int,
-    height: int,
-    hole: tuple[int, int, int, int] | None,
-) -> bool:
-    """Shape the window to `width`x`height` minus `hole` (x, y, w, h), or clear it.
+def work_area() -> tuple[int, int, int, int]:
+    """The primary screen minus the taskbar, as (left, top, width, height)."""
+    rect = wintypes.RECT()
+    if not user32.SystemParametersInfoW(SPI_GETWORKAREA, 0, ctypes.byref(rect), 0):
+        return (0, 0, user32.GetSystemMetrics(0), user32.GetSystemMetrics(1))
+    return (rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top)
 
-    Region coordinates are relative to the window's upper-left. The window is
-    frameless, so its window rect equals its client rect (measured: identical
-    origin and size) and CSS pixels map straight through at 100% scaling — the
-    hole rect can be handed over exactly as the DOM reports it.
 
-    Pixels inside the hole leave the window entirely: whatever sits behind
-    renders there and takes the clicks. Passing None restores a solid window.
+def fit_and_centre(hwnd: int, width: int, height: int) -> tuple[int, int]:
+    """Size the window to exactly width x height, clamped to the work area.
+
+    The window is frameless, so its window rect is its client rect (measured:
+    identical origin and size) and the size asked for here is the space the page
+    actually gets. Returns the size applied, which is what the caller should
+    treat as the layout's real height once a short screen has clamped it.
+
+    Centred on the *primary* work area: a shorter secondary screen would clip a
+    window this tall.
     """
-    if hole is None:
-        return user32.SetWindowRgn(hwnd, None, True) != 0
-
-    x, y, w, h = (int(v) for v in hole)
-    if w <= 0 or h <= 0:
-        return user32.SetWindowRgn(hwnd, None, True) != 0
-
-    outer = gdi32.CreateRectRgn(0, 0, int(width), int(height))
-    inner = gdi32.CreateRectRgn(x, y, x + w, y + h)
-    if not outer or not inner:
-        # Nothing was handed to the window, so both handles are still ours.
-        gdi32.DeleteObject(outer)
-        gdi32.DeleteObject(inner)
-        return False
-
-    gdi32.CombineRgn(outer, outer, inner, RGN_DIFF)
-    gdi32.DeleteObject(inner)
-
-    # SetWindowRgn takes ownership of `outer` on success — deleting it here
-    # would leave the window pointing at a freed region.
-    if user32.SetWindowRgn(hwnd, outer, True) == 0:
-        gdi32.DeleteObject(outer)
-        return False
-    return True
+    area_x, area_y, area_w, area_h = work_area()
+    w = min(int(width), area_w)
+    h = min(int(height), area_h)
+    x = area_x + (area_w - w) // 2
+    y = area_y + (area_h - h) // 2
+    user32.SetWindowPos(hwnd, 0, x, y, w, h, SWP_NOZORDER | SWP_NOACTIVATE)
+    return (w, h)
 
 
 def move_to(hwnd: int, x: int, y: int) -> bool:

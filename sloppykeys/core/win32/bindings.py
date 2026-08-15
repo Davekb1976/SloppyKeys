@@ -26,8 +26,8 @@ SWP_NOOWNERZORDER = 0x0200
 HWND_TOPMOST = -1
 HWND_NOTOPMOST = -2
 
-# # Region combine modes (CombineRgn)
-RGN_DIFF = 4
+# # SystemParametersInfo actions
+SPI_GETWORKAREA = 0x0030
 
 
 
@@ -48,7 +48,6 @@ KEY_DOWN_MASK = 0x8000
 
 user32 = ctypes.windll.user32
 kernel32 = ctypes.windll.kernel32
-gdi32 = ctypes.windll.gdi32
 
 WNDENUMPROC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
 
@@ -94,15 +93,15 @@ _set_sig(
 )
 
 _set_sig(user32.FindWindowW, wintypes.HWND, wintypes.LPCWSTR, wintypes.LPCWSTR)
-_set_sig(user32.SetWindowRgn, ctypes.c_int, wintypes.HWND, wintypes.HRGN, wintypes.BOOL)
-
+_set_sig(user32.GetSystemMetrics, ctypes.c_int, ctypes.c_int)
 _set_sig(
-    gdi32.CreateRectRgn, wintypes.HRGN, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int
+    user32.SystemParametersInfoW,
+    wintypes.BOOL,
+    wintypes.UINT,
+    wintypes.UINT,
+    ctypes.c_void_p,
+    wintypes.UINT,
 )
-_set_sig(
-    gdi32.CombineRgn, ctypes.c_int, wintypes.HRGN, wintypes.HRGN, wintypes.HRGN, ctypes.c_int
-)
-_set_sig(gdi32.DeleteObject, wintypes.BOOL, wintypes.HGDIOBJ)
 
 _set_sig(kernel32.OpenProcess, wintypes.HANDLE, wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
 _set_sig(
