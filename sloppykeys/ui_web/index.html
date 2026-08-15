@@ -377,6 +377,31 @@
     </div>
   </div>
 
+<div class="modal-overlay" id="pos-modal" style="display:none;">
+  <div class="modal-box" style="width:900px; max-height:90vh; display:flex; flex-direction:column;">
+    <div class="modal-header">
+      <span class="modal-title">Set Position</span>
+      <button class="modal-close" id="pos-close">&times;</button>
+    </div>
+    <div class="modal-body" style="flex:1; min-height:0; display:flex; flex-direction:column; gap:8px;">
+      <!-- Category tabs + actions -->
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        <div id="pos-tabs" class="pos-tabs"></div>
+        <div style="margin-left:auto; display:flex; gap:6px;">
+          <button class="btn btn--sm" id="pos-back" style="display:none;">← Maps</button>
+          <span class="pos-readout" id="pos-readout">Not set</span>
+          <button class="btn btn--sm btn--primary" id="pos-roblox">Use Roblox Screen</button>
+        </div>
+      </div>
+      <!-- Map grid OR canvas -->
+      <div id="pos-grid" class="pos-grid" style="flex:1; overflow-y:auto;"></div>
+      <div id="pos-canvas-wrap" style="flex:1; display:none; position:relative; overflow:hidden;">
+        <canvas id="pos-canvas" style="cursor:crosshair;"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="app.js"></script>
 </body>
 </html>

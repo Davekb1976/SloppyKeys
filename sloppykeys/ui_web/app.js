@@ -310,11 +310,11 @@
       }
       zone.innerHTML = blocks.map((b, i) => {
         let fields = "";
-        if (b.type === "place_unit") fields = `<input placeholder="name" value="${b.params?.name || ""}" data-field="params.name"><input placeholder="x" value="${b.params?.x || 0}" data-field="params.x" type="number"><input placeholder="y" value="${b.params?.y || 0}" data-field="params.y" type="number">`;
+        if (b.type === "place_unit") fields = `<input placeholder="name" value="${b.params?.name || ""}" data-field="params.name"><input placeholder="x" value="${b.params?.x || 0}" data-field="params.x" type="number"><input placeholder="y" value="${b.params?.y || 0}" data-field="params.y" type="number"><button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button>`;
         else if (b.type === "wait_ms") fields = `<input placeholder="ms" value="${b.params?.ms || 500}" data-field="params.ms" type="number">`;
         else if (b.type === "wait_wave") fields = `<input placeholder="wave" value="${b.params?.wave || 1}" data-field="params.wave" type="number">`;
         else if (b.type === "leave_at_minute") fields = `<input placeholder="min" value="${b.params?.minutes || 10}" data-field="params.minutes" type="number">`;
-        else if (b.type === "click") fields = `<input placeholder="x" value="${b.params?.x || 0}" data-field="params.x" type="number"><input placeholder="y" value="${b.params?.y || 0}" data-field="params.y" type="number">`;
+        else if (b.type === "click") fields = `<input placeholder="x" value="${b.params?.x || 0}" data-field="params.x" type="number"><input placeholder="y" value="${b.params?.y || 0}" data-field="params.y" type="number"><button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button>`;
         else if (b.type === "send_key") fields = `<input placeholder="key" value="${b.key || ""}" data-field="key" style="width:40px;"><input placeholder="hold ms" value="${b.params?.hold_ms || 0}" data-field="params.hold_ms" type="number">`;
         else if (b.type === "upgrade_unit" || b.type === "sell_unit" || b.type === "target_priority") fields = `<input placeholder="#" value="${b.params?.index || 1}" data-field="params.index" type="number" style="width:40px;">`;
         return `<div class="block-row" data-phase="${phase}" data-idx="${i}">
@@ -436,6 +436,142 @@
     opDirty = false;
     renderPhases();
     opLoad.value = "";
+  });
+
+  // ---- Position Picker Modal ----
+  let posTarget = null; // {phase, idx} — which block we're setting coords for
+  let posImage = null;  // loaded Image object
+  let posCategories = [];
+  let posCategory = "";
+
+  const posModal = document.getElementById("pos-modal");
+  const posTabs = document.getElementById("pos-tabs");
+  const posGrid = document.getElementById("pos-grid");
+  const posCanvasWrap = document.getElementById("pos-canvas-wrap");
+  const posCanvas = document.getElementById("pos-canvas");
+  const posReadout = document.getElementById("pos-readout");
+  const posCtx = posCanvas.getContext("2d");
+
+  window.openPositionPicker = async function (phase, idx) {
+    posTarget = { phase, idx };
+    const block = opPhases[phase][idx];
+    posReadout.textContent = (block.params?.x && block.params?.y) ? `X ${block.params.x}, Y ${block.params.y}` : "Not set";
+    posModal.style.display = "flex";
+    posGrid.style.display = "";
+    posCanvasWrap.style.display = "none";
+    document.getElementById("pos-back").style.display = "none";
+
+    if (!window.pywebview || !pywebview.api) return;
+    posCategories = await pywebview.api.list_map_categories();
+    renderPosTabs();
+    if (posCategories.length) selectPosCategory(posCategories[0]);
+  };
+
+  document.getElementById("pos-close").addEventListener("click", () => { posModal.style.display = "none"; });
+  document.getElementById("pos-back").addEventListener("click", () => {
+    posGrid.style.display = "";
+    posCanvasWrap.style.display = "none";
+    document.getElementById("pos-back").style.display = "none";
+  });
+
+  document.getElementById("pos-roblox").addEventListener("click", async () => {
+    if (!window.pywebview || !pywebview.api) return;
+    const r = await pywebview.api.get_roblox_snapshot();
+    if (!r.ok) { window.addLog("Capture failed: " + (r.reason || "error")); return; }
+    loadPosImage(r.data_uri);
+  });
+
+  function renderPosTabs() {
+    posTabs.innerHTML = posCategories.map((c) =>
+      `<button class="pos-tab${c === posCategory ? " active" : ""}" data-cat="${c}">${c}</button>`
+    ).join("");
+    posTabs.querySelectorAll(".pos-tab").forEach((btn) => {
+      btn.addEventListener("click", () => selectPosCategory(btn.dataset.cat));
+    });
+  }
+
+  async function selectPosCategory(cat) {
+    posCategory = cat;
+    renderPosTabs();
+    if (!window.pywebview || !pywebview.api) return;
+    const maps = await pywebview.api.list_maps(cat);
+    posGrid.innerHTML = maps.map((name) =>
+      `<div class="pos-thumb" data-name="${name}"><img alt="${name}"><div class="pos-thumb-label">${name}</div></div>`
+    ).join("");
+    // Load thumbnails
+    posGrid.querySelectorAll(".pos-thumb").forEach((thumb) => {
+      const name = thumb.dataset.name;
+      pywebview.api.get_map_image(cat, name).then((r) => {
+        if (r.ok) thumb.querySelector("img").src = r.data_uri;
+      });
+      thumb.addEventListener("click", async () => {
+        const r = await pywebview.api.get_map_image(cat, name);
+        if (r.ok) loadPosImage(r.data_uri);
+      });
+    });
+  }
+
+  function loadPosImage(dataUri) {
+    const img = new Image();
+    img.onload = () => {
+      posImage = img;
+      posGrid.style.display = "none";
+      posCanvasWrap.style.display = "";
+      document.getElementById("pos-back").style.display = "";
+      fitPosCanvas();
+      drawPosCanvas();
+    };
+    img.src = dataUri;
+  }
+
+  function fitPosCanvas() {
+    if (!posImage) return;
+    const wrap = posCanvasWrap;
+    const w = wrap.clientWidth || 860;
+    const h = wrap.clientHeight || 560;
+    const scale = Math.min(w / posImage.naturalWidth, h / posImage.naturalHeight, 1);
+    posCanvas.width = Math.floor(posImage.naturalWidth * scale);
+    posCanvas.height = Math.floor(posImage.naturalHeight * scale);
+    posCanvas.dataset.scale = scale;
+  }
+
+  function drawPosCanvas() {
+    if (!posImage) return;
+    const scale = parseFloat(posCanvas.dataset.scale) || 1;
+    posCtx.clearRect(0, 0, posCanvas.width, posCanvas.height);
+    posCtx.drawImage(posImage, 0, 0, posCanvas.width, posCanvas.height);
+    // Draw existing mark
+    if (posTarget) {
+      const block = opPhases[posTarget.phase][posTarget.idx];
+      const x = (block.params?.x || 0) * scale;
+      const y = (block.params?.y || 0) * scale;
+      if (x || y) {
+        posCtx.beginPath();
+        posCtx.arc(x, y, 6, 0, Math.PI * 2);
+        posCtx.fillStyle = "rgba(139, 92, 246, 0.7)";
+        posCtx.fill();
+        posCtx.strokeStyle = "#fff";
+        posCtx.lineWidth = 2;
+        posCtx.stroke();
+      }
+    }
+  }
+
+  posCanvas.addEventListener("click", (e) => {
+    if (!posTarget || !posImage) return;
+    const rect = posCanvas.getBoundingClientRect();
+    const scale = parseFloat(posCanvas.dataset.scale) || 1;
+    const x = Math.round((e.clientX - rect.left) / scale);
+    const y = Math.round((e.clientY - rect.top) / scale);
+    // Write back to the block
+    const block = opPhases[posTarget.phase][posTarget.idx];
+    block.params = block.params || {};
+    block.params.x = x;
+    block.params.y = y;
+    opDirty = true;
+    posReadout.textContent = `X ${x}, Y ${y}`;
+    drawPosCanvas();
+    renderPhases();
   });
 
   renderPhases();

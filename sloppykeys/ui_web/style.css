@@ -333,6 +333,36 @@ input:focus, select:focus {
 }
 .palette-block:hover { border-color: var(--accent); }
 
+/* ---- Position Picker Modal ---- */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+  display: flex; align-items: center; justify-content: center; z-index: 1000;
+}
+.modal-box {
+  background: var(--surface-base); border: 1px solid var(--border);
+  padding: 16px; max-width: 95vw;
+}
+.modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.modal-title { font-size: 14px; font-weight: 700; color: var(--text); }
+.modal-close { font-size: 20px; color: var(--text-faint); cursor: pointer; background: none; border: none; }
+.modal-close:hover { color: var(--text); }
+.modal-body { overflow: hidden; }
+.pos-tabs { display: flex; gap: 4px; }
+.pos-tab {
+  padding: 4px 12px; font-size: 11px; font-weight: 600; border: 1px solid var(--border);
+  background: var(--surface-panel); cursor: pointer; color: var(--text-muted);
+}
+.pos-tab.active { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.pos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+.pos-thumb {
+  border: 1px solid var(--border); cursor: pointer; overflow: hidden;
+  display: flex; flex-direction: column; transition: border-color 0.12s;
+}
+.pos-thumb:hover { border-color: var(--accent); }
+.pos-thumb img { width: 100%; aspect-ratio: 1152/756; object-fit: cover; display: block; }
+.pos-thumb-label { font-size: 10px; font-weight: 600; padding: 4px 6px; color: var(--text); background: var(--surface-panel); }
+.pos-readout { font-size: 11px; font-weight: 700; color: var(--accent); padding: 4px 8px; border: 1px solid var(--accent); }
+
 /* ---- Settings layout ---- */
 .settings-layout { display: flex; flex: 1; min-height: 0; }
 .settings-nav {

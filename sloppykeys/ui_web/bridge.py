@@ -349,6 +349,80 @@ class Api:
         ok = delete_operation(self._app_root, name)
         return {"ok": ok}
 
+    # ---- Position Picker (map images) ----
+
+    def list_map_categories(self) -> list:
+        """Category folders under images/reference/."""
+        if not self._app_root:
+            return []
+        ref = os.path.join(self._app_root, "images", "reference")
+        if not os.path.isdir(ref):
+            return []
+        return sorted(
+            d for d in os.listdir(ref)
+            if os.path.isdir(os.path.join(ref, d))
+        )
+
+    def list_maps(self, category: str) -> list:
+        """Map image names in a category (without .png extension)."""
+        if not self._app_root:
+            return []
+        folder = os.path.join(self._app_root, "images", "reference", category)
+        if not os.path.isdir(folder):
+            return []
+        return sorted(
+            f[:-4] for f in os.listdir(folder)
+            if f.lower().endswith(".png")
+        )
+
+    def get_map_image(self, category: str, name: str) -> dict:
+        """Base64 data URI of a map image for the position picker."""
+        if not self._app_root:
+            return {"ok": False}
+        import base64
+
+        path = os.path.join(self._app_root, "images", "reference", category, name + ".png")
+        if not os.path.isfile(path):
+            return {"ok": False, "reason": "not found"}
+        try:
+            with open(path, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode("ascii")
+            return {"ok": True, "data_uri": f"data:image/png;base64,{b64}"}
+        except OSError as exc:
+            return {"ok": False, "reason": str(exc)}
+
+    def get_roblox_snapshot(self) -> dict:
+        """Capture the live Roblox window as a base64 PNG for position picking."""
+        import base64
+
+        try:
+            import mss
+            import cv2
+            import numpy as np
+        except ImportError:
+            return {"ok": False, "reason": "mss/cv2 not available"}
+
+        hwnd = find_roblox_window()
+        if not hwnd:
+            return {"ok": False, "reason": "Roblox not found"}
+
+        from sloppykeys.core.win32.roblox_window import client_to_screen, client_size
+
+        origin = client_to_screen(hwnd, 0, 0)
+        size = client_size(hwnd)
+        if not origin or not size:
+            return {"ok": False, "reason": "couldn't read Roblox geometry"}
+
+        monitor = {"left": origin[0], "top": origin[1], "width": size[0], "height": size[1]}
+        with mss.mss() as sct:
+            img = np.array(sct.grab(monitor))
+
+        ok, buf = cv2.imencode(".png", img[:, :, :3])
+        if not ok:
+            return {"ok": False, "reason": "encode failed"}
+        b64 = base64.b64encode(buf.tobytes()).decode("ascii")
+        return {"ok": True, "data_uri": f"data:image/png;base64,{b64}"}
+
     # ---- Macro control ----
 
     def start_macro(self, gamemode: str, map_name: str, target: str, config_path: str) -> dict:
