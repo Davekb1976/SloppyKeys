@@ -7,7 +7,7 @@ Task-queue-driven. Start runs the queue in order, loops back to task 1 when done
 - **Dashboard** — Start/Stop, status, log. No selector.
 - **Task Queue** — ordered list + task builder (right panel when a task is selected).
 - **Macro Manager** — block-based routine builder with four phases + a position picker.
-- **Settings** — unchanged.
+- **Settings** — auto-save, categorized (General, Hotkeys, Webhook, Debug), searchable, import/export.
 
 ## Data Model
 
@@ -25,7 +25,7 @@ Task-queue-driven. Start runs the queue in order, loops back to task 1 when done
 }
 ```
 
-Stored as an ordered list in `tasks.json`. Re-read each pass so edits mid-run take effect.
+Stored as an ordered list in `settings.json` under `"tasks"`. Re-read each pass so edits mid-run take effect.
 
 ### Macro Operation (reusable template)
 
@@ -91,15 +91,59 @@ Detect blocks branch: evaluate condition → run `then` blocks or `else` blocks.
 
 ## Position Picker
 
-A modal that shows map screenshots (from `images/maps/`) organized by gamemode. Click to set coordinates. Also offers "Use Roblox Screen" to capture the live game. Coordinates are in the 1152×756 client space.
+A modal showing map screenshots (from `images/maps/`) organized by gamemode. Click to set coordinates. Also offers "Use Roblox Screen" to capture the live game. Coordinates in the 1152×756 client space. Other placed units shown as markers.
 
 ## Task Presets
 
-Save/load the entire queue under a name. Stored in `operations/presets/<name>.json`. Separate from file export/import (which is for sharing between installs).
+Save/load the entire queue under a name. Stored in `operations/presets/<name>.json`. Separate from file export/import (for sharing between installs).
 
-## What This Replaces
+## Settings Redesign
 
-- The per-gamemode selector on the Dashboard → gone; Start just runs the queue.
-- The Unit Planner screen (steps grid + sequence editor) → replaced by Macro Manager.
-- The current `configs/<Gamemode>/<Map>/<Act>.json` unit plans → replaced by `operations/<name>.json`.
-- The `MacroRunner` step-chain builder in `controller.py` → reworked to read task queue + operation phases.
+- **Auto-save** — no save button. Every change writes immediately via `update_json`.
+- **Categories** — General, Hotkeys, Webhook, Debug. Left nav rail with an "All" option.
+- **Search** — text filter over setting labels + descriptions, auto-switches to "All" view.
+- **Import/Export** — exports all settings as a JSON file; import applies each key.
+- **Reset to Defaults** — per-section (e.g. "Reset Hotkeys").
+- Atomic writes (write to `.tmp`, fsync, `os.replace`).
+
+## File Organization (new)
+
+```
+sloppykeys/                   source code (unchanged)
+data/                         gitignored, beside the exe in a frozen build
+  settings.json               single file: settings, hotkeys, tasks, stats
+  operations/                 macro operations (one JSON per named operation)
+    presets/                   saved task queue snapshots
+  paths/                      recorded walk paths
+  debug/                      debug screenshots
+images/                       shipped with the build, user-editable
+  ui/                         nav/match templates (folder-per-name for variants)
+  maps/                       map preview thumbnails for position picker
+    Story/
+    Raid/
+    Expedition/
+    Events/
+```
+
+## What Changes from Current
+
+| Current | New |
+|---------|-----|
+| Dashboard gamemode selector | Removed; Start runs the task queue |
+| Unit Planner screen | Replaced by Macro Manager (block-based) |
+| `configs/<Mode>/<Map>/<Act>.json` | Replaced by `operations/<name>.json` |
+| Manual save button | Auto-save on every change |
+| Flat image files | Folder-per-name variant system (later) |
+| `settings.json` per-key stores scattered | Single settings.json with sections |
+| Separate delay/keybind/region/position stores | Consolidated into settings.json |
+
+## What to Add (from reference)
+
+- Auto-reopen Roblox on crash mid-run
+- Periodic Roblox refresh (rejoin for memory protection)
+- Start minimized option
+- Compact strip mode (game + small control bar only)
+- Settings search/filter
+- Settings import/export + reset keybinds to defaults
+- Atomic file writes (tmp → fsync → replace)
+- Walk path recording/replay system
