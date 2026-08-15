@@ -133,6 +133,21 @@ the gutter is **8px** everywhere in the dashboard:
   must end at the same distance from the window edge. The last section in `.dash-right`
   uses `flex: 1` to stretch and fill remaining height so both columns end flush.
 
+## Full-Height Rule
+
+Every screen that shows two or more columns (Task Queue, Macro Manager, Settings) has a
+**structural divider** — the `border-right` on the left container. That border must run
+from the titlebar all the way to the bottom of the window with no gap. This is achieved
+by making every container in the chain `height: 100%`:
+
+    .screen → .fullpage-split → .split-left / .split-right / .palette-panel / .settings-nav
+
+If the content inside is shorter than the screen, the container still fills to the bottom
+and its `border-right` stays continuous. Panels inside fill their parent with `flex: 1` so
+they never shrink-wrap to their content — a panel with one item and a panel with twenty
+both touch the bottom edge. Scrolling happens inside the panel body, never on the
+outer container.
+
 ## Interactions
 
 - Hover: border tint toward accent + subtle lift (`translateY(-1px)`)
