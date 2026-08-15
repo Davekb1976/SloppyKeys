@@ -690,6 +690,7 @@
         <div class="im-card-header">
           <span class="im-card-cat">${img.catKey}</span>
           <span class="im-card-name">${img.name}</span>
+          <button class="im-card-add" data-cat="${img.catKey}" data-name="${img.name}" title="Capture &amp; add variant">+</button>
         </div>
         <img class="im-card-thumb" src="${img.data_uri}" alt="${img.name}">
         <div class="im-card-slider">
@@ -709,6 +710,125 @@
         pywebview.api.set_image_threshold(e.target.dataset.name, parseFloat(e.target.value));
       });
     });
+    // Wire + buttons (capture & crop)
+    imGrid.querySelectorAll(".im-card-add").forEach((btn) => {
+      btn.addEventListener("click", () => startImageCapture(btn.dataset.cat, btn.dataset.name));
+    });
+  }
+
+  // ---- Image capture + crop flow ----
+  let cropTarget = null; // {category, name}
+  let cropImage = null;
+  let cropRect = null; // {x, y, w, h} in image coords
+  let cropDragging = false;
+  let cropStart = null;
+
+  async function startImageCapture(category, name) {
+    cropTarget = { category, name };
+    // Hide modal, restore game, capture, then show crop view
+    imModal.style.display = "none";
+    if (window.pywebview && pywebview.api) pywebview.api.set_game_visible(true);
+    await new Promise(r => setTimeout(r, 400)); // let game render a frame
+    if (!window.pywebview || !pywebview.api) return;
+    const result = await pywebview.api.get_roblox_snapshot();
+    if (window.pywebview && pywebview.api) pywebview.api.set_game_visible(false);
+    if (!result.ok) {
+      window.addLog("[Image Manager] Capture failed: " + (result.reason || "error"));
+      imModal.style.display = "flex";
+      return;
+    }
+    // Show crop modal
+    showCropView(result.data_uri, name);
+  }
+
+  function showCropView(dataUri, name) {
+    const img = new Image();
+    img.onload = () => {
+      cropImage = img;
+      cropRect = null;
+      // Reuse the Image Manager modal as the crop view
+      imModal.style.display = "flex";
+      const body = imModal.querySelector(".modal-body");
+      body.innerHTML = `
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+          <button class="btn btn--sm" id="crop-back">← Library</button>
+          <span style="font-size:11px; color:var(--text-muted);">Draw a box around the element to crop</span>
+          <span class="pos-readout" id="crop-readout" style="margin-left:auto;">No selection</span>
+        </div>
+        <div style="flex:1; position:relative; overflow:hidden; border:1px solid var(--border);">
+          <canvas id="crop-canvas" style="cursor:crosshair; display:block;"></canvas>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px; margin-top:8px;">
+          <span style="font-size:12px; font-weight:600; color:var(--text);">${name}</span>
+          <button class="btn btn--sm" id="crop-retake">Retake</button>
+          <button class="btn btn--sm btn--primary" id="crop-save" style="margin-left:auto;" disabled>Save Crop</button>
+        </div>
+      `;
+      const canvas = document.getElementById("crop-canvas");
+      const ctx = canvas.getContext("2d");
+      const wrap = canvas.parentElement;
+      const scale = Math.min(wrap.clientWidth / img.naturalWidth, (wrap.clientHeight || 500) / img.naturalHeight, 1);
+      canvas.width = Math.floor(img.naturalWidth * scale);
+      canvas.height = Math.floor(img.naturalHeight * scale);
+      canvas.dataset.scale = scale;
+
+      function drawCrop() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        if (cropRect) {
+          const s = scale;
+          ctx.strokeStyle = "#8b5cf6";
+          ctx.lineWidth = 2;
+          ctx.strokeRect(cropRect.x * s, cropRect.y * s, cropRect.w * s, cropRect.h * s);
+          ctx.fillStyle = "rgba(139, 92, 246, 0.15)";
+          ctx.fillRect(cropRect.x * s, cropRect.y * s, cropRect.w * s, cropRect.h * s);
+        }
+      }
+      drawCrop();
+
+      // Mouse drag to draw crop rectangle
+      canvas.addEventListener("mousedown", (e) => {
+        const rect = canvas.getBoundingClientRect();
+        cropStart = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        cropDragging = true;
+      });
+      canvas.addEventListener("mousemove", (e) => {
+        if (!cropDragging || !cropStart) return;
+        const rect = canvas.getBoundingClientRect();
+        const cx = e.clientX - rect.left;
+        const cy = e.clientY - rect.top;
+        const s = parseFloat(canvas.dataset.scale);
+        const x = Math.round(Math.min(cropStart.x, cx) / s);
+        const y = Math.round(Math.min(cropStart.y, cy) / s);
+        const w = Math.round(Math.abs(cx - cropStart.x) / s);
+        const h = Math.round(Math.abs(cy - cropStart.y) / s);
+        cropRect = { x, y, w, h };
+        drawCrop();
+        document.getElementById("crop-readout").textContent = `${w}×${h}`;
+        document.getElementById("crop-save").disabled = (w < 4 || h < 4);
+      });
+      canvas.addEventListener("mouseup", () => { cropDragging = false; });
+
+      document.getElementById("crop-back").addEventListener("click", () => {
+        // Return to library view
+        imModal.querySelector(".modal-body").innerHTML = `<div id="im-tabs" class="pos-tabs"></div><div id="im-grid" class="im-grid"></div>`;
+        window.openImageManager();
+      });
+      document.getElementById("crop-retake").addEventListener("click", () => startImageCapture(cropTarget.category, cropTarget.name));
+      document.getElementById("crop-save").addEventListener("click", async () => {
+        if (!cropRect || !cropTarget || !window.pywebview || !pywebview.api) return;
+        const r = await pywebview.api.save_image_crop(cropTarget.category, cropTarget.name, cropRect.x, cropRect.y, cropRect.w, cropRect.h);
+        if (r.ok) {
+          window.addLog(`[Image Manager] Saved crop for "${cropTarget.name}".`);
+          // Return to library
+          imModal.querySelector(".modal-body").innerHTML = `<div id="im-tabs" class="pos-tabs"></div><div id="im-grid" class="im-grid"></div>`;
+          window.openImageManager();
+        } else {
+          window.addLog(`[Image Manager] Save failed: ${r.reason || "error"}`);
+        }
+      });
+    };
+    img.src = dataUri;
   }
 
   // F6 hotkey to open Image Manager (registered in the hotkey loop on the Python side)

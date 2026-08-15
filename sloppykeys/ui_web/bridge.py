@@ -532,6 +532,51 @@ class Api:
             apply_confidence_overrides(self._ctrl._engine, thresholds)
         return {"ok": True}
 
+    def save_image_crop(self, category: str, name: str, x: int, y: int, w: int, h: int) -> dict:
+        """Crop the last Roblox snapshot and save it as a variant for `name`."""
+        if not self._app_root:
+            return {"ok": False, "reason": "no app root"}
+        try:
+            import cv2
+            import numpy as np
+            import mss
+        except ImportError:
+            return {"ok": False, "reason": "cv2/mss not available"}
+
+        # Capture fresh (the snapshot from get_roblox_snapshot isn't cached)
+        hwnd = find_roblox_window()
+        if not hwnd:
+            return {"ok": False, "reason": "Roblox not found"}
+        from sloppykeys.core.win32.roblox_window import client_to_screen, client_size
+
+        origin = client_to_screen(hwnd, 0, 0)
+        size = client_size(hwnd)
+        if not origin or not size:
+            return {"ok": False, "reason": "couldn't read geometry"}
+
+        monitor = {"left": origin[0], "top": origin[1], "width": size[0], "height": size[1]}
+        with mss.mss() as sct:
+            full = np.array(sct.grab(monitor))[:, :, :3]
+
+        # Crop
+        x, y, w, h = int(x), int(y), int(w), int(h)
+        if w < 4 or h < 4:
+            return {"ok": False, "reason": "selection too small"}
+        crop = full[y:y+h, x:x+w]
+        if crop.size == 0:
+            return {"ok": False, "reason": "crop is empty"}
+
+        # Save to images/<category>/<name>_variant_<n>.png
+        folder = os.path.join(self._app_root, "images", category)
+        os.makedirs(folder, exist_ok=True)
+        # Find next available variant number
+        existing = [f for f in os.listdir(folder) if f.startswith(name) and f.endswith(".png")]
+        idx = len(existing) + 1
+        filename = f"{name}_{idx}.png"
+        path = os.path.join(folder, filename)
+        cv2.imwrite(path, crop)
+        return {"ok": True, "path": path}
+
     # ---- Macro control ----
 
     def start_macro(self, *args) -> dict:
