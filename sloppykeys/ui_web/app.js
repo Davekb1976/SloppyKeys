@@ -626,9 +626,6 @@
   let imData = null;
   let imCategory = "all";
   const imModal = document.getElementById("im-modal");
-  const imGrid = document.getElementById("im-grid");
-  const imTabs = document.getElementById("im-tabs");
-  const imFilter = document.getElementById("im-filter");
 
   window.openImageManager = async function () {
     // Toggle: if already open, close it
@@ -661,22 +658,27 @@
     else window.addLog("[Image Manager] Capture failed: " + (r.reason || "error"));
   });
 
-  imFilter.addEventListener("input", () => renderImGrid());
+  document.getElementById("im-filter").addEventListener("input", () => renderImGrid());
 
   function renderImTabs() {
     if (!imData) return;
+    const tabsEl = document.getElementById("im-tabs");
+    if (!tabsEl) return;
     const cats = [{ key: "all", label: "All" }].concat(imData.categories.map((c) => ({ key: c.key, label: c.label })));
-    imTabs.innerHTML = cats.map((c) =>
+    tabsEl.innerHTML = cats.map((c) =>
       `<button class="pos-tab${c.key === imCategory ? " active" : ""}" data-cat="${c.key}">${c.label}</button>`
     ).join("");
-    imTabs.querySelectorAll(".pos-tab").forEach((btn) => {
+    tabsEl.querySelectorAll(".pos-tab").forEach((btn) => {
       btn.addEventListener("click", () => { imCategory = btn.dataset.cat; renderImTabs(); renderImGrid(); });
     });
   }
 
   function renderImGrid() {
-    if (!imData) { imGrid.innerHTML = ""; return; }
-    const q = (imFilter.value || "").trim().toLowerCase();
+    if (!imData) return;
+    const gridEl = document.getElementById("im-grid");
+    if (!gridEl) return;
+    const filterEl = document.getElementById("im-filter");
+    const q = (filterEl ? filterEl.value : "").trim().toLowerCase();
     let items = [];
     imData.categories.forEach((cat) => {
       if (imCategory !== "all" && cat.key !== imCategory) return;
@@ -685,7 +687,7 @@
         items.push({ ...img, catKey: cat.key, catLabel: cat.label });
       });
     });
-    imGrid.innerHTML = items.map((img) => `
+    gridEl.innerHTML = items.map((img) => `
       <div class="im-card">
         <div class="im-card-header">
           <span class="im-card-cat">${img.catKey}</span>
@@ -701,7 +703,7 @@
       </div>
     `).join("");
     // Wire sliders
-    imGrid.querySelectorAll('input[type="range"]').forEach((slider) => {
+    gridEl.querySelectorAll('input[type="range"]').forEach((slider) => {
       slider.addEventListener("input", (e) => {
         e.target.closest(".im-card-slider").querySelector(".im-val").textContent = parseFloat(e.target.value).toFixed(2);
       });
@@ -711,7 +713,7 @@
       });
     });
     // Wire + buttons (capture & crop)
-    imGrid.querySelectorAll(".im-card-add").forEach((btn) => {
+    gridEl.querySelectorAll(".im-card-add").forEach((btn) => {
       btn.addEventListener("click", () => startImageCapture(btn.dataset.cat, btn.dataset.name));
     });
   }
@@ -813,9 +815,16 @@
       canvas.addEventListener("mouseup", () => { cropDragging = false; });
 
       document.getElementById("crop-back").addEventListener("click", () => {
-        // Return to library view
-        imModal.querySelector(".modal-body").innerHTML = `<div id="im-tabs" class="pos-tabs"></div><div id="im-grid" class="im-grid"></div>`;
-        window.openImageManager();
+        // Restore the library view inside the modal body
+        const body = imModal.querySelector(".modal-body");
+        body.innerHTML = `<div id="im-tabs" class="pos-tabs"></div><div id="im-grid" class="im-grid"></div>`;
+        // Re-bind the global references to the new DOM elements
+        Object.defineProperty(window, '_imGrid', { value: document.getElementById("im-grid"), writable: true });
+        Object.defineProperty(window, '_imTabs', { value: document.getElementById("im-tabs"), writable: true });
+        // Re-render using cached data
+        renderImTabs();
+        renderImGrid();
+        if (window.pywebview && pywebview.api) pywebview.api.set_game_visible(false);
       });
       document.getElementById("crop-retake").addEventListener("click", () => startImageCapture(cropTarget.category, cropTarget.name));
       document.getElementById("crop-save").addEventListener("click", async () => {
@@ -825,7 +834,13 @@
           window.addLog(`[Image Manager] Saved crop for "${cropTarget.name}".`);
           // Return to library
           imModal.querySelector(".modal-body").innerHTML = `<div id="im-tabs" class="pos-tabs"></div><div id="im-grid" class="im-grid"></div>`;
-          window.openImageManager();
+          // Re-fetch data to include the new image
+          if (window.pywebview && pywebview.api) {
+            const fresh = await pywebview.api.list_vision_templates();
+            if (fresh.ok) imData = fresh;
+          }
+          renderImTabs();
+          renderImGrid();
         } else {
           window.addLog(`[Image Manager] Save failed: ${r.reason || "error"}`);
         }
