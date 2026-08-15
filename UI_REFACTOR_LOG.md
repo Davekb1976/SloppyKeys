@@ -6,5 +6,6 @@ Tracks the migration from PySide6 to pywebview + HTML/CSS/JS.
 |---|---|---|---|
 | 2026-08-07 | Design conventions steering file created | Establish stack, layout, color, and commit rules before code begins | done |
 | 2026-08-07 | Progress log created | Track refactor work across sessions | done |
-| 2026-08-07 | HTML/CSS/JS skeleton: layout, panels, nav, Run screen | Validate structure and density before wiring the backend | done |
+| 2026-08-07 | HTML/CSS/JS skeleton v1 (right-panel layout) | Initial structure attempt | replaced |
+| 2026-08-07 | HTML/CSS/JS skeleton v2 (full-page screens) | Each screen owns the full window; game visible only on Dashboard | done |
 | | Wire pywebview bridge and viewport positioning | Connect the static shell to the Python backend | next |

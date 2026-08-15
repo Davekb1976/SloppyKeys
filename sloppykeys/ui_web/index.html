@@ -7,226 +7,265 @@
 </head>
 <body>
 
-  <!-- Custom titlebar (frameless window, drag region) -->
+  <!-- Titlebar -->
   <header id="titlebar" class="titlebar drag-region">
     <div class="titlebar-left">
       <span class="titlebar-brand">SloppyKeys</span>
+      <span class="titlebar-version no-drag" id="version-badge">v0.1.2</span>
     </div>
 
     <nav class="titlebar-nav no-drag">
-      <button class="nav-btn active" data-screen="run" title="Run">
+      <button class="nav-btn active" data-screen="dashboard" title="Dashboard">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polygon points="6,4 20,12 6,20"/>
         </svg>
       </button>
-      <button class="nav-btn" data-screen="units" title="Units">
+      <button class="nav-btn" data-screen="planner" title="Unit Planner">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
           <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
         </svg>
       </button>
-      <button class="nav-btn" data-screen="tasks" title="Tasks">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M9 11l3 3L22 4"/>
-          <path stroke-linecap="round" stroke-linejoin="round" d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+      <button class="nav-btn" data-screen="queue" title="Task Queue">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
         </svg>
       </button>
-      <button class="nav-btn" data-screen="route" title="Route">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 2l9 5-9 5-9-5 9-5zM3 12l9 5 9-5"/>
+      <button class="nav-btn" data-screen="route" title="Route Editor">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 12h4l3-9 4 18 3-9h4"/>
         </svg>
       </button>
       <button class="nav-btn" data-screen="settings" title="Settings">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="3"/>
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          <line x1="4" y1="6" x2="20" y2="6"/><circle cx="8" cy="6" r="2" fill="currentColor" stroke="none"/>
+          <line x1="4" y1="12" x2="20" y2="12"/><circle cx="16" cy="12" r="2" fill="currentColor" stroke="none"/>
+          <line x1="4" y1="18" x2="20" y2="18"/><circle cx="11" cy="18" r="2" fill="currentColor" stroke="none"/>
         </svg>
       </button>
     </nav>
 
     <div class="titlebar-right no-drag">
-      <div class="titlebar-uptime">
-        <span class="uptime-label">Uptime</span>
-        <span class="uptime-value" id="uptime">00:00:00</span>
+      <div class="titlebar-clocks">
+        <div class="clock-item">
+          <span class="clock-label">Session</span>
+          <span class="clock-value" id="session-clock">00:00</span>
+        </div>
       </div>
       <button class="titlebar-btn" id="btn-minimize" title="Minimize">&#8211;</button>
       <button class="titlebar-btn titlebar-close" id="btn-close" title="Close">&#10005;</button>
     </div>
   </header>
 
-  <!-- Main content: two columns -->
-  <main id="app">
-    <!-- Left column: game viewport + process log -->
-    <div class="col-left">
-      <div id="game-slot" class="game-slot">
-        <!-- Native HWND positioned here by Python -->
-      </div>
-      <section class="panel log-panel">
-        <header class="panel-head">
-          <span class="panel-tag" style="--tag: var(--brand);">Live</span>
-          <span class="panel-title">Process Log</span>
-          <span class="panel-rule"></span>
-          <button class="panel-action" id="btn-clear-log">Clear</button>
-        </header>
-        <div id="log-list" class="log-list">
-          <div class="log-entry">&gt; Waiting for macro to start...</div>
+  <!-- ============ DASHBOARD ============ -->
+  <div class="screen active" id="screen-dashboard">
+    <div class="dash-layout">
+      <!-- Left: game + log -->
+      <div class="dash-left">
+        <div id="game-slot" class="game-slot"></div>
+        <div class="dash-log">
+          <div class="log-header">
+            <span class="log-title">Process Log</span>
+            <button class="log-action" id="btn-clear-log">Clear</button>
+          </div>
+          <div id="log-list" class="log-list">
+            <div class="log-line">&gt; Waiting for macro to start...</div>
+          </div>
         </div>
-      </section>
-    </div>
+      </div>
 
-    <!-- Right column: screen content swaps here -->
-    <div class="col-right">
-
-      <!-- RUN screen (default) -->
-      <div class="screen active" id="screen-run">
-
-        <!-- Status readout -->
-        <section class="panel">
-          <header class="panel-head">
-            <span class="panel-tag" style="--tag: var(--lilac);">Live</span>
-            <span class="panel-title">Status</span>
-            <span class="panel-rule"></span>
-          </header>
-          <div class="panel-hero">
-            <span class="hero-pulse"></span>
-            <div>
-              <div class="hero-label">Action</div>
-              <div class="hero-value" id="stat-action">Idle</div>
+      <!-- Right: status + controls + stats -->
+      <div class="dash-right">
+        <!-- Status -->
+        <div class="dash-section">
+          <div class="dash-section-title">Status</div>
+          <div class="status-grid">
+            <div class="status-hero">
+              <span class="status-dot"></span>
+              <span class="status-action" id="stat-action">Idle</span>
             </div>
+            <div class="status-row"><span class="status-label">Gamemode</span><span class="status-value" id="stat-gamemode">—</span></div>
+            <div class="status-row"><span class="status-label">Target</span><span class="status-value" id="stat-target">—</span></div>
+            <div class="status-row"><span class="status-label">Cycle</span><span class="status-value" id="stat-cycle">0</span></div>
+            <div class="status-row"><span class="status-label">Last Match</span><span class="status-value" id="stat-last">—</span></div>
           </div>
-          <div class="ledger">
-            <div class="ledger-row">
-              <span class="ledger-mark" style="--mk: var(--lilac);"></span>
-              <span class="ledger-label">Gamemode</span>
-              <span class="ledger-dots"></span>
-              <span class="ledger-value" id="stat-gamemode">—</span>
-            </div>
-            <div class="ledger-row">
-              <span class="ledger-mark" style="--mk: var(--brand);"></span>
-              <span class="ledger-label">Map / Act</span>
-              <span class="ledger-dots"></span>
-              <span class="ledger-value" id="stat-map">—</span>
-            </div>
-            <div class="ledger-row">
-              <span class="ledger-mark" style="--mk: var(--teal);"></span>
-              <span class="ledger-label">Cycle</span>
-              <span class="ledger-dots"></span>
-              <span class="ledger-value" id="stat-cycle">0</span>
-            </div>
-            <div class="ledger-row">
-              <span class="ledger-mark" style="--mk: var(--amber);"></span>
-              <span class="ledger-label">Last Match</span>
-              <span class="ledger-dots"></span>
-              <span class="ledger-value" id="stat-last">—</span>
-            </div>
-          </div>
-        </section>
+        </div>
 
         <!-- Controls -->
-        <section class="panel">
-          <header class="panel-head">
-            <span class="panel-tag" style="--tag: var(--teal);">Macro</span>
-            <span class="panel-title">Controls</span>
-            <span class="panel-rule"></span>
-          </header>
-          <div class="controls-grid">
-            <button class="ctrl-btn ctrl-start" id="btn-start">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg>
+        <div class="dash-section">
+          <div class="dash-section-title">Controls</div>
+          <div class="controls-row">
+            <button class="btn-primary" id="btn-start">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg>
               Start
             </button>
-            <button class="ctrl-btn ctrl-stop" id="btn-stop" disabled>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
+            <button class="btn-danger" id="btn-stop" disabled>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
               Stop
             </button>
           </div>
-        </section>
+        </div>
 
         <!-- Scoreboard -->
-        <section class="panel">
-          <header class="panel-head">
-            <span class="panel-tag" style="--tag: var(--teal);">Session</span>
-            <span class="panel-title">Scoreboard</span>
-            <span class="panel-rule"></span>
-          </header>
-          <div class="scoreboard">
-            <div class="score-cell">
-              <div class="score-num" style="color: var(--teal);" id="stat-wins">0</div>
-              <div class="score-cap">Wins</div>
+        <div class="dash-section">
+          <div class="dash-section-title">Scoreboard</div>
+          <div class="scoreboard-row">
+            <div class="score-item score-win">
+              <span class="score-number" id="stat-wins">0</span>
+              <span class="score-label">Wins</span>
             </div>
-            <div class="score-cell">
-              <div class="score-num score-rate" id="stat-winrate">—</div>
-              <div class="score-cap">Rate</div>
+            <div class="score-item score-rate">
+              <span class="score-number" id="stat-winrate">—</span>
+              <span class="score-label">Rate</span>
             </div>
-            <div class="score-cell">
-              <div class="score-num" style="color: var(--rose);" id="stat-losses">0</div>
-              <div class="score-cap">Losses</div>
+            <div class="score-item score-loss">
+              <span class="score-number" id="stat-losses">0</span>
+              <span class="score-label">Losses</span>
             </div>
           </div>
-        </section>
+        </div>
 
         <!-- Run History -->
-        <section class="panel panel-fill">
-          <header class="panel-head">
-            <span class="panel-tag" style="--tag: var(--amber);">Session</span>
-            <span class="panel-title">Run History</span>
-            <span class="panel-rule"></span>
-          </header>
+        <div class="dash-section dash-section-fill">
+          <div class="dash-section-title">Run History</div>
           <div class="history-list" id="run-history">
-            <div class="history-empty">No runs yet</div>
+            <div class="empty-state">No runs yet</div>
           </div>
-        </section>
+        </div>
       </div>
-
-      <!-- UNITS screen (placeholder) -->
-      <div class="screen" id="screen-units">
-        <section class="panel panel-fill">
-          <header class="panel-head">
-            <span class="panel-tag" style="--tag: var(--brand);">Editor</span>
-            <span class="panel-title">Unit Plan</span>
-            <span class="panel-rule"></span>
-          </header>
-          <div class="panel-body-placeholder">Unit placement editor</div>
-        </section>
-      </div>
-
-      <!-- TASKS screen (placeholder) -->
-      <div class="screen" id="screen-tasks">
-        <section class="panel panel-fill">
-          <header class="panel-head">
-            <span class="panel-tag" style="--tag: var(--lilac);">Queue</span>
-            <span class="panel-title">Task Queue</span>
-            <span class="panel-rule"></span>
-          </header>
-          <div class="panel-body-placeholder">Task queue and builder</div>
-        </section>
-      </div>
-
-      <!-- ROUTE screen (placeholder) -->
-      <div class="screen" id="screen-route">
-        <section class="panel panel-fill">
-          <header class="panel-head">
-            <span class="panel-tag" style="--tag: var(--sky);">Events</span>
-            <span class="panel-title">Route Editor</span>
-            <span class="panel-rule"></span>
-          </header>
-          <div class="panel-body-placeholder">Route step list and editor</div>
-        </section>
-      </div>
-
-      <!-- SETTINGS screen (placeholder) -->
-      <div class="screen" id="screen-settings">
-        <section class="panel panel-fill">
-          <header class="panel-head">
-            <span class="panel-tag" style="--tag: var(--slate);">Config</span>
-            <span class="panel-title">Settings</span>
-            <span class="panel-rule"></span>
-          </header>
-          <div class="panel-body-placeholder">Settings categories and controls</div>
-        </section>
-      </div>
-
     </div>
-  </main>
+  </div>
+
+  <!-- ============ PLANNER (full page) ============ -->
+  <div class="screen" id="screen-planner">
+    <div class="fullpage-split">
+      <div class="split-left">
+        <div class="page-header">
+          <span class="page-title">Unit Planner</span>
+          <span class="page-subtitle">Place and configure units for each stage</span>
+        </div>
+        <div class="placeholder-body">Step grid and chip selector will go here</div>
+      </div>
+      <div class="split-right">
+        <div class="page-header">
+          <span class="page-title">Step Detail</span>
+        </div>
+        <div class="placeholder-body">Selected step's fields, sequence editor, coordinate picker</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ QUEUE (full page) ============ -->
+  <div class="screen" id="screen-queue">
+    <div class="fullpage-split">
+      <div class="split-left">
+        <div class="page-header">
+          <span class="page-title">Task Queue</span>
+          <div class="page-actions">
+            <button class="btn-small">+ Add Task</button>
+          </div>
+        </div>
+        <div class="placeholder-body">Queue list — drag to reorder, click to edit</div>
+      </div>
+      <div class="split-right">
+        <div class="page-header">
+          <span class="page-title">Task Settings</span>
+        </div>
+        <div class="placeholder-body">Selected task's gamemode, map, act, run limit</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ ROUTE (full page) ============ -->
+  <div class="screen" id="screen-route">
+    <div class="fullpage-split">
+      <div class="split-left">
+        <div class="page-header">
+          <span class="page-title">Route Editor</span>
+          <span class="page-subtitle">Events navigation steps</span>
+        </div>
+        <div class="placeholder-body">Event/act selector, step list, add/reorder/delete</div>
+      </div>
+      <div class="split-right">
+        <div class="page-header">
+          <span class="page-title">Step Detail</span>
+        </div>
+        <div class="placeholder-body">Selected step's kind, image, region, timeout</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SETTINGS (full page) ============ -->
+  <div class="screen" id="screen-settings">
+    <div class="settings-layout">
+      <nav class="settings-nav">
+        <button class="settings-nav-btn active" data-cat="general">General</button>
+        <button class="settings-nav-btn" data-cat="keybinds">Keybinds</button>
+        <button class="settings-nav-btn" data-cat="delays">Delays</button>
+        <button class="settings-nav-btn" data-cat="vision">Vision</button>
+        <button class="settings-nav-btn" data-cat="position">Position</button>
+        <button class="settings-nav-btn" data-cat="debug">Debug</button>
+      </nav>
+      <div class="settings-content">
+        <div class="settings-category active" data-cat="general">
+          <div class="page-header">
+            <span class="page-title">General</span>
+            <span class="page-subtitle">Connection, updates, and macro behaviour</span>
+          </div>
+          <div class="setting-group">
+            <div class="setting-row">
+              <div class="setting-info">
+                <span class="setting-name">Private Server Link</span>
+                <span class="setting-desc">The deep link used to join your server</span>
+              </div>
+              <input type="text" class="setting-input" placeholder="https://www.roblox.com/share?code=...">
+            </div>
+            <div class="setting-row">
+              <div class="setting-info">
+                <span class="setting-name">Discord Webhook</span>
+                <span class="setting-desc">Posts win/loss notifications to your channel</span>
+              </div>
+              <input type="text" class="setting-input" placeholder="https://discord.com/api/webhooks/...">
+            </div>
+            <div class="setting-row">
+              <div class="setting-info">
+                <span class="setting-name">Check for updates on startup</span>
+                <span class="setting-desc">Asks GitHub once per launch</span>
+              </div>
+              <label class="toggle"><input type="checkbox" checked><span class="toggle-track"></span></label>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info">
+                <span class="setting-name">Hard Mode (Story only)</span>
+                <span class="setting-desc">Enables the hard mode toggle before starting</span>
+              </div>
+              <label class="toggle"><input type="checkbox"><span class="toggle-track"></span></label>
+            </div>
+          </div>
+        </div>
+        <div class="settings-category" data-cat="keybinds">
+          <div class="page-header"><span class="page-title">Keybinds</span></div>
+          <div class="placeholder-body">Hotkey capture buttons for each action</div>
+        </div>
+        <div class="settings-category" data-cat="delays">
+          <div class="page-header"><span class="page-title">Delays</span></div>
+          <div class="placeholder-body">Tunable timing values from DELAY_SPEC</div>
+        </div>
+        <div class="settings-category" data-cat="vision">
+          <div class="page-header"><span class="page-title">Vision</span></div>
+          <div class="placeholder-body">Per-template tolerance, test buttons, image list</div>
+        </div>
+        <div class="settings-category" data-cat="position">
+          <div class="page-header"><span class="page-title">Start Position</span></div>
+          <div class="placeholder-body">Per-target walk paths</div>
+        </div>
+        <div class="settings-category" data-cat="debug">
+          <div class="page-header"><span class="page-title">Debug</span></div>
+          <div class="placeholder-body">Template tester, geometry report, macro tester</div>
+        </div>
+      </div>
+    </div>
+  </div>
 
 <script src="app.js"></script>
 </body>
