@@ -257,6 +257,62 @@ class Api:
         ok = UnifiedSettings(self._app_root).set_delay(key, value)
         return {"ok": ok}
 
+    # ---- Task Queue ----
+
+    def get_tasks(self) -> list:
+        """The ordered task queue."""
+        if not self._app_root:
+            return []
+        return UnifiedSettings(self._app_root).get_tasks()
+
+    def add_task(self, task: dict) -> dict:
+        """Append a new task to the queue. Assigns an id if missing."""
+        if not self._app_root:
+            return {"ok": False}
+        import time as _time
+
+        if not task.get("id"):
+            task["id"] = f"t{int(_time.time() * 1000)}"
+        tasks = UnifiedSettings(self._app_root).get_tasks()
+        tasks.append(task)
+        ok = UnifiedSettings(self._app_root).set_tasks(tasks)
+        return {"ok": ok, "id": task["id"]}
+
+    def update_task(self, task_id: str, changes: dict) -> dict:
+        """Update fields on a task by id. Auto-saves."""
+        if not self._app_root:
+            return {"ok": False}
+        settings = UnifiedSettings(self._app_root)
+        tasks = settings.get_tasks()
+        for t in tasks:
+            if t.get("id") == task_id:
+                t.update(changes)
+                return {"ok": settings.set_tasks(tasks)}
+        return {"ok": False, "error": "not found"}
+
+    def remove_task(self, task_id: str) -> dict:
+        """Remove a task by id."""
+        if not self._app_root:
+            return {"ok": False}
+        settings = UnifiedSettings(self._app_root)
+        tasks = [t for t in settings.get_tasks() if t.get("id") != task_id]
+        return {"ok": settings.set_tasks(tasks)}
+
+    def reorder_tasks(self, ids: list) -> dict:
+        """Reorder the queue to match the given id list."""
+        if not self._app_root:
+            return {"ok": False}
+        settings = UnifiedSettings(self._app_root)
+        old = {t.get("id"): t for t in settings.get_tasks()}
+        reordered = [old[tid] for tid in ids if tid in old]
+        return {"ok": settings.set_tasks(reordered)}
+
+    def clear_tasks(self) -> dict:
+        """Remove all tasks."""
+        if not self._app_root:
+            return {"ok": False}
+        return {"ok": UnifiedSettings(self._app_root).set_tasks([])}
+
     # ---- Macro control ----
 
     def start_macro(self, gamemode: str, map_name: str, target: str, config_path: str) -> dict:
