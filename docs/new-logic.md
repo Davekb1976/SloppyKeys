@@ -93,7 +93,30 @@ Detect blocks branch: evaluate condition → run `then` blocks or `else` blocks.
 
 A modal showing map screenshots (from `images/maps/`) organized by gamemode. Click to set coordinates. Also offers "Use Roblox Screen" to capture the live game. Coordinates in the 1152×756 client space. Other placed units shown as markers.
 
-## Task Presets
+## Image Manager
+
+Opens via hotkey (F6) or from Settings. A modal overlay (works from any screen).
+
+**Layout**: Category tabs (UI, Maps, Detect) + name filter + "Open Folder" + "Capture Roblox" buttons at the top. Below is a scrollable grid of cards — one card per searched image name.
+
+**Each card shows**:
+- Category badge + name + variant count + "+" add button
+- Description (optional, from a readme/comment)
+- Per-name match threshold slider (0.50–1.00, default 0.90, persisted in `settings.json["image_thresholds"]`)
+- Thumbnail grid of all variant images for that name
+
+**Data model**: Folder-per-name under `images/ui/<name>/` (or `images/maps/<name>/`, `images/detect/<name>/`). Each PNG inside is a variant tried in order during search. The primary variant is `<name>.png`; extras sort alphabetically after it.
+
+**API**:
+- `list_vision_templates()` → returns all categories with all names and base64 thumbnails
+- `set_image_threshold(name, value)` → persists + applies live
+- `capture_image_search_screen()` → freezes the Roblox frame for cropping
+- `save_image_search_crop(category, name, x, y, w, h)` → crops + saves as a new variant
+- `delete_vision_template_image(category, name, filename)` → removes one variant
+
+**Workflow**: Capture Roblox → draw a box over the element → name it → saved as a variant. The match threshold slider tunes sensitivity per-name without touching code. "Open Folder" launches the OS file explorer for hand-editing.
+
+**For us**: replaces our current `Settings > Vision` screen. The folder-per-name variant system replaces our single-file-per-template approach. The Image Manager hotkey is registered globally so it can open mid-run when a search fails.
 
 Save/load the entire queue under a name. Stored in `operations/presets/<name>.json`. Separate from file export/import (for sharing between installs).
 
