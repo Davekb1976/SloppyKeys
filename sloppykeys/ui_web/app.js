@@ -272,7 +272,6 @@
   // Populate gamemodes in the task builder mode dropdown + load queue
   window.addEventListener("pywebviewready", () => {
     loadTasks();
-    loadSettings();
     if (window.pywebview && pywebview.api && pywebview.api.get_gamemodes) {
       pywebview.api.get_gamemodes().then((modes) => {
         tbMode.innerHTML = modes.map((m) => `<option value="${m}">${m}</option>`).join("");
@@ -280,6 +279,11 @@
     }
     loadOperationList();
   });
+
+  // Called from Python's on_loaded after _app_root is set.
+  window.onBackendReady = function () {
+    loadSettings();
+  };
 
   // ---- Macro Manager ----
   const PHASES = ["pre_start", "battle", "loop_a", "loop_b"];

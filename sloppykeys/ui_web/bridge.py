@@ -824,6 +824,8 @@ def main() -> None:
             'document.getElementById("version-badge").textContent = '
             f'"v{api.get_version()}";'
         )
+        # Signal JS that the backend is ready (app_root set, controller built).
+        window.evaluate_js("window.onBackendReady && window.onBackendReady();")
         threading.Thread(target=api._follow_loop, daemon=True).start()
         threading.Thread(target=api._hotkey_loop, daemon=True).start()
 
