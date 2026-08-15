@@ -56,6 +56,7 @@ from sloppykeys.core.win32.roblox_window import (
     window_rect,
 )
 from sloppykeys.config.keybinds import DEFAULTS as KEYBIND_DEFAULTS, KeybindStore
+from sloppykeys.config.unified import UnifiedSettings
 from sloppykeys.config.unit_configs import UnitConfigStore
 from sloppykeys.content.units import UnitPlan
 from sloppykeys.macro.controller import MacroController
@@ -214,6 +215,47 @@ class Api:
 
         path = os.path.join(*parts)
         return path if os.path.isfile(path) else ""
+
+    # ---- Settings (unified, auto-save) ----
+
+    def get_settings(self) -> dict:
+        """All settings with defaults merged. Called from JS to populate the Settings screen."""
+        if not self._app_root:
+            return {}
+        return UnifiedSettings(self._app_root).get_all()
+
+    def set_setting(self, key: str, value) -> dict:
+        """Write one setting immediately. No save button needed."""
+        if not self._app_root:
+            return {"ok": False}
+        ok = UnifiedSettings(self._app_root).set(key, value)
+        return {"ok": ok}
+
+    def get_hotkeys(self) -> dict:
+        """Current hotkey bindings with display names."""
+        if not self._app_root:
+            return {}
+        return UnifiedSettings(self._app_root).get_hotkeys()
+
+    def reset_hotkeys(self) -> dict:
+        """Reset all hotkeys to defaults."""
+        if not self._app_root:
+            return {"ok": False}
+        hotkeys = UnifiedSettings(self._app_root).reset_hotkeys()
+        return {"ok": True, "hotkeys": hotkeys}
+
+    def get_delays(self) -> dict:
+        """Current delay values."""
+        if not self._app_root:
+            return {}
+        return UnifiedSettings(self._app_root).get_delays()
+
+    def set_delay(self, key: str, value: float) -> dict:
+        """Write one delay immediately."""
+        if not self._app_root:
+            return {"ok": False}
+        ok = UnifiedSettings(self._app_root).set_delay(key, value)
+        return {"ok": ok}
 
     # ---- Macro control ----
 

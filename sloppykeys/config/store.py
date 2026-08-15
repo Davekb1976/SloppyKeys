@@ -64,13 +64,28 @@ def update_json(
 
 
 def _write(path: str, payload: dict[str, Any]) -> bool:
+    """Atomic write: dump to a temp file, fsync, then os.replace.
+
+    A crash or kill mid-write can only ever leave the OLD complete file or the
+    NEW complete file — never a half-written, truncated JSON that read_json
+    would report as {}.
+    """
     try:
         parent = os.path.dirname(path)
         if parent:
             os.makedirs(parent, exist_ok=True)
-        with open(path, "w", encoding="utf-8") as handle:
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as handle:
             json.dump(payload, handle, indent=2)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp, path)
     except OSError:
+        # Clean up the temp file if replace failed.
+        try:
+            os.remove(tmp)  # type: ignore[possibly-undefined]
+        except OSError:
+            pass
         return False
     return True
 
