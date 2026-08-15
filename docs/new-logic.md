@@ -136,22 +136,119 @@ Save/load the entire queue under a name. Stored in `operations/presets/<name>.js
 
 ## File Organization (new)
 
+### Source tree (`sloppykeys/`)
+
 ```
-sloppykeys/                   source code (unchanged)
-data/                         gitignored, beside the exe in a frozen build
-  settings.json               single file: settings, hotkeys, tasks, stats
-  operations/                 macro operations (one JSON per named operation)
-    presets/                   saved task queue snapshots
-  paths/                      recorded walk paths
-  debug/                      debug screenshots
-images/                       shipped with the build, user-editable
-  ui/                         nav/match templates (folder-per-name for variants)
-  maps/                       map preview thumbnails for position picker
-    Story/
-    Raid/
-    Expedition/
-    Events/
+sloppykeys/
+├── __init__.py
+├── __main__.py               entry point
+├── version.py                VERSION string
+│
+├── core/                     services — no UI, no macro logic
+│   ├── ahk.py               AHK v2 bridge (run scripts, find exe)
+│   ├── image_search.py       template matching engine (folder-per-name variants)
+│   ├── ocr.py                RapidOCR wrapper
+│   ├── updates.py            GitHub release check + Roblox deep-link relaunch
+│   ├── webhook.py            Discord webhook (rich embeds, screenshots)
+│   ├── pacing.py             global action delay (NEW — ms sleep after every click)
+│   └── win32/                typed ctypes bindings + OS helpers
+│       ├── bindings.py       raw user32/kernel32/gdi32 signatures
+│       ├── display.py        DPI, refresh rate, scale %
+│       ├── frameless.py      frameless window helpers (topmost, move, fit)
+│       └── roblox_window.py  find/measure/position the Roblox window
+│
+├── macro/                    execution logic — drives the game
+│   ├── runner.py             state machine (block-per-tick, phase tracking)
+│   ├── controller.py         task-queue orchestrator (reads queue, loads ops, drives runner)
+│   ├── lobby.py              lobby navigation (click Play, select stage, wait for load)
+│   ├── blocks.py             block executors: place, upgrade, sell, click, send_key, detect (NEW)
+│   ├── camera.py             camera setup AHK script
+│   ├── detect.py             Detect block evaluation + flatten (NEW)
+│   ├── input_scripts.py      AHK script generators (nudge, walk, sequence)
+│   ├── recording.py          walk path + full input recording/replay (NEW — merges paths + input_record)
+│   └── challenge.py          challenge scanner (OCR the panel)
+│
+├── config/                   persistence — JSON store, no game logic
+│   ├── store.py              atomic read/write/update_json (enhanced: tmp → fsync → replace)
+│   ├── settings.py           single settings.json accessor (all keys consolidated)
+│   ├── operations.py         macro operation CRUD (NEW — list/load/save/delete operations/)
+│   ├── presets.py            task queue preset save/load (NEW)
+│   └── routes.py             events routes.json store (renamed from nav_routes.py)
+│
+├── content/                  game schema — static data tables, no persistence
+│   ├── gamemodes.py          modes, maps, stages, targets
+│   ├── acts.py               per-act click coordinates
+│   ├── nav_images.py         image path resolution for lobby nav
+│   ├── nav_route.py          NavStep dataclass + route validation
+│   └── start_stage.py        start/difficulty coordinates
+│
+└── ui_web/                   pywebview frontend (the only UI)
+    ├── __init__.py
+    ├── __main__.py           launch entry
+    ├── bridge.py             Python↔JS API (all backend methods exposed here)
+    ├── index.html            all screens + modals
+    ├── style.css             design system (vars, panels, blocks, modals)
+    └── app.js                screen switching, drag-drop, macro controls, selectors
 ```
+
+### Data directory (gitignored, beside the exe in frozen builds)
+
+```
+data/                         created on first launch
+├── settings.json             everything: settings, hotkeys, tasks, stats, thresholds, delays
+├── operations/               macro operations (one JSON per named operation)
+│   └── presets/              saved task queue snapshots
+├── paths/                    recorded walk paths (WASD JSON)
+├── recordings/               full input recordings (mouse+keyboard JSON)
+└── debug/                    debug screenshots
+```
+
+### Assets (shipped with the build, user-editable)
+
+```
+images/
+├── ui/                       nav/match templates — folder-per-name for variants
+│   ├── start_game/           example: start_game.png + cropped variants
+│   ├── victory/
+│   ├── defeat/
+│   └── ...
+├── maps/                     map preview thumbnails for position picker
+│   ├── Story/
+│   ├── Raid/
+│   ├── Expedition/
+│   └── Events/
+├── detect/                   user-added detection images (Detect block)
+└── reference/                reference screenshots (existing, unchanged)
+```
+
+### What was removed
+
+```
+REMOVED:
+  sloppykeys/ui/              entire PySide6 tree (window.py, pages/, editors, theme, icons)
+  sloppykeys/config/delays.py         → merged into settings.json
+  sloppykeys/config/keybinds.py       → merged into settings.json
+  sloppykeys/config/regions.py        → merged into settings.json
+  sloppykeys/config/start_position.py → walk_path block in Macro Manager
+  sloppykeys/config/stats.py          → merged into settings.json
+  sloppykeys/config/tasks.py          → merged into settings.json
+  sloppykeys/config/unit_configs.py   → replaced by operations/
+  sloppykeys/config/route_paths.py    → merged into routes.py
+  sloppykeys/content/challenge.py     → absorbed into macro/challenge.py
+  sloppykeys/content/start_position.py→ walk_path block handles this
+  sloppykeys/content/units.py         → block executor internal types
+  sloppykeys/macro/placement.py       → split into blocks.py executors
+  sloppykeys/macro/tasks.py           → simplified in controller.py
+  configs/                            → replaced by data/operations/
+```
+
+### Notes
+
+- `__pycache__/` folders appear in every package — this is normal Python bytecode caching, covered by `.gitignore`, harmless.
+- 4 packages (`core`, `macro`, `config`, `content`) + 1 UI package (`ui_web`). Down from 6.
+- No `ui/pages/` sub-package. The webview is one HTML file with screen sections.
+- `content/` is read-only game data (coordinates, names). `config/` is read/write user data. Clear split.
+- Every module has one job. No 4000-line window.py.
 
 ## What Changes from Current
 
