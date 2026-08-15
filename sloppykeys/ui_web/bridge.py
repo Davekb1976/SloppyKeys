@@ -57,10 +57,8 @@ from sloppykeys.core.win32.roblox_window import (
 )
 from sloppykeys.config.keybinds import DEFAULTS as KEYBIND_DEFAULTS, KeybindStore
 from sloppykeys.config.unified import UnifiedSettings
-from sloppykeys.config.unit_configs import UnitConfigStore
 from sloppykeys.content.units import UnitPlan
 from sloppykeys.macro.controller import MacroController
-from sloppykeys.macro.runner import MacroTarget
 
 WINDOW_TITLE = "SloppyKeys"
 
@@ -425,25 +423,14 @@ class Api:
 
     # ---- Macro control ----
 
-    def start_macro(self, gamemode: str, map_name: str, target: str, config_path: str) -> dict:
-        """Start a run. Called from JS Start button."""
+    def start_macro(self, *args) -> dict:
+        """Start the macro — runs the task queue. No selector args needed."""
         if self._ctrl is None:
             return {"ok": False, "error": "controller not ready"}
         if self._ctrl.is_running:
             return {"ok": False, "error": "already running"}
 
-        # Load the unit plan from the config path
-        if not config_path:
-            return {"ok": False, "error": "no config selected"}
-        store = UnitConfigStore(self._app_root) if self._app_root else None
-        if store is None:
-            return {"ok": False, "error": "no app root"}
-        plan = store.load(config_path)
-        if not plan.enabled_steps():
-            return {"ok": False, "error": "no enabled unit steps"}
-
-        macro_target = MacroTarget(gamemode=gamemode, map_name=map_name, target=target)
-        error = self._ctrl.start(macro_target, plan)
+        error = self._ctrl.start()
         if error:
             return {"ok": False, "error": error}
 
@@ -459,15 +446,35 @@ class Api:
         self._ctrl.stop()
         return {"ok": True}
 
+    def pause_macro(self) -> dict:
+        """Pause the running macro."""
+        if self._ctrl is None or not self._ctrl.is_running:
+            return {"ok": False}
+        self._ctrl.pause()
+        return {"ok": True}
+
+    def resume_macro(self) -> dict:
+        """Resume a paused macro."""
+        if self._ctrl is None:
+            return {"ok": False}
+        self._ctrl.resume()
+        return {"ok": True}
+
     def get_macro_status(self) -> dict:
         """Poll macro state from JS."""
         if self._ctrl is None:
             return {"running": False, "cycle": 0, "target": "", "phase": "idle"}
+        task = self._ctrl.current_task
+        target = ""
+        if task:
+            target = " / ".join(
+                p for p in (task.get("mode"), task.get("map"), task.get("stage")) if p
+            )
         return {
             "running": self._ctrl.is_running,
             "cycle": self._ctrl.cycle,
-            "target": self._ctrl.target.label(),
-            "phase": self._ctrl.phase.value,
+            "target": target,
+            "phase": "running" if self._ctrl.is_running else "idle",
         }
 
     def _macro_run_loop(self) -> None:
