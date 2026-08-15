@@ -86,9 +86,24 @@ change propagates everywhere.
 
 ## Panel Component
 
-Every section is a `.panel` — rounded card (12px radius) with:
-1. **Header**: colored tag pill (8px uppercase) + title (11px semibold) + gradient rule
-2. **Body**: content pattern (hero row, ledger rows, grid, form fields, list)
+Every distinct section is a `.panel` — a bordered card with:
+1. **Header**: colored tag pill (8–9px uppercase, e.g. `MACRO`, `EDITOR`, `SYSTEM`, `INPUT`) + title (12–13px semibold) + optional count/badge on the right
+2. **Toolbar** (optional): row of action buttons below the header, inside the panel
+3. **Body**: the section's content (list, form fields, grid, drop zone)
+
+**When to use a panel**: every time a section has a distinct identity on screen. Two sections side-by-side each get their own panel with their own header. Panels are separated by a gap (8px), never touching edge-to-edge.
+
+**Tags/Pills**: small colored rectangles (`padding: 2px 8px`, `font-size: 9px`, uppercase, no border-radius) that label the panel's purpose. Colors from the semantic palette:
+- `--accent` (purple) for primary contexts: `MACRO`, `EDITOR`
+- `--teal` for setup/success: `SETUP`, `REPEATS`
+- `--rose` for combat/destructive: `COMBAT`
+- `--slate` for neutral: `SYSTEM`, `INPUT`, `DISCORD`
+
+**Badges/Counts**: a small number or text on the right side of the panel header (e.g. "1 task", "0" block count) in `--text-faint`.
+
+**Highlight**: the selected item in a list gets `border-left: 3px solid var(--accent)` and a soft `background: var(--accent-soft)`.
+
+**Setting rows**: two-column layout within a panel body. Left: label + description. Right: control (input/toggle/select). Full-width rows have the control below. Labels are 12px semibold (`--text`), descriptions are 10px (`--text-faint`), micro-labels above controls are 9px uppercase (`--text-muted`).
 
 ## Typography
 

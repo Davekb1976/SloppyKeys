@@ -149,47 +149,9 @@
   <!-- ============ PLANNER → MACRO MANAGER (full page) ============ -->
   <div class="screen" id="screen-planner">
     <div class="fullpage-split">
-      <div class="split-left" style="flex:1; min-width:0;">
-        <div class="page-header" style="display:flex; align-items:center; gap:8px;">
-          <span class="page-title">Macro Manager</span>
-          <input type="text" class="setting-input" id="op-name" placeholder="Operation name" style="width:180px; margin-left:auto;">
-          <button class="btn btn--sm" id="btn-op-save">Save</button>
-          <button class="btn btn--sm" id="btn-op-new">New</button>
-          <button class="btn btn--sm btn--danger" id="btn-op-delete">Delete</button>
-          <select class="setting-select" id="op-load" style="width:160px;"><option value="">Load...</option></select>
-        </div>
-
-        <!-- Phases -->
-        <div class="phases-container" id="phases-container">
-          <div class="phase-section" data-phase="pre_start">
-            <div class="phase-header"><span class="phase-tag tag-setup">Setup</span><span class="phase-label">Pre Start</span><span class="phase-count" id="count-pre_start">0</span></div>
-            <div class="phase-dropzone" id="zone-pre_start">
-              <div class="phase-placeholder">Drag blocks here — walk, place starter units, settings</div>
-            </div>
-          </div>
-          <div class="phase-section" data-phase="battle">
-            <div class="phase-header"><span class="phase-tag tag-combat">Combat</span><span class="phase-label">Battle</span><span class="phase-count" id="count-battle">0</span></div>
-            <div class="phase-dropzone" id="zone-battle">
-              <div class="phase-placeholder">Drag blocks here — upgrades, sells, waits, clicks</div>
-            </div>
-          </div>
-          <div class="phase-section" data-phase="loop_a">
-            <div class="phase-header"><span class="phase-tag tag-loop">Repeats</span><span class="phase-label">Loop A</span><span class="phase-count" id="count-loop_a">0</span></div>
-            <div class="phase-dropzone" id="zone-loop_a">
-              <div class="phase-placeholder">Repeats during the match — detect→act cycles</div>
-            </div>
-          </div>
-          <div class="phase-section" data-phase="loop_b">
-            <div class="phase-header"><span class="phase-tag tag-loop">Repeats</span><span class="phase-label">Loop B</span><span class="phase-count" id="count-loop_b">0</span></div>
-            <div class="phase-dropzone" id="zone-loop_b">
-              <div class="phase-placeholder">Second independent repeat loop</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Block palette (right) -->
-      <div class="split-right" style="width:160px; flex-shrink:0; padding:8px; overflow-y:auto; border-left:1px solid var(--border);">
+      <!-- Block palette (LEFT) -->
+      <div class="palette-panel">
+        <div class="palette-title">Blocks</div>
         <div class="palette-group-label">Units</div>
         <div class="palette-block" data-type="place_unit" draggable="true">Place Unit</div>
         <div class="palette-block" data-type="upgrade_unit" draggable="true">Upgrade Unit</div>
@@ -206,6 +168,45 @@
         <div class="palette-block" data-type="send_key" draggable="true">Send Key</div>
         <div class="palette-group-label">Logic</div>
         <div class="palette-block" data-type="detect" draggable="true">Detect</div>
+        <div class="palette-hint">Drag a block into a phase below; drag rows to reorder.</div>
+      </div>
+
+      <!-- Phases (main area) -->
+      <div class="split-main">
+        <div class="page-header" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <input type="text" class="setting-input" id="op-name" placeholder="Template name" style="width:160px;">
+          <button class="btn btn--sm" id="btn-op-save">Save</button>
+          <select class="setting-select" id="op-load" style="width:140px;"><option value="">Load...</option></select>
+          <button class="btn btn--sm" id="btn-op-new">New</button>
+          <button class="btn btn--sm btn--danger" id="btn-op-delete">Delete</button>
+        </div>
+
+        <div class="phases-container" id="phases-container">
+          <div class="phase-section" data-phase="pre_start">
+            <div class="phase-header"><span class="phase-tag tag-setup">Setup</span><span class="phase-label">Pre Start</span><span class="phase-count" id="count-pre_start">0</span></div>
+            <div class="phase-dropzone" id="zone-pre_start">
+              <div class="phase-placeholder">Drag Place Unit, Setting, Click, or Wait blocks here — only these are possible before the match starts.</div>
+            </div>
+          </div>
+          <div class="phase-section" data-phase="battle">
+            <div class="phase-header"><span class="phase-tag tag-combat">Combat</span><span class="phase-label">Battle</span><span class="phase-count" id="count-battle">0</span></div>
+            <div class="phase-dropzone" id="zone-battle">
+              <div class="phase-placeholder">Drag blocks here — upgrades, sells, waits, clicks, anything goes mid-battle.</div>
+            </div>
+          </div>
+          <div class="phase-section" data-phase="loop_a">
+            <div class="phase-header"><span class="phase-tag tag-loop">Repeats</span><span class="phase-label">Loop A</span><span class="phase-count" id="count-loop_a">0</span></div>
+            <div class="phase-dropzone" id="zone-loop_a">
+              <div class="phase-placeholder">Drag blocks here — this list repeats over and over during the match. Pair a Detect block with a Wait to "watch for an image, then act".</div>
+            </div>
+          </div>
+          <div class="phase-section" data-phase="loop_b">
+            <div class="phase-header"><span class="phase-tag tag-loop">Repeats</span><span class="phase-label">Loop B</span><span class="phase-count" id="count-loop_b">0</span></div>
+            <div class="phase-dropzone" id="zone-loop_b">
+              <div class="phase-placeholder">Drag blocks here — this list repeats over and over during the match. Pair a Detect block with a Wait to "watch for an image, then act".</div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
