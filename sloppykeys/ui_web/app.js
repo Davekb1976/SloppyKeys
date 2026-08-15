@@ -512,8 +512,34 @@
       const hkList = document.getElementById("hotkeys-list");
       if (hk && Object.keys(hk).length) {
         hkList.innerHTML = Object.entries(hk).map(([action, display]) =>
-          `<div class="setting-row"><div class="setting-info"><span class="setting-name">${action.replace(/_/g, " ")}</span></div><span class="setting-value" style="font-size:12px; color:var(--text-muted); font-weight:600; padding:4px 10px; border:1px solid var(--border);">${display || "Unbound"}</span></div>`
+          `<div class="setting-row">
+            <div class="setting-info"><span class="setting-name">${action.replace(/_/g, " ")}</span></div>
+            <button class="hotkey-btn" data-action="${action}">${display || "Unbound"}</button>
+          </div>`
         ).join("");
+        // Wire key capture
+        hkList.querySelectorAll(".hotkey-btn").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            btn.textContent = "Press a key...";
+            btn.classList.add("capturing");
+            const handler = (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              document.removeEventListener("keydown", handler, true);
+              btn.classList.remove("capturing");
+              const vk = e.keyCode;
+              const ctrl = e.ctrlKey;
+              const shift = e.shiftKey;
+              const alt = e.altKey;
+              const display = (ctrl ? "Ctrl + " : "") + (shift ? "Shift + " : "") + (alt ? "Alt + " : "") + e.key.toUpperCase();
+              btn.textContent = display;
+              if (window.pywebview && pywebview.api) {
+                pywebview.api.set_hotkey(btn.dataset.action, vk, ctrl, shift, alt);
+              }
+            };
+            document.addEventListener("keydown", handler, true);
+          });
+        });
       }
     } catch (e) {}
 

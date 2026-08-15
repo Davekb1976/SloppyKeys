@@ -242,6 +242,18 @@ class Api:
         hotkeys = UnifiedSettings(self._app_root).reset_hotkeys()
         return {"ok": True, "hotkeys": hotkeys}
 
+    def set_hotkey(self, action: str, vk: int, ctrl: bool = False, shift: bool = False, alt: bool = False) -> dict:
+        """Set a single hotkey binding."""
+        if not self._app_root:
+            return {"ok": False}
+        from sloppykeys.config.keybinds import ACTIONS, Keybind, KeybindStore
+
+        if action not in ACTIONS:
+            return {"ok": False, "error": "unknown action"}
+        store = KeybindStore(self._app_root)
+        store.set(action, Keybind(vk=int(vk), ctrl=bool(ctrl), shift=bool(shift), alt=bool(alt)))
+        return {"ok": True}
+
     def get_delays(self) -> dict:
         """Current delay values."""
         if not self._app_root:

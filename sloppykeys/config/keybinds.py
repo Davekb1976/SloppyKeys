@@ -24,6 +24,7 @@ ACTIONS: dict[str, str] = {
     "stop": "Stop",
     "reload": "Reload",
     "open_tester": "Open Macro Tester",
+    "image_manager": "Image Manager",
 }
 
 # In-game keys the macro *presses* through AHK, matching the game's own binds.
@@ -98,6 +99,7 @@ DEFAULTS: dict[str, Keybind] = {
     "stop": Keybind(0x71),                  # F2
     "reload": Keybind(0x72),                # F3
     "open_tester": Keybind(0x54, ctrl=True),  # Ctrl + T
+    "image_manager": Keybind(0x75),         # F6
 }
 
 

@@ -464,6 +464,15 @@ input:focus, select:focus {
 }
 .settings-category .page-header { margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
 
+.hotkey-btn {
+  font-size: 12px; font-weight: 600; color: var(--text-muted);
+  padding: 5px 12px; border: 1px solid var(--border); background: var(--surface-sunken);
+  cursor: pointer; min-width: 80px; text-align: center; transition: border-color 0.12s;
+}
+.hotkey-btn:hover { border-color: var(--accent); color: var(--text); }
+.hotkey-btn.capturing { border-color: var(--accent); color: var(--accent); animation: pulse 0.8s infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
 /* Setting rows — two-column grid */
 .setting-group { display: grid; grid-template-columns: 1fr 1fr; gap: 0 var(--space-5); }
 .setting-row {
