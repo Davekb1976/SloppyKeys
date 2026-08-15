@@ -755,8 +755,8 @@
           <span style="font-size:11px; color:var(--text-muted);">Draw a box around the element to crop</span>
           <span class="pos-readout" id="crop-readout" style="margin-left:auto;">No selection</span>
         </div>
-        <div style="flex:1; position:relative; overflow:hidden; border:1px solid var(--border);">
-          <canvas id="crop-canvas" style="cursor:crosshair; display:block;"></canvas>
+        <div style="flex:1; min-height:400px; display:flex; align-items:center; justify-content:center; overflow:hidden; border:1px solid var(--border);">
+          <canvas id="crop-canvas" style="cursor:crosshair; display:block; max-width:100%; max-height:100%;"></canvas>
         </div>
         <div style="display:flex; align-items:center; gap:8px; margin-top:8px;">
           <span style="font-size:12px; font-weight:600; color:var(--text);">${name}</span>
@@ -767,7 +767,10 @@
       const canvas = document.getElementById("crop-canvas");
       const ctx = canvas.getContext("2d");
       const wrap = canvas.parentElement;
-      const scale = Math.min(wrap.clientWidth / img.naturalWidth, (wrap.clientHeight || 500) / img.naturalHeight, 1);
+      // Use the wrap's actual size (flex:1 + min-height gives it real dimensions)
+      const wrapW = wrap.clientWidth || 860;
+      const wrapH = wrap.clientHeight || 400;
+      const scale = Math.min(wrapW / img.naturalWidth, wrapH / img.naturalHeight, 1);
       canvas.width = Math.floor(img.naturalWidth * scale);
       canvas.height = Math.floor(img.naturalHeight * scale);
       canvas.dataset.scale = scale;
