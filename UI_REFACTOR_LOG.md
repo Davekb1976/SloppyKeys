@@ -20,3 +20,5 @@ Tracks the migration from PySide6 to pywebview + HTML/CSS/JS.
 | 2026-08-15 | Window sized from Win32 to 1536x1014, clamped to the work area | pywebview sized the Form with its frame still on, leaving the client 39px short and clipping the log | done |
 | 2026-08-15 | Game slot rect reported from the DOM to the backend | The cutout is measured where the slot rendered rather than duplicated as a constant | done |
 | | Wire macro controls (Start/Stop) to the existing runner | Clicking Start in the new UI should start a run the same as F1 does | next |
+| | Extract runner control from window.py into a headless controller | The runner, navigator, task director, and settings are tangled into a 4000-line QWidget; a standalone controller lets both UIs drive them | blocked on extraction |
+| | Wire remaining screens (Planner, Queue, Route, Settings) | Full-page screens are placeholder divs; need real content from the backend | planned |
