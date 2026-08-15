@@ -36,9 +36,9 @@
   });
 
   // ---- Window dragging ----
-  // One call on mousedown hands the window to the OS move loop; there is no
-  // per-frame message, which is what keeps the drag (and the docked game
-  // window following it) smooth. pywebview's own drag handler is not used.
+  // One call on mousedown; the backend then tracks the cursor itself until the
+  // button comes up. Sending a delta per mousemove instead put a bridge round
+  // trip on every frame, which is what made the drag stutter.
   const dragEl = document.getElementById("drag-handle");
   if (dragEl) {
     dragEl.addEventListener("mousedown", (e) => {

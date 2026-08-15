@@ -10,7 +10,9 @@ the Roblox window is modified, so closing us cannot take it down and its
 toolbar is back the moment we are gone.
 
 Reparenting with SetParent was tried and abandoned: the child dies with the
-parent, which is the whole bug this layout avoids.
+parent, which is the whole bug this layout avoids. Handing the window move to
+the OS caption loop was tried too and does nothing -- WebView2 owns the mouse
+capture from another process -- so the drag is tracked here in `_drag_loop`.
 """
 
 from __future__ import annotations
@@ -28,11 +30,14 @@ from sloppykeys.core.win32.bindings import (
     SWP_NOACTIVATE,
     SWP_NOMOVE,
     SWP_NOSIZE,
+    VK_LBUTTON,
+    get_cursor_pos,
+    is_key_down,
     user32,
 )
 from sloppykeys.core.win32.frameless import (
-    begin_caption_drag,
     find_window_by_title,
+    move_to,
     set_cutout_mask,
     set_topmost,
 )
@@ -53,6 +58,7 @@ DEFAULT_SLOT = (0, 38, 1152, 756)
 
 FOLLOW_INTERVAL = 0.016  # ~60Hz; the follower is the only thing carrying Roblox.
 SEARCH_INTERVAL = 1.0
+DRAG_INTERVAL = 0.008  # ~125Hz, so a drag never misses a displayed frame.
 
 
 class Api:
@@ -66,6 +72,7 @@ class Api:
         self._game_visible = True
         self._docked = False
         self._running = True
+        self._dragging = False
         self._last_rect: tuple[int, int, int, int] | None = None
 
     # ---- Window chrome ----
@@ -81,10 +88,18 @@ class Api:
             self._window.destroy()
 
     def begin_drag(self) -> None:
-        """Start an OS-driven window move. Returns when the drag ends."""
-        hwnd = self._host_hwnd()
-        if hwnd:
-            begin_caption_drag(hwnd)
+        """Start dragging the window. Returns at once; the loop runs on a thread.
+
+        Handing the move to the OS caption loop does not work here: WebView2
+        holds the mouse capture in its own process, so the loop on our thread
+        never receives a mouse move and the window sits still. Reading the
+        cursor globally needs no capture, and running the loop in Python keeps
+        the per-frame cost off the JS bridge.
+        """
+        if self._dragging:
+            return
+        self._dragging = True
+        threading.Thread(target=self._drag_loop, daemon=True).start()
 
     # ---- Screens ----
 
@@ -183,15 +198,55 @@ class Api:
             return
         user32.SetWindowPos(hwnd, 0, rect[0], 0, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE)
 
+    def _drag_loop(self) -> None:
+        """Track the cursor until the button comes up, moving both windows.
+
+        The game window is moved in the same iteration as ours rather than left
+        to the follower thread, so the two never land a frame apart.
+        """
+        try:
+            hwnd = self._host_hwnd()
+            origin = window_rect(hwnd) if hwnd else None
+            grab = get_cursor_pos()
+            if not hwnd or origin is None or grab is None:
+                return
+
+            while self._running and is_key_down(VK_LBUTTON):
+                cursor = get_cursor_pos()
+                current = window_rect(hwnd)
+                if cursor is None or current is None:
+                    break
+                x = origin[0] + cursor[0] - grab[0]
+                y = origin[1] + cursor[1] - grab[1]
+                if (x, y) != (current[0], current[1]):
+                    move_to(hwnd, x, y)
+                    if self._docked and self._game_hwnd:
+                        slot_x, slot_y, slot_w, slot_h = self._slot
+                        position_window_to_client_rect(
+                            self._game_hwnd, x + slot_x, y + slot_y, slot_w, slot_h
+                        )
+                time.sleep(DRAG_INTERVAL)
+        except OSError as exc:
+            print(f"Failed to drag the window: {exc}", file=sys.stderr)
+        finally:
+            self._dragging = False
+            self._last_rect = window_rect(self._hwnd) if self._hwnd else None
+
     def _follow_loop(self) -> None:
         """Find Roblox, dock it, and keep it under the hole as we move.
 
-        Polling our own rect from Python is what makes a drag smooth: the OS
-        move loop repositions us with no round trip, and this thread carries
-        Roblox within a frame of it.
+        Dragging is handled by `_drag_loop`; this catches every other way the
+        window can move (minimise/restore, a shell arrangement) and the initial
+        dock once Roblox appears.
         """
         while self._running:
             try:
+                if self._dragging:
+                    # The drag loop is moving both windows; two threads calling
+                    # SetWindowPos on the same pair only fight each other.
+                    time.sleep(DRAG_INTERVAL)
+                    continue
+
                 if not is_window(self._game_hwnd):
                     self._docked = False
                     self._game_hwnd = find_roblox_window()

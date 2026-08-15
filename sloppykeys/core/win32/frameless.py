@@ -10,7 +10,6 @@ import ctypes
 from ctypes import wintypes
 
 from .bindings import (
-    HTCAPTION,
     HWND_NOTOPMOST,
     HWND_TOPMOST,
     RGN_DIFF,
@@ -20,7 +19,6 @@ from .bindings import (
     SWP_NOMOVE,
     SWP_NOSIZE,
     SWP_NOZORDER,
-    WM_NCLBUTTONDOWN,
     gdi32,
     user32,
 )
@@ -174,13 +172,10 @@ def set_cutout_mask(
     return True
 
 
-def begin_caption_drag(hwnd: int) -> None:
-    """Hand the window to the OS move loop as if the caption had been grabbed.
-
-    The mouse button is already physically down when this is called from the
-    titlebar's mousedown, so DefWindowProc's modal loop tracks the cursor and
-    ends on the real button release. Dragging then costs zero round trips per
-    frame, which is the difference between smooth and stuttering.
-    """
-    user32.ReleaseCapture()
-    user32.SendMessageW(hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0)
+def move_to(hwnd: int, x: int, y: int) -> bool:
+    """Move without resizing, activating, or leaving the topmost band."""
+    return bool(
+        user32.SetWindowPos(
+            hwnd, 0, int(x), int(y), 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE
+        )
+    )

@@ -29,10 +29,7 @@ HWND_NOTOPMOST = -2
 # # Region combine modes (CombineRgn)
 RGN_DIFF = 4
 
-# # Caption-drag: hand the move loop to the OS instead of stepping the window
-# # ourselves, so a drag costs no per-frame round trip.
-WM_NCLBUTTONDOWN = 0x00A1
-HTCAPTION = 2
+
 
 # # ShowWindow commands
 SW_MINIMIZE = 6
@@ -98,15 +95,6 @@ _set_sig(
 
 _set_sig(user32.FindWindowW, wintypes.HWND, wintypes.LPCWSTR, wintypes.LPCWSTR)
 _set_sig(user32.SetWindowRgn, ctypes.c_int, wintypes.HWND, wintypes.HRGN, wintypes.BOOL)
-_set_sig(user32.ReleaseCapture, wintypes.BOOL)
-_set_sig(
-    user32.SendMessageW,
-    ctypes.c_ssize_t,
-    wintypes.HWND,
-    wintypes.UINT,
-    ctypes.c_size_t,
-    ctypes.c_ssize_t,
-)
 
 _set_sig(
     gdi32.CreateRectRgn, wintypes.HRGN, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int
