@@ -80,12 +80,53 @@
   const statGamemode = document.getElementById("stat-gamemode");
   const statCycle = document.getElementById("stat-cycle");
 
+  // ---- Gamemode selector ----
+  const selGamemode = document.getElementById("sel-gamemode");
+  const selMap = document.getElementById("sel-map");
+  const selTarget = document.getElementById("sel-target");
+
+  function fillSelect(el, items, placeholder) {
+    el.innerHTML = '<option value="">' + (placeholder || "—") + "</option>";
+    items.forEach((item) => {
+      const opt = document.createElement("option");
+      opt.value = item;
+      opt.textContent = item;
+      el.appendChild(opt);
+    });
+  }
+
+  function loadGamemodes() {
+    if (!window.pywebview || !pywebview.api) return;
+    pywebview.api.get_gamemodes().then((modes) => fillSelect(selGamemode, modes, "—"));
+  }
+
+  selGamemode.addEventListener("change", () => {
+    selMap.innerHTML = '<option value="">—</option>';
+    selTarget.innerHTML = '<option value="">—</option>';
+    if (!selGamemode.value || !window.pywebview) return;
+    pywebview.api.get_maps(selGamemode.value).then((maps) => fillSelect(selMap, maps, "—"));
+  });
+
+  selMap.addEventListener("change", () => {
+    selTarget.innerHTML = '<option value="">—</option>';
+    if (!selGamemode.value || !selMap.value || !window.pywebview) return;
+    pywebview.api.get_targets(selGamemode.value, selMap.value).then((targets) => {
+      if (targets.length > 0) fillSelect(selTarget, targets, "—");
+    });
+  });
+
+  window.addEventListener("pywebviewready", loadGamemodes);
+
   btnStart.addEventListener("click", () => {
     if (!window.pywebview || !pywebview.api) return;
-    // For now, start_macro needs a selection from the UI. Until the gamemode
-    // selector is wired, pressing Start just logs a reminder.
-    pywebview.api.start_macro("", "", "", "").then((r) => {
-      if (!r.ok) window.addLog("Start blocked: " + r.error);
+    const gm = selGamemode.value;
+    const map = selMap.value;
+    const tgt = selTarget.value;
+    // Ask the backend for the config path, then start.
+    pywebview.api.get_config_path(gm, map, tgt).then((path) => {
+      pywebview.api.start_macro(gm, map, tgt, path).then((r) => {
+        if (!r.ok) window.addLog("Start blocked: " + r.error);
+      });
     });
   });
 

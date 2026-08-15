@@ -87,6 +87,25 @@
 
       <!-- Right: status + controls + stats -->
       <div class="dash-right">
+        <!-- Selection -->
+        <div class="dash-section">
+          <div class="dash-section-title">Selection</div>
+          <div class="status-grid">
+            <div class="status-row">
+              <span class="status-label">Gamemode</span>
+              <select class="setting-select" id="sel-gamemode"><option value="">—</option></select>
+            </div>
+            <div class="status-row">
+              <span class="status-label">Map</span>
+              <select class="setting-select" id="sel-map"><option value="">—</option></select>
+            </div>
+            <div class="status-row">
+              <span class="status-label">Act</span>
+              <select class="setting-select" id="sel-target"><option value="">—</option></select>
+            </div>
+          </div>
+        </div>
+
         <!-- Status -->
         <div class="dash-section">
           <div class="dash-section-title">Status</div>
@@ -96,7 +115,6 @@
               <span class="status-action" id="stat-action">Idle</span>
             </div>
             <div class="status-row"><span class="status-label">Gamemode</span><span class="status-value" id="stat-gamemode">—</span></div>
-            <div class="status-row"><span class="status-label">Target</span><span class="status-value" id="stat-target">—</span></div>
             <div class="status-row"><span class="status-label">Cycle</span><span class="status-value" id="stat-cycle">0</span></div>
             <div class="status-row"><span class="status-label">Last Match</span><span class="status-value" id="stat-last">—</span></div>
           </div>

@@ -171,6 +171,50 @@ class Api:
 
         return VERSION
 
+    # ---- Gamemode data ----
+
+    def get_gamemodes(self) -> list[str]:
+        """Farm-target gamemodes the user can select."""
+        from sloppykeys.content.gamemodes import FARM_GAMEMODE_NAMES
+
+        return FARM_GAMEMODE_NAMES
+
+    def get_maps(self, gamemode: str) -> list[str]:
+        """Maps for a gamemode. Events reads from the route store."""
+        from sloppykeys.content.gamemodes import is_custom, maps_for
+
+        if is_custom(gamemode) and self._app_root:
+            from sloppykeys.config.nav_routes import RouteStore
+
+            return RouteStore(self._app_root).maps()
+        return maps_for(gamemode)
+
+    def get_targets(self, gamemode: str, map_name: str) -> list[str]:
+        """Acts/targets for a gamemode+map combo."""
+        from sloppykeys.content.gamemodes import is_custom, targets_for
+
+        if is_custom(gamemode) and self._app_root:
+            from sloppykeys.config.nav_routes import RouteStore
+
+            return RouteStore(self._app_root).acts(map_name)
+        return targets_for(gamemode, map_name)
+
+    def get_config_path(self, gamemode: str, map_name: str, target: str) -> str:
+        """The unit plan config path for the current selection."""
+        if not self._app_root or not gamemode or not map_name:
+            return ""
+        from sloppykeys.content.gamemodes import has_targets
+
+        parts = [self._app_root, "configs", gamemode, map_name]
+        if has_targets(gamemode) and target:
+            parts = [self._app_root, "configs", gamemode, map_name, target + ".json"]
+        else:
+            parts = [self._app_root, "configs", gamemode, map_name + ".json"]
+        import os
+
+        path = os.path.join(*parts)
+        return path if os.path.isfile(path) else ""
+
     # ---- Macro control ----
 
     def start_macro(self, gamemode: str, map_name: str, target: str, config_path: str) -> dict:

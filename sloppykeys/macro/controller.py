@@ -186,7 +186,7 @@ class MacroController:
 
     def _placement_step(self, step: UnitStep) -> MacroStep:
         def action() -> StepResult:
-            ok = self._placer.execute_step(step)
+            ok, _msg = self._placer.run_step(step)
             return StepResult.DONE if ok else StepResult.FAILED
 
         return MacroStep(
@@ -325,16 +325,18 @@ class MacroController:
 
     def _route_steps(self, stage: str, act: str) -> tuple[list[MacroStep], str]:
         """Events route steps from routes.json."""
-        route = self._routes.steps_for(stage, act)
-        if not route:
+        from sloppykeys.content.nav_route import NavStep
+
+        nav_steps = self._routes.steps(stage, act)
+        if not nav_steps:
             return ([], f"no route for {stage} / {act}")
 
         steps: list[MacroStep] = []
-        for rs in route:
+        for ns in nav_steps:
             steps.append(self._nav_step(
-                rs.get("Name", "route step"),
-                lambda bound=rs: self._nav.execute_route_step(bound),
+                ns.label or "route step",
+                lambda bound=ns: self._nav.run_route_step(bound),
                 settle=False,
-                timeout=float(rs.get("Timeout", RUN_STEP_TIMEOUT)),
+                timeout=float(ns.timeout or RUN_STEP_TIMEOUT),
             ))
         return (steps, "")
