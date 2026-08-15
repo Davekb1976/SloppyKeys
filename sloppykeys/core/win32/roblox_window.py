@@ -208,5 +208,35 @@ def is_window(hwnd: int | None) -> bool:
     return hwnd is not None and bool(user32.IsWindow(hwnd))
 
 
+def is_frameless(hwnd: int) -> bool:
+    """True if the window is missing its caption (we stripped it earlier)."""
+    style = user32.GetWindowLongW(hwnd, GWL_STYLE)
+    return not bool(style & WS_CAPTION)
+
+
+# The standard Roblox style includes WS_CAPTION | WS_THICKFRAME | WS_POPUP etc.
+# We store the original, but after a force-kill we don't have it any more. This
+# reconstructs a normal Roblox style by adding caption + thickframe back.
+def recover_frame(hwnd: int, client_w: int, client_h: int) -> bool:
+    """Re-add caption + thick frame to a window that lost it to a prior session.
+
+    Used on startup to undo a previous force-kill that left Roblox borderless.
+    """
+    style = user32.GetWindowLongW(hwnd, GWL_STYLE)
+    if not style:
+        return False
+    new_style = style | WS_CAPTION | WS_THICKFRAME
+    if new_style == style:
+        return True  # already has its frame
+    user32.SetWindowLongW(hwnd, GWL_STYLE, new_style)
+    user32.SetWindowPos(
+        hwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED
+    )
+    rect = window_rect(hwnd)
+    if rect is None:
+        return False
+    return position_window_to_client_rect(hwnd, rect[0], rect[1], client_w, client_h)
+
+
 def is_minimized(hwnd: int) -> bool:
     return bool(user32.IsIconic(hwnd))

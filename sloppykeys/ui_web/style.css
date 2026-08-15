@@ -140,12 +140,12 @@ input:focus, select:focus {
 .screen.active { display: flex; }
 
 /* ---- Dashboard ---- */
-.dash-layout { display: flex; flex: 1; min-height: 0; }
+.dash-layout { display: flex; flex: 1; min-height: 0; max-height: 100%; }
 .dash-left { display: flex; flex-direction: column; width: 1152px; flex-shrink: 0; }
 .game-slot { width: 1152px; height: 756px; flex-shrink: 0; background: var(--surface-sunken); }
 .dash-log {
   flex: 1; display: flex; flex-direction: column; min-height: 0;
-  margin: var(--space-2) var(--space-3) var(--space-3);
+  margin: 8px 0;
   background: var(--surface-panel); border: 1px solid var(--border);
   border-radius: 0; overflow: hidden;
 }
@@ -165,8 +165,8 @@ input:focus, select:focus {
 .log-line:hover { background: rgba(139, 92, 246, 0.06); }
 
 .dash-right {
-  flex: 1; display: flex; flex-direction: column; gap: var(--space-3);
-  padding: var(--space-3); overflow-y: auto; min-height: 0;
+  width: 384px; flex-shrink: 0; display: flex; flex-direction: column; gap: var(--space-3);
+  padding: 8px; min-height: 0;
 }
 
 /* Dashboard sections */

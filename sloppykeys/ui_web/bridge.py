@@ -46,9 +46,11 @@ from sloppykeys.core.win32.frameless import (
 from sloppykeys.core.win32.roblox_window import (
     activate_window,
     find_roblox_window,
+    is_frameless,
     is_minimized,
     is_window,
     position_window_to_client_rect,
+    recover_frame,
     restore_frame,
     strip_frame,
     window_rect,
@@ -63,13 +65,11 @@ VIEWPORT_H = 756
 
 TITLEBAR_H = 38
 PANEL_W = 384
-LOG_MIN_H = 80
+LOG_H = 90
 
-# The window should fill the work area height so the log gets all remaining
-# space via flex: 1. A hardcoded LOG_H created an empty gap when the window
-# was taller than needed, and clipped the log when shorter. Now the window
-# simply asks for the full work area and the CSS flex layout distributes space.
+# Fixed window size: just enough for titlebar + game + a compact log.
 WANT_W = VIEWPORT_W + PANEL_W
+WANT_H = TITLEBAR_H + VIEWPORT_H + LOG_H
 
 # Fallback slot in CSS pixels until the page reports its own rect. Measured
 # against the DOM: at 100% display scaling CSS pixels are window pixels.
@@ -314,10 +314,11 @@ def main() -> None:
         title=WINDOW_TITLE,
         url=html_path,
         width=WANT_W,
-        height=TITLEBAR_H + VIEWPORT_H + LOG_MIN_H,
-        min_size=(WANT_W, TITLEBAR_H + VIEWPORT_H + LOG_MIN_H),
+        height=WANT_H,
+        min_size=(WANT_W, WANT_H),
         frameless=True,
         easy_drag=False,
+        on_top=True,
         js_api=api,
     )
     api._window = window
@@ -325,11 +326,20 @@ def main() -> None:
     def on_loaded() -> None:
         hwnd = api._host_hwnd()
         if hwnd:
-            # Size the window to fill the work area height so the log gets all
-            # remaining space via flex: 1. The width is fixed to the layout.
-            from sloppykeys.core.win32.frameless import work_area
-            _, _, _, area_h = work_area()
-            fit_and_centre(hwnd, WANT_W, area_h)
+            fit_and_centre(hwnd, WANT_W, WANT_H)
+            # Keep topmost just long enough to be seen, then drop. Delaying
+            # ensures the Form is fully shown before we demote.
+            import time as _time
+            _time.sleep(0.3)
+            set_topmost(hwnd, False)
+
+        # If a previous session was force-killed, Roblox may still be running
+        # without its frame. Fix it before we dock so our strip_frame gets a
+        # clean baseline to save/restore.
+        rbx = find_roblox_window()
+        if rbx and is_frameless(rbx):
+            recover_frame(rbx, VIEWPORT_W, VIEWPORT_H)
+            set_topmost(rbx, False)
         window.evaluate_js(
             'document.getElementById("version-badge").textContent = '
             f'"v{api.get_version()}";'

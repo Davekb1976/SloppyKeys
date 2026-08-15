@@ -99,11 +99,24 @@ Every section is a `.panel` — rounded card (12px radius) with:
 
 ## Density
 
-- Panel padding: 10-12px
+- Panel padding: 8px (uniform gutter between all adjacent sections)
 - Row gaps: 6-8px
 - Section gaps: 10-12px
 - Control heights: 28-32px
 - Icon buttons: 30×30px
+
+## Alignment Rule
+
+Every element at the same nesting level shares the same inset from its container's edge —
+the gutter is **8px** everywhere in the dashboard:
+
+- The game viewport sits flush left/right inside `.dash-left` (zero inset from its parent).
+- The process log matches the viewport width (zero horizontal margin), with 8px vertical
+  margin above and below.
+- The right panel uses 8px padding on all four sides.
+- Bottom alignment: the process log's bottom border and the Run History's bottom border
+  must end at the same distance from the window edge. The last section in `.dash-right`
+  uses `flex: 1` to stretch and fill remaining height so both columns end flush.
 
 ## Interactions
 
