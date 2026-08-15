@@ -421,6 +421,78 @@ class Api:
         b64 = base64.b64encode(buf.tobytes()).decode("ascii")
         return {"ok": True, "data_uri": f"data:image/png;base64,{b64}"}
 
+    # ---- Image Manager ----
+
+    def list_vision_templates(self) -> dict:
+        """All searchable image names organized by category, with thumbnails and thresholds."""
+        if not self._app_root:
+            return {"ok": False, "categories": []}
+        import base64
+
+        IMAGE_CATEGORIES = {
+            "lobby": "Lobby Navigation",
+            "match": "Match State",
+            "gamemodes": "Gamemode Cards",
+            "stages": "Stage Selection",
+            "challenge": "Challenge",
+            "events": "Events",
+            "actions": "Actions",
+        }
+
+        # Read current thresholds from settings
+        settings = UnifiedSettings(self._app_root)
+        thresholds = settings.get("image_thresholds", {})
+        default_threshold = 0.70
+
+        categories = []
+        images_root = os.path.join(self._app_root, "images")
+
+        for key, label in IMAGE_CATEGORIES.items():
+            folder = os.path.join(images_root, key)
+            if not os.path.isdir(folder):
+                continue
+            names = []
+            for fname in sorted(os.listdir(folder)):
+                if not fname.lower().endswith(".png"):
+                    continue
+                name = fname[:-4]
+                path = os.path.join(folder, fname)
+                try:
+                    with open(path, "rb") as f:
+                        b64 = base64.b64encode(f.read()).decode("ascii")
+                    names.append({
+                        "name": name,
+                        "file": fname,
+                        "data_uri": f"data:image/png;base64,{b64}",
+                        "threshold": float(thresholds.get(name, default_threshold)),
+                    })
+                except OSError:
+                    continue
+            if names:
+                categories.append({"key": key, "label": label, "names": names})
+
+        return {"ok": True, "categories": categories, "default_threshold": default_threshold}
+
+    def set_image_threshold(self, name: str, value: float) -> dict:
+        """Set a per-image match threshold. Auto-saves."""
+        if not self._app_root:
+            return {"ok": False}
+        settings = UnifiedSettings(self._app_root)
+        thresholds = settings.get("image_thresholds", {})
+        if not isinstance(thresholds, dict):
+            thresholds = {}
+        default = 0.70
+        if abs(float(value) - default) < 0.01:
+            thresholds.pop(name, None)
+        else:
+            thresholds[name] = max(0.50, min(1.0, float(value)))
+        settings.set("image_thresholds", thresholds)
+        # Apply live to the search engine
+        if self._ctrl and hasattr(self._ctrl, '_engine'):
+            from sloppykeys.core.image_search import apply_confidence_overrides
+            apply_confidence_overrides(self._ctrl._engine, thresholds)
+        return {"ok": True}
+
     # ---- Macro control ----
 
     def start_macro(self, *args) -> dict:

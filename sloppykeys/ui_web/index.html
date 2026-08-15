@@ -419,6 +419,23 @@
     </div>
   </div>
 
+<div class="modal-overlay" id="im-modal" style="display:none;">
+  <div class="modal-box" style="width:960px; max-height:90vh; display:flex; flex-direction:column;">
+    <div class="modal-header">
+      <span class="modal-title">Image Manager</span>
+      <div style="display:flex; gap:6px; margin-left:auto; align-items:center;">
+        <input type="text" class="settings-search" id="im-filter" placeholder="Filter names..." style="width:160px; margin:0;">
+        <button class="btn btn--sm btn--primary" id="im-capture">Capture Roblox</button>
+      </div>
+      <button class="modal-close" id="im-close">&times;</button>
+    </div>
+    <div class="modal-body" style="flex:1; min-height:0; display:flex; flex-direction:column; gap:8px;">
+      <div id="im-tabs" class="pos-tabs"></div>
+      <div id="im-grid" class="im-grid"></div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="pos-modal" style="display:none;">
   <div class="modal-box" style="width:900px; max-height:90vh; display:flex; flex-direction:column;">
     <div class="modal-header">

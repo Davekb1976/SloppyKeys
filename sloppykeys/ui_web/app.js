@@ -516,6 +516,85 @@
 
   wireAutoSave();
 
+  // ---- Image Manager Modal ----
+  let imData = null;
+  let imCategory = "all";
+  const imModal = document.getElementById("im-modal");
+  const imGrid = document.getElementById("im-grid");
+  const imTabs = document.getElementById("im-tabs");
+  const imFilter = document.getElementById("im-filter");
+
+  window.openImageManager = async function () {
+    imModal.style.display = "flex";
+    if (!window.pywebview || !pywebview.api) return;
+    const result = await pywebview.api.list_vision_templates();
+    if (!result.ok) return;
+    imData = result;
+    renderImTabs();
+    renderImGrid();
+  };
+
+  document.getElementById("im-close").addEventListener("click", () => { imModal.style.display = "none"; });
+  document.getElementById("im-capture").addEventListener("click", async () => {
+    if (!window.pywebview || !pywebview.api) return;
+    const r = await pywebview.api.get_roblox_snapshot();
+    if (r.ok) window.addLog("[Image Manager] Captured Roblox screen.");
+    else window.addLog("[Image Manager] Capture failed: " + (r.reason || "error"));
+  });
+
+  imFilter.addEventListener("input", () => renderImGrid());
+
+  function renderImTabs() {
+    if (!imData) return;
+    const cats = [{ key: "all", label: "All" }].concat(imData.categories.map((c) => ({ key: c.key, label: c.label })));
+    imTabs.innerHTML = cats.map((c) =>
+      `<button class="pos-tab${c.key === imCategory ? " active" : ""}" data-cat="${c.key}">${c.label}</button>`
+    ).join("");
+    imTabs.querySelectorAll(".pos-tab").forEach((btn) => {
+      btn.addEventListener("click", () => { imCategory = btn.dataset.cat; renderImTabs(); renderImGrid(); });
+    });
+  }
+
+  function renderImGrid() {
+    if (!imData) { imGrid.innerHTML = ""; return; }
+    const q = (imFilter.value || "").trim().toLowerCase();
+    let items = [];
+    imData.categories.forEach((cat) => {
+      if (imCategory !== "all" && cat.key !== imCategory) return;
+      cat.names.forEach((img) => {
+        if (q && !img.name.toLowerCase().includes(q)) return;
+        items.push({ ...img, catKey: cat.key, catLabel: cat.label });
+      });
+    });
+    imGrid.innerHTML = items.map((img) => `
+      <div class="im-card">
+        <div class="im-card-header">
+          <span class="im-card-cat">${img.catKey}</span>
+          <span class="im-card-name">${img.name}</span>
+        </div>
+        <img class="im-card-thumb" src="${img.data_uri}" alt="${img.name}">
+        <div class="im-card-slider">
+          <span>Match</span>
+          <input type="range" min="0.50" max="1.00" step="0.01" value="${img.threshold}" data-name="${img.name}">
+          <span class="im-val">${img.threshold.toFixed(2)}</span>
+        </div>
+      </div>
+    `).join("");
+    // Wire sliders
+    imGrid.querySelectorAll('input[type="range"]').forEach((slider) => {
+      slider.addEventListener("input", (e) => {
+        e.target.closest(".im-card-slider").querySelector(".im-val").textContent = parseFloat(e.target.value).toFixed(2);
+      });
+      slider.addEventListener("change", (e) => {
+        if (!window.pywebview || !pywebview.api) return;
+        pywebview.api.set_image_threshold(e.target.dataset.name, parseFloat(e.target.value));
+      });
+    });
+  }
+
+  // F6 hotkey to open Image Manager (registered in the hotkey loop on the Python side)
+  // For now, also accessible via a titlebar button or from Settings.
+
   // ---- Position Picker Modal ----
   let posTarget = null; // {phase, idx} — which block we're setting coords for
   let posImage = null;  // loaded Image object

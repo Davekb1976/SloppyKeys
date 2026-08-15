@@ -408,6 +408,17 @@ input:focus, select:focus {
 .pos-thumb-label { font-size: 10px; font-weight: 600; padding: 4px 6px; color: var(--text); background: var(--surface-panel); }
 .pos-readout { font-size: 11px; font-weight: 700; color: var(--accent); padding: 4px 8px; border: 1px solid var(--accent); }
 
+/* ---- Image Manager ---- */
+.im-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; overflow-y: auto; flex: 1; min-height: 0; }
+.im-card { border: 1px solid var(--border); background: var(--surface-panel); padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+.im-card-header { display: flex; align-items: center; gap: 6px; }
+.im-card-cat { font-size: 9px; font-weight: 700; text-transform: uppercase; padding: 2px 6px; background: var(--accent-soft); color: var(--accent); }
+.im-card-name { font-size: 12px; font-weight: 600; color: var(--text); }
+.im-card-thumb { width: 100%; max-height: 60px; object-fit: contain; background: var(--surface-sunken); }
+.im-card-slider { display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-muted); }
+.im-card-slider input[type="range"] { flex: 1; height: 4px; }
+.im-card-slider .im-val { min-width: 32px; text-align: right; }
+
 /* ---- Settings layout ---- */
 .settings-layout { display: flex; flex: 1; min-height: 0; }
 .settings-nav {
