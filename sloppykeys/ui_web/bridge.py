@@ -140,16 +140,13 @@ class Api:
                     user32.SetWindowPos(hwnd, 0, rect[0], rect[1], compact_w, compact_h, 0x0004)
 
     def exit_compact(self) -> None:
-        """Exit compact mode: restore full window size."""
+        """Exit compact mode: restore full window size, keeping current position."""
         if not self._window:
             return
         try:
             self._window.resize(WANT_W, WANT_H)
         except Exception as exc:
             self._log_to_ui(f"[Compact] resize failed: {exc}")
-        hwnd = self._host_hwnd()
-        if hwnd:
-            fit_and_centre(hwnd, WANT_W, WANT_H)
 
     def begin_drag(self) -> None:
         """Start dragging the window. Returns at once; the loop runs on a thread.
