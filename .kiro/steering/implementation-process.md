@@ -78,6 +78,12 @@ turns, and step announcements ("now I'll…", "let me check…").
 **A question gets an answer, not a report.** Answer it in as few lines as the answer
 takes, and stop — no file list, no verification line, no options menu appended to it.
 
+## Originality
+
+All implementation is our own. External products are studied for general UX patterns only.
+Never reference external tools, products, or inspiration sources in commits, code comments,
+or documentation. Commit messages describe only the technical change in our code.
+
 ## Shell
 
 - **Don't read or search the tree through the shell.** Use the editor's own file tools to
