@@ -55,6 +55,11 @@ from sloppykeys.core.win32.roblox_window import (
     strip_frame,
     window_rect,
 )
+from sloppykeys.config.keybinds import DEFAULTS as KEYBIND_DEFAULTS, KeybindStore
+from sloppykeys.config.unit_configs import UnitConfigStore
+from sloppykeys.content.units import UnitPlan
+from sloppykeys.macro.controller import MacroController
+from sloppykeys.macro.runner import MacroTarget
 
 WINDOW_TITLE = "SloppyKeys"
 
@@ -78,6 +83,7 @@ DEFAULT_SLOT = (0, TITLEBAR_H, VIEWPORT_W, VIEWPORT_H)
 FOLLOW_INTERVAL = 0.016  # ~60Hz
 SEARCH_INTERVAL = 1.0
 DRAG_INTERVAL = 0.008  # ~125Hz, so a drag never misses a displayed frame.
+HOTKEY_INTERVAL = 0.04  # ~25Hz, same cadence as the PySide6 window's 40ms timer.
 
 
 class Api:
@@ -94,6 +100,12 @@ class Api:
         self._running = True
         self._dragging = False
         self._last_rect: tuple[int, int, int, int] | None = None
+        # Macro controller — created lazily in on_loaded once app_root is known.
+        self._ctrl: MacroController | None = None
+        self._app_root: str | None = None
+        self._run_thread: threading.Thread | None = None
+        # Hotkey edge detection
+        self._key_down: dict[str, bool] = {"start": False, "stop": False}
 
     # ---- Window chrome ----
 
@@ -158,6 +170,126 @@ class Api:
         from sloppykeys.version import VERSION
 
         return VERSION
+
+    # ---- Macro control ----
+
+    def start_macro(self, gamemode: str, map_name: str, target: str, config_path: str) -> dict:
+        """Start a run. Called from JS Start button."""
+        if self._ctrl is None:
+            return {"ok": False, "error": "controller not ready"}
+        if self._ctrl.is_running:
+            return {"ok": False, "error": "already running"}
+
+        # Load the unit plan from the config path
+        if not config_path:
+            return {"ok": False, "error": "no config selected"}
+        store = UnitConfigStore(self._app_root) if self._app_root else None
+        if store is None:
+            return {"ok": False, "error": "no app root"}
+        plan = store.load(config_path)
+        if not plan.enabled_steps():
+            return {"ok": False, "error": "no enabled unit steps"}
+
+        macro_target = MacroTarget(gamemode=gamemode, map_name=map_name, target=target)
+        error = self._ctrl.start(macro_target, plan)
+        if error:
+            return {"ok": False, "error": error}
+
+        self._run_thread = threading.Thread(target=self._macro_run_loop, daemon=True)
+        self._run_thread.start()
+        self._push_status()
+        return {"ok": True}
+
+    def stop_macro(self) -> dict:
+        """Stop the running macro. Called from JS Stop button."""
+        if self._ctrl is None or not self._ctrl.is_running:
+            return {"ok": False, "error": "not running"}
+        self._ctrl.stop()
+        return {"ok": True}
+
+    def get_macro_status(self) -> dict:
+        """Poll macro state from JS."""
+        if self._ctrl is None:
+            return {"running": False, "cycle": 0, "target": "", "phase": "idle"}
+        return {
+            "running": self._ctrl.is_running,
+            "cycle": self._ctrl.cycle,
+            "target": self._ctrl.target.label(),
+            "phase": self._ctrl.phase.value,
+        }
+
+    def _macro_run_loop(self) -> None:
+        """Worker thread driving the runner."""
+        try:
+            ok, msg = self._ctrl.run_loop()  # type: ignore[union-attr]
+            self._log_to_ui(f"Macro finished: {msg}")
+        except Exception as exc:
+            self._log_to_ui(f"Macro crashed: {exc}")
+        finally:
+            self._run_thread = None
+            self._push_status()
+
+    def _push_status(self) -> None:
+        """Push macro state to the frontend."""
+        if self._window is None:
+            return
+        status = self.get_macro_status()
+        running_js = "true" if status["running"] else "false"
+        self._window.evaluate_js(
+            f'window.onMacroStatus && window.onMacroStatus({running_js}, {status["cycle"]}, '
+            f'"{status["target"]}", "{status["phase"]}");'
+        )
+
+    def _log_to_ui(self, msg: str) -> None:
+        """Push a log line to the frontend."""
+        if self._window is None:
+            return
+        safe = msg.replace("\\", "\\\\").replace('"', '\\"').replace("\n", " ")
+        self._window.evaluate_js(f'window.addLog && window.addLog("{safe}");')
+
+    # ---- Hotkey polling ----
+
+    def _hotkey_loop(self) -> None:
+        """Poll F1/F2 globally so Start/Stop work without clicking buttons."""
+        if self._app_root is None:
+            return
+        keybinds = KeybindStore(self._app_root)
+        start_kb = keybinds.get("start_stop")
+        stop_kb = keybinds.get("stop")
+
+        def kb_pressed(kb) -> bool:
+            if not is_key_down(kb.vk):
+                return False
+            if kb.ctrl and not is_key_down(0x11):
+                return False
+            if kb.shift and not is_key_down(0x10):
+                return False
+            if kb.alt and not is_key_down(0x12):
+                return False
+            return True
+
+        while self._running:
+            try:
+                # Start key — rising edge
+                start_down = kb_pressed(start_kb)
+                if start_down and not self._key_down["start"]:
+                    if self._ctrl and not self._ctrl.is_running:
+                        self._log_to_ui("Start hotkey: select gamemode in the UI first.")
+                    elif self._ctrl and self._ctrl.is_running:
+                        self._log_to_ui("Already running — use the stop key.")
+                self._key_down["start"] = start_down
+
+                # Stop key — rising edge
+                stop_down = kb_pressed(stop_kb)
+                if stop_down and not self._key_down["stop"]:
+                    if self._ctrl and self._ctrl.is_running:
+                        self._ctrl.stop()
+                        self._log_to_ui("Stop requested; finishing current step.")
+                        self._push_status()
+                self._key_down["stop"] = stop_down
+            except Exception:
+                pass
+            time.sleep(HOTKEY_INTERVAL)
 
     # ---- Internal ----
 
@@ -340,11 +472,22 @@ def main() -> None:
         if rbx and is_frameless(rbx):
             recover_frame(rbx, VIEWPORT_W, VIEWPORT_H)
             set_topmost(rbx, False)
+
+        # Init the macro controller.
+        api._app_root = os.path.dirname(os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__)
+        )))
+        api._ctrl = MacroController(
+            api._app_root,
+            log=api._log_to_ui,
+        )
+
         window.evaluate_js(
             'document.getElementById("version-badge").textContent = '
             f'"v{api.get_version()}";'
         )
         threading.Thread(target=api._follow_loop, daemon=True).start()
+        threading.Thread(target=api._hotkey_loop, daemon=True).start()
 
     def on_closing() -> None:
         # The X button is ours, but an OS-initiated close bypasses it.

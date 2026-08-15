@@ -73,6 +73,36 @@
     logList.innerHTML = "";
   });
 
+  // ---- Macro controls ----
+  const btnStart = document.getElementById("btn-start");
+  const btnStop = document.getElementById("btn-stop");
+  const statAction = document.getElementById("stat-action");
+  const statGamemode = document.getElementById("stat-gamemode");
+  const statCycle = document.getElementById("stat-cycle");
+
+  btnStart.addEventListener("click", () => {
+    if (!window.pywebview || !pywebview.api) return;
+    // For now, start_macro needs a selection from the UI. Until the gamemode
+    // selector is wired, pressing Start just logs a reminder.
+    pywebview.api.start_macro("", "", "", "").then((r) => {
+      if (!r.ok) window.addLog("Start blocked: " + r.error);
+    });
+  });
+
+  btnStop.addEventListener("click", () => {
+    if (!window.pywebview || !pywebview.api) return;
+    pywebview.api.stop_macro();
+  });
+
+  // Called from Python when macro state changes.
+  window.onMacroStatus = function (running, cycle, target, phase) {
+    btnStart.disabled = running;
+    btnStop.disabled = !running;
+    statAction.textContent = running ? phase : "Idle";
+    statGamemode.textContent = target || "—";
+    statCycle.textContent = String(cycle);
+  };
+
   // ---- Game slot geometry ----
   // The backend cuts a hole in the window over this rect, so the rect has to
   // come from where the slot actually rendered rather than a duplicated
