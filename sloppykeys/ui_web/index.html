@@ -52,8 +52,10 @@
           <span class="clock-value" id="session-clock">00:00</span>
         </div>
       </div>
-      <button class="titlebar-btn" id="btn-minimize" title="Minimize">&#8211;</button>
-      <button class="titlebar-btn titlebar-close" id="btn-close" title="Close">&#10005;</button>
+      <div class="win-btns">
+        <button class="titlebar-btn win-minimize" id="btn-minimize" title="Minimize"></button>
+        <button class="titlebar-btn win-close" id="btn-close" title="Close"></button>
+      </div>
     </div>
   </header>
 
@@ -95,11 +97,11 @@
         <div class="dash-section">
           <div class="dash-section-title">Controls</div>
           <div class="controls-row">
-            <button class="btn-primary" id="btn-start">
+            <button class="btn btn--primary" id="btn-start">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg>
               Start
             </button>
-            <button class="btn-danger" id="btn-stop" disabled>
+            <button class="btn btn--danger" id="btn-stop" disabled>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
               Stop
             </button>
@@ -162,7 +164,7 @@
         <div class="page-header">
           <span class="page-title">Task Queue</span>
           <div class="page-actions">
-            <button class="btn-small">+ Add Task</button>
+          <button class="btn btn--sm">+ Add Task</button>
           </div>
         </div>
         <div class="placeholder-body">Queue list — drag to reorder, click to edit</div>
