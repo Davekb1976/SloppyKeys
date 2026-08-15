@@ -59,7 +59,8 @@ Stored per-file in `operations/<name>.json`:
 | `upgrade_unit` | Units | `params.index`, `params.times` |
 | `sell_unit` | Units | `params.index` |
 | `target_priority` | Units | `params.index` |
-| `walk` | Pathing | `mode`, `pathName` |
+| `walk_path` | Pathing | `mode: "auto"|"custom"`, `pathName` — **pinned first block in Pre Start**, always present, not removable |
+| `walk` | Pathing | `mode`, `pathName`, `sprint` — a mid-battle repositioning replay |
 | `wait_ms` | Timing | `params.ms` |
 | `wait_wave` | Timing | `params.wave` |
 | `leave_at_minute` | Timing | `params.minutes` |
@@ -67,9 +68,13 @@ Stored per-file in `operations/<name>.json`:
 | `send_key` | Setup | `key`, `params.hold_ms` |
 | `detect` | Logic | `image`, `region`, `threshold`, `then: []`, `else: []`, `loop`, `loopAttempts` |
 
+**Walk Path vs Walk:**
+- `walk_path` = the startup walk that gets you from spawn to your placement spot. Lives ONLY in Pre Start, pinned as the first block. Mode is Auto (uses the map's default recorded path) or Custom (a specific named recording). This replaces our current "Start Position" settings tab entirely.
+- `walk` = a mid-match repositioning move. Lives in Battle/Loop phases. Replays a recorded WASD path during combat.
+
 Phase constraints:
-- Pre Start: `place_unit`, `walk`, `wait_ms`, `click`, `send_key`, `detect`, `target_priority`
-- Battle / Loop A / Loop B: all except `walk` (the pre-start walk block)
+- Pre Start: `walk_path` (pinned first), `place_unit`, `walk`, `wait_ms`, `click`, `send_key`, `detect`, `target_priority`
+- Battle / Loop A / Loop B: all except `walk_path`
 
 `once: true` = skip on repeat entries to the same stage.
 
@@ -159,6 +164,7 @@ images/                       shipped with the build, user-editable
 | Flat image files | Folder-per-name variant system (later) |
 | `settings.json` per-key stores scattered | Single settings.json with sections |
 | Separate delay/keybind/region/position stores | Consolidated into settings.json |
+| Start Position settings tab | Absorbed into Macro Manager as `walk_path` block (pinned first in Pre Start) |
 
 ## What to Add (from reference)
 
