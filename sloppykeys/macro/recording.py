@@ -660,6 +660,16 @@ def list_recordings(app_root: str) -> list[str]:
     return names
 
 
+def delete_recording(app_root: str, name: str) -> bool:
+    """Delete a recording by name."""
+    path = os.path.join(app_root, "recordings", f"{_safe_name(name)}.json")
+    try:
+        os.remove(path)
+        return True
+    except OSError:
+        return False
+
+
 def list_walk_paths(app_root: str) -> list[str]:
     folder = os.path.join(app_root, "paths")
     if not os.path.isdir(folder):

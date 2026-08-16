@@ -373,7 +373,7 @@
         else if (b.type === "send_key") fields = `<input placeholder="key" value="${b.key || ""}" data-field="key" style="width:40px;"><input placeholder="hold ms" value="${b.params?.hold_ms || 0}" data-field="params.hold_ms" type="number">`;
         else if (b.type === "upgrade_unit" || b.type === "sell_unit" || b.type === "target_priority") fields = `<input placeholder="#" value="${b.params?.index || 1}" data-field="params.index" type="number" style="width:40px;">`;
         else if (b.type === "walk") fields = `<input placeholder="path name" value="${b.pathName || ""}" data-field="pathName" style="width:100px;"><button class="btn btn--sm" id="btn-walk-rec-${phase}-${i}">Rec</button>`;
-        else if (b.type === "record") fields = `<select class="setting-select" data-field="recordingName" style="width:110px;height:22px;font-size:10px;" id="sel-rec-${phase}-${i}"><option value="">Select...</option></select><button class="btn btn--sm" id="btn-record-${phase}-${i}">Rec</button><button class="btn btn--sm" id="btn-test-rec-${phase}-${i}">Test</button>`;
+        else if (b.type === "record") fields = `<select class="setting-select" data-field="recordingName" style="width:110px;height:22px;font-size:10px;" id="sel-rec-${phase}-${i}"><option value="">Select...</option></select><button class="btn btn--sm" id="btn-record-${phase}-${i}">Rec</button><button class="btn btn--sm" id="btn-test-rec-${phase}-${i}">Test</button><button class="btn btn--sm btn--danger" id="btn-del-rec-${phase}-${i}" title="Delete recording">✕</button>`;
         else if (b.type === "detect") {
           // Detect block: rendered as a nested container with then/else zones
           const thenBlocks = (b.then || []);
@@ -578,6 +578,15 @@
           const ph = parts[3];
           const idx = parseInt(parts[4]);
           testRecording(ph, idx);
+        });
+      });
+      // Wire delete recording buttons
+      zone.querySelectorAll("[id^='btn-del-rec-']").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const parts = btn.id.split("-");
+          const ph = parts[3];
+          const idx = parseInt(parts[4]);
+          deleteRecording(ph, idx);
         });
       });
       // Populate recording dropdowns
@@ -1401,6 +1410,22 @@
     else window.addLog("[Record] Replay failed: " + (r.reason || "error"));
     // Switch back to the Macro Manager
     switchScreen("planner");
+  }
+
+  async function deleteRecording(phase, idx) {
+    const name = opPhases[phase][idx].recordingName || "";
+    if (!name) { window.addLog("[Record] No recording selected to delete."); return; }
+    if (!window.pywebview || !pywebview.api) return;
+    const r = await pywebview.api.delete_recording(name);
+    if (r.ok) {
+      opPhases[phase][idx].recordingName = "";
+      opDirty = true;
+      _cachedRecordings = null;
+      window.addLog("[Record] Deleted: " + name);
+      renderPhases();
+    } else {
+      window.addLog("[Record] Delete failed: " + (r.reason || "not found"));
+    }
   }
 
   // ---- Input Recording (Record block) ----

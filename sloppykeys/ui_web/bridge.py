@@ -660,6 +660,14 @@ class Api:
         t.join(timeout=120.0)
         return {"ok": True}
 
+    def delete_recording(self, name: str) -> dict:
+        """Delete a saved recording by name."""
+        if not self._app_root:
+            return {"ok": False}
+        from sloppykeys.macro.recording import delete_recording
+        ok = delete_recording(self._app_root, name)
+        return {"ok": ok}
+
     def list_walk_paths(self) -> list:
         """Names of all recorded walk paths."""
         if not self._app_root:
