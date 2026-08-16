@@ -415,8 +415,14 @@ input:focus, select:focus {
 }
 .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .modal-title { font-size: 14px; font-weight: 700; color: var(--text); }
-.modal-close { font-size: 20px; color: var(--text-faint); cursor: pointer; background: none; border: none; }
-.modal-close:hover { color: var(--text); }
+.modal-close {
+  width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+  font-size: 16px; color: var(--text-muted); cursor: pointer;
+  background: var(--surface-panel); border: 1px solid var(--border);
+  margin-left: 8px; transition: border-color 0.12s, color 0.12s;
+  box-shadow: inset 0 -3px 0 rgba(0,0,0,0.25);
+}
+.modal-close:hover { color: var(--rose); border-color: var(--rose); }
 .modal-body { overflow: hidden; display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .pos-tabs { display: flex; gap: 4px; }
 .pos-tab {
