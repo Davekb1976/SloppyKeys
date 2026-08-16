@@ -340,7 +340,7 @@
 
   // ---- Macro Manager ----
   const PHASES = ["pre_start", "battle", "loop_a", "loop_b"];
-  let opPhases = { pre_start: [], battle: [], loop_a: [], loop_b: [] };
+  let opPhases = { pre_start: [{ type: "walk_path", params: {}, mode: "auto", pathName: "" }], battle: [], loop_a: [], loop_b: [] };
   let opDirty = false;
 
   function renderPhases() {
@@ -355,7 +355,11 @@
       }
       zone.innerHTML = blocks.map((b, i) => {
         let fields = "";
-        if (b.type === "place_unit") fields = `<input placeholder="name" value="${b.params?.name || ""}" data-field="params.name"><input placeholder="x" value="${b.params?.x || 0}" data-field="params.x" type="number"><input placeholder="y" value="${b.params?.y || 0}" data-field="params.y" type="number"><button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button>`;
+        let removable = true;
+        if (b.type === "walk_path") {
+          fields = `<span style="font-size:11px; color:var(--teal);">Auto</span>`;
+          removable = false; // pinned
+        } else if (b.type === "place_unit") fields = `<input placeholder="name" value="${b.params?.name || ""}" data-field="params.name"><input placeholder="x" value="${b.params?.x || 0}" data-field="params.x" type="number"><input placeholder="y" value="${b.params?.y || 0}" data-field="params.y" type="number"><button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button>`;
         else if (b.type === "wait_ms") fields = `<input placeholder="ms" value="${b.params?.ms || 500}" data-field="params.ms" type="number">`;
         else if (b.type === "wait_wave") fields = `<input placeholder="wave" value="${b.params?.wave || 1}" data-field="params.wave" type="number">`;
         else if (b.type === "leave_at_minute") fields = `<input placeholder="min" value="${b.params?.minutes || 10}" data-field="params.minutes" type="number">`;
@@ -365,7 +369,7 @@
         return `<div class="block-row" data-phase="${phase}" data-idx="${i}">
           <span class="block-type">${b.type.replace(/_/g, " ")}</span>
           <span class="block-fields">${fields}</span>
-          <span class="block-remove" data-phase="${phase}" data-idx="${i}">&times;</span>
+          ${removable ? `<span class="block-remove" data-phase="${phase}" data-idx="${i}">&times;</span>` : ""}
         </div>`;
       }).join("");
 
@@ -455,7 +459,7 @@
 
   document.getElementById("btn-op-new").addEventListener("click", () => {
     opName.value = "";
-    opPhases = { pre_start: [], battle: [], loop_a: [], loop_b: [] };
+    opPhases = { pre_start: [{ type: "walk_path", params: {}, mode: "auto", pathName: "" }], battle: [], loop_a: [], loop_b: [] };
     opDirty = false;
     renderPhases();
   });

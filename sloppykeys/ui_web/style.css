@@ -400,9 +400,15 @@ input:focus, select:focus {
 .palette-block {
   padding: 8px 10px; font-size: 12px; font-weight: 600; color: var(--text);
   background: var(--surface-panel); border: 1px solid var(--border);
+  border-left: 4px solid var(--border);
   margin-bottom: 4px; cursor: grab; transition: border-color 0.12s;
 }
-.palette-block:hover { border-color: var(--accent); }
+.palette-block:hover { border-color: var(--accent); border-left-color: var(--accent); }
+.palette-purple { border-left-color: var(--accent); }
+.palette-teal { border-left-color: var(--teal); }
+.palette-amber { border-left-color: var(--amber); }
+.palette-rose { border-left-color: var(--rose); }
+.palette-blue { border-left-color: #60a5fa; }
 
 /* ---- Position Picker Modal ---- */
 .modal-overlay {
