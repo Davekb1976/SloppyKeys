@@ -1392,10 +1392,15 @@
     const name = opPhases[phase][idx].recordingName || "";
     if (!name) { window.addLog("[Record] No recording selected to test."); return; }
     if (!window.pywebview || !pywebview.api) return;
+    // Switch to dashboard so Roblox is visible for the replay
+    switchScreen("dashboard");
+    await new Promise(r => setTimeout(r, 300));
     window.addLog("[Record] Testing: " + name);
     const r = await pywebview.api.test_recording(name);
     if (r.ok) window.addLog("[Record] Replay finished.");
     else window.addLog("[Record] Replay failed: " + (r.reason || "error"));
+    // Switch back to the Macro Manager
+    switchScreen("planner");
   }
 
   // ---- Input Recording (Record block) ----
