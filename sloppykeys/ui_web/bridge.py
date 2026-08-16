@@ -833,7 +833,14 @@ class Api:
                 start_down = kb_pressed(start_kb)
                 if start_down and not self._key_down["start"]:
                     if self._ctrl and not self._ctrl.is_running:
-                        self._log_to_ui("Start hotkey: select gamemode in the UI first.")
+                        # Start the macro from the task queue
+                        error = self._ctrl.start()
+                        if error:
+                            self._log_to_ui(f"Can't start: {error}")
+                        else:
+                            self._run_thread = threading.Thread(target=self._macro_run_loop, daemon=True)
+                            self._run_thread.start()
+                            self._push_status()
                     elif self._ctrl and self._ctrl.is_running:
                         self._log_to_ui("Already running — use the stop key.")
                 self._key_down["start"] = start_down
