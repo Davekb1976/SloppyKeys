@@ -436,7 +436,7 @@ input:focus, select:focus {
   background: var(--surface-panel); cursor: pointer; color: var(--text-muted);
 }
 .pos-tab.active { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
-.pos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+.pos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; align-content: start; overflow-y: auto; }
 .pos-thumb {
   border: 1px solid var(--border); cursor: pointer; overflow: hidden;
   display: flex; flex-direction: column; transition: border-color 0.12s;
