@@ -499,9 +499,10 @@ class MacroController:
         return None
 
     def _tick_upgrade_unit(self, block: dict) -> bool:
-        """Click the unit, press T to upgrade. Repeats up to `times`."""
+        """Click the unit, press T to upgrade. Repeats up to `times`. If autograde is on, press V after."""
         params = block.get("params", {})
         times = max(1, int(params.get("times", 1) or 1))
+        autograde = block.get("autograde", False)
 
         # Track state across ticks
         if not hasattr(self, '_upgrade_state'):
@@ -523,6 +524,10 @@ class MacroController:
 
         state["remaining"] -= 1
         if state["remaining"] <= 0:
+            # Press V for autograde if enabled
+            if autograde:
+                time.sleep(0.2)
+                self._ahk.run(key_script("v"), wait=True, timeout=3.0)
             del self._upgrade_state[id(block)]
             return True
         return False  # more upgrades to do — retry next tick
@@ -676,12 +681,13 @@ class MacroController:
             x = int(params.get("x", 0))
             y = int(params.get("y", 0))
             hotkey = block.get("hotkey", "")
-            if x and y and hotkey:
-                from sloppykeys.macro.input_scripts import nudge_click_script, key_script
-                # Press the unit hotkey, then click the position
-                self._ahk.run(key_script(hotkey), wait=True, timeout=5.0)
-                time.sleep(0.3)
-                self._ahk.run(nudge_click_script(x, y), wait=True, timeout=5.0)
+            if x and y:
+                from sloppykeys.macro.input_scripts import nudge_click_script, key_script, SPREAD_TIGHT
+                # Press the unit slot hotkey to select it, then click the position
+                if hotkey:
+                    self._ahk.run(key_script(hotkey), wait=True, timeout=5.0)
+                    time.sleep(0.3)
+                self._ahk.run(nudge_click_script(x, y, spread=SPREAD_TIGHT), wait=True, timeout=5.0)
 
         elif btype == "upgrade_unit":
             idx = int(params.get("index", 1))

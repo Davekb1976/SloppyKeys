@@ -369,13 +369,20 @@
               <button class="btn btn--sm" id="btn-walktest-${phase}-${i}">Test</button>`;
           }
           fields += `<span class="block-once-badge">RUNS ONCE</span>`;
-        } else if (b.type === "place_unit") fields = `<input placeholder="name" value="${b.params?.name || ""}" data-field="params.name"><input placeholder="x" value="${b.params?.x || 0}" data-field="params.x" type="number"><input placeholder="y" value="${b.params?.y || 0}" data-field="params.y" type="number"><button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button>`;
-        else if (b.type === "wait_ms") fields = `<input placeholder="ms" value="${b.params?.ms || 500}" data-field="params.ms" type="number">`;
+        } else if (b.type === "place_unit") {
+          const hk = b.hotkey || "";
+          fields = `<button class="btn btn--sm hotkey-capture" id="hk-${phase}-${i}" title="Unit slot hotkey">${hk ? hk.toUpperCase() : "Key"}</button><input placeholder="x" value="${b.params?.x || 0}" data-field="params.x" type="number"><input placeholder="y" value="${b.params?.y || 0}" data-field="params.y" type="number"><button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button><input placeholder="name" value="${b.params?.name || ""}" data-field="params.name" style="width:70px;">`;
+        } else if (b.type === "upgrade_unit") {
+          fields = `<input placeholder="x" value="${b.params?.x || 0}" data-field="params.x" type="number" style="width:40px;"><input placeholder="y" value="${b.params?.y || 0}" data-field="params.y" type="number" style="width:40px;"><button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button><input placeholder="×" value="${b.params?.times || 1}" data-field="params.times" type="number" style="width:35px;" title="Upgrade presses"><label style="font-size:10px;color:var(--text-muted);display:flex;align-items:center;gap:3px;" title="Press V for autograde after upgrading"><input type="checkbox" ${b.autograde ? "checked" : ""} data-field="autograde" style="width:auto;height:auto;"> Auto</label>`;
+        } else if (b.type === "sell_unit") {
+          fields = `<input placeholder="x" value="${b.params?.x || 0}" data-field="params.x" type="number" style="width:40px;"><input placeholder="y" value="${b.params?.y || 0}" data-field="params.y" type="number" style="width:40px;"><button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button>`;
+        } else if (b.type === "target_priority") {
+          fields = `<input placeholder="x" value="${b.params?.x || 0}" data-field="params.x" type="number" style="width:40px;"><input placeholder="y" value="${b.params?.y || 0}" data-field="params.y" type="number" style="width:40px;"><button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button>`;
+        } else if (b.type === "wait_ms") fields = `<input placeholder="ms" value="${b.params?.ms || 500}" data-field="params.ms" type="number">`;
         else if (b.type === "wait_wave") fields = `<input placeholder="wave" value="${b.params?.wave || 1}" data-field="params.wave" type="number">`;
         else if (b.type === "leave_at_minute") fields = `<input placeholder="min" value="${b.params?.minutes || 10}" data-field="params.minutes" type="number">`;
         else if (b.type === "click") fields = `<input placeholder="x" value="${b.params?.x || 0}" data-field="params.x" type="number"><input placeholder="y" value="${b.params?.y || 0}" data-field="params.y" type="number"><button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button>`;
         else if (b.type === "send_key") fields = `<input placeholder="key" value="${b.key || ""}" data-field="key" style="width:40px;"><input placeholder="hold ms" value="${b.params?.hold_ms || 0}" data-field="params.hold_ms" type="number">`;
-        else if (b.type === "upgrade_unit" || b.type === "sell_unit" || b.type === "target_priority") fields = `<input placeholder="x" value="${b.params?.x || 0}" data-field="params.x" type="number" style="width:40px;"><input placeholder="y" value="${b.params?.y || 0}" data-field="params.y" type="number" style="width:40px;"><button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button>${b.type === "upgrade_unit" ? `<input placeholder="times" value="${b.params?.times || 1}" data-field="params.times" type="number" style="width:40px;">` : ""}`;
         else if (b.type === "walk") fields = `<button class="btn btn--sm" id="btn-walk-rec-${phase}-${i}">Rec</button><button class="btn btn--sm" id="btn-walktest-${phase}-${i}">Test</button><select class="setting-select" data-field="pathName" style="width:100px;height:22px;font-size:10px;" id="sel-walk-${phase}-${i}"><option value="">Pick path...</option></select><label style="font-size:10px;color:var(--text-muted);display:flex;align-items:center;gap:3px;"><input type="checkbox" ${b.sprint ? "checked" : ""} data-field="sprint" style="width:auto;height:auto;"> Sprint</label>`;
         else if (b.type === "record") fields = `<select class="setting-select" data-field="recordingName" style="width:110px;height:22px;font-size:10px;" id="sel-rec-${phase}-${i}"><option value="">Select...</option></select><button class="btn btn--sm" id="btn-record-${phase}-${i}">Rec</button><button class="btn btn--sm" id="btn-test-rec-${phase}-${i}">Test</button><button class="btn btn--sm btn--danger" id="btn-del-rec-${phase}-${i}" title="Delete recording">✕</button>`;
         else if (b.type === "detect") {
@@ -501,6 +508,30 @@
           opPhases[ph][idx].once = !opPhases[ph][idx].once;
           opDirty = true;
           renderPhases();
+        });
+      });
+
+      // Wire hotkey capture buttons (Place Unit)
+      zone.querySelectorAll(".hotkey-capture").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          btn.textContent = "...";
+          btn.classList.add("capturing");
+          const handler = (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            document.removeEventListener("keydown", handler, true);
+            btn.classList.remove("capturing");
+            const key = ev.key.length === 1 ? ev.key : ev.key;
+            btn.textContent = key.toUpperCase();
+            // Parse phase/idx from btn id: hk-<phase>-<idx>
+            const parts = btn.id.replace("hk-", "").split("-");
+            const ph = parts[0];
+            const idx = parseInt(parts[1]);
+            opPhases[ph][idx].hotkey = key.toLowerCase();
+            opDirty = true;
+          };
+          document.addEventListener("keydown", handler, true);
         });
       });
 
