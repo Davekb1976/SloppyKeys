@@ -537,7 +537,7 @@ class Api:
         return {"ok": True}
 
     def save_image_crop(self, category: str, name: str, x: int, y: int, w: int, h: int) -> dict:
-        """Crop from the cached snapshot and save it as a variant for `name`."""
+        """Crop from the cached snapshot and save it, OVERWRITING the original image."""
         if not self._app_root:
             return {"ok": False, "reason": "no app root"}
         if not hasattr(self, '_cached_snapshot') or self._cached_snapshot is None:
@@ -558,13 +558,10 @@ class Api:
         if crop.size == 0:
             return {"ok": False, "reason": "crop is empty"}
 
-        # Save to images/<category>/<name>_<n>.png
+        # Overwrite the original file: images/<category>/<name>.png
         folder = os.path.join(self._app_root, "images", category)
         os.makedirs(folder, exist_ok=True)
-        existing = [f for f in os.listdir(folder) if f.startswith(name) and f.endswith(".png")]
-        idx = len(existing) + 1
-        filename = f"{name}_{idx}.png"
-        path = os.path.join(folder, filename)
+        path = os.path.join(folder, f"{name}.png")
         cv2.imwrite(path, crop)
         return {"ok": True, "path": path}
 
