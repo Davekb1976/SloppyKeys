@@ -386,8 +386,14 @@ input:focus, select:focus {
 .phase-count { font-size: 10px; color: var(--text-faint); margin-left: auto; }
 .phase-dropzone {
   min-height: 70px; padding: 8px; display: flex; flex-direction: column; gap: 4px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 30%, var(--border));
+  transition: border-color 0.15s, background 0.15s;
 }
-.phase-dropzone.drag-over { background: var(--accent-soft); }
+.phase-dropzone.drag-over {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border-color: var(--accent);
+  border-style: dashed;
+}
 .phase-placeholder { font-size: 11px; color: var(--text-faint); text-align: center; padding: 12px; }
 .block-row {
   display: flex; align-items: center; gap: 6px; padding: 5px 8px;
@@ -426,11 +432,10 @@ input:focus, select:focus {
 
 /* Drop placeholder line between blocks */
 .drop-placeholder {
-  height: 2px; background: var(--accent); border-radius: 1px;
-  margin: 2px 0; opacity: 0.8;
-  animation: pulse-placeholder 0.8s ease-in-out infinite alternate;
+  height: 3px; background: var(--accent); border-radius: 2px;
+  margin: 2px 0;
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 50%, transparent);
 }
-@keyframes pulse-placeholder { from { opacity: 0.5; } to { opacity: 1; } }
 
 /* Block type color coding */
 .block-row[data-type="place_unit"],

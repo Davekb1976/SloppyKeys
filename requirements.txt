@@ -25,3 +25,10 @@ opencv-python-headless==5.0.0.93
 # Models ship inside the rapidocr wheel, so recognition is offline.
 rapidocr==3.9.2
 onnxruntime==1.28.0
+
+# Global input hooks for the Record block (mouse+keyboard recording). Both are small,
+# pure-Python wrappers around Windows SetWindowsHookEx — they handle the hook chain,
+# message pump, and thread safety that raw ctypes gets wrong (bricking all input
+# system-wide if CallNextHookEx returns the wrong value).
+keyboard==0.13.5
+mouse==0.7.1
