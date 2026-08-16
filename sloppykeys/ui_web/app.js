@@ -596,9 +596,14 @@
         if (!window.pywebview || !pywebview.api) return;
         const key = btn.dataset.vrSet;
         btn.textContent = "...";
+        // Show the game so we can capture it
+        switchScreen("dashboard");
+        await new Promise(r => setTimeout(r, 400));
         const snap = await pywebview.api.get_roblox_snapshot();
+        // Switch back to settings immediately
+        switchScreen("settings");
         btn.textContent = "Set";
-        if (!snap.ok) { window.addLog("[OCR] Capture failed — is Roblox visible?"); return; }
+        if (!snap.ok) { window.addLog("[OCR] Capture failed — is Roblox running?"); return; }
         openRegionPicker(key, snap.data_uri);
       });
     });
