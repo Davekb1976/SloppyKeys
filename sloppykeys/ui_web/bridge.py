@@ -981,6 +981,14 @@ class Api:
 
         while self._running:
             try:
+                # Skip hotkeys when our own window is focused (so rebinding
+                # a key in Settings doesn't trigger the function it's mapped to).
+                our_hwnd = self._host_hwnd()
+                fg = user32.GetForegroundWindow()
+                if our_hwnd and fg == our_hwnd:
+                    time.sleep(HOTKEY_INTERVAL)
+                    continue
+
                 # Start key — rising edge
                 start_down = kb_pressed(start_kb)
                 if start_down and not self._key_down["start"]:
@@ -1036,7 +1044,7 @@ class Api:
                         self._window.evaluate_js("window.toggleCompact && window.toggleCompact();")
                 self._key_down["f7"] = f7_down
 
-                # Reload (F3) — refresh settings/delays/configs from disk
+                # Reload (F4) — restart the macro process
                 reload_kb = keybinds.get("reload")
                 reload_down = kb_pressed(reload_kb)
                 if reload_down and not self._key_down.get("reload", False):
