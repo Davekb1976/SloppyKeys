@@ -490,20 +490,24 @@ class MacroController:
             return True
 
     def _unit_click_position(self, block: dict) -> tuple[int, int] | None:
-        """Resolve a unit block's click position from its index.
-
-        Unit index refers to the Nth place_unit block across all phases. We look
-        up the stored position from the operation's pre_start phase. If not found,
-        use params.x/y as fallback.
-        """
+        """Resolve a unit block's click position from its params, converted to screen coords."""
         params = block.get("params", {})
         x = int(params.get("x", 0))
         y = int(params.get("y", 0))
         if x and y:
-            return (x, y)
-        # ponytail: index-based lookup from placed units would go here once
-        # we track placed positions during pre_start execution.
+            return self._client_to_screen(x, y)
         return None
+
+    def _client_to_screen(self, cx: int, cy: int) -> tuple[int, int] | None:
+        """Convert 1152×756 client-space coords to screen coords using the Roblox rect."""
+        rect = self._rect()
+        if rect is None:
+            return None
+        vx, vy, vw, vh = rect
+        # Scale from reference (1152×756) to actual viewport size, then offset
+        screen_x = vx + int(cx * vw / 1152)
+        screen_y = vy + int(cy * vh / 756)
+        return (screen_x, screen_y)
 
     def _game_keybind(self, action: str) -> str:
         """Get the in-game keybind for an action (upgrade, sell, priority, autograde)."""
@@ -693,11 +697,16 @@ class MacroController:
             hotkey = block.get("hotkey", "")
             if x and y:
                 from sloppykeys.macro.input_scripts import nudge_click_script, key_script, SPREAD_TIGHT
-                # Press the unit slot hotkey to select it, then click the position
+                # Convert client-space coords to screen coords
+                screen_pos = self._client_to_screen(x, y)
+                if screen_pos is None:
+                    self._log("    [block] place_unit: can't resolve screen position")
+                    return
+                sx, sy = screen_pos
                 if hotkey:
                     self._ahk.run(key_script(hotkey), wait=True, timeout=5.0)
                     time.sleep(0.3)
-                self._ahk.run(nudge_click_script(x, y, spread=SPREAD_TIGHT), wait=True, timeout=5.0)
+                self._ahk.run(nudge_click_script(sx, sy, spread=SPREAD_TIGHT), wait=True, timeout=5.0)
 
         elif btype == "upgrade_unit":
             idx = int(params.get("index", 1))
@@ -731,7 +740,9 @@ class MacroController:
             y = int(params.get("y", 0))
             if x and y:
                 from sloppykeys.macro.input_scripts import nudge_click_script
-                self._ahk.run(nudge_click_script(x, y), wait=True, timeout=5.0)
+                screen_pos = self._client_to_screen(x, y)
+                if screen_pos:
+                    self._ahk.run(nudge_click_script(screen_pos[0], screen_pos[1]), wait=True, timeout=5.0)
 
         elif btype == "send_key":
             key = block.get("key", "")
