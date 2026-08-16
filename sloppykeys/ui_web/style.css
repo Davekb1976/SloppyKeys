@@ -533,6 +533,19 @@ input:focus, select:focus {
 .rec-stop-btn:hover { background: color-mix(in srgb, var(--rose) 26%, transparent); border-color: var(--rose); }
 .rec-stop-btn:active { transform: scale(0.95); }
 
+/* Image Manager: missing template card */
+.im-card-missing { border-color: color-mix(in srgb, var(--rose) 50%, var(--border)); }
+.im-missing-badge {
+  font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+  padding: 1px 6px; background: color-mix(in srgb, var(--rose) 15%, transparent);
+  border: 1px solid var(--rose); color: var(--rose); margin-left: auto;
+}
+.im-card-missing-body {
+  padding: 20px 10px; text-align: center; font-size: 11px; color: var(--text-faint);
+  border: 1px dashed color-mix(in srgb, var(--rose) 30%, var(--border));
+  margin: 4px 0;
+}
+
 /* Palette */
 .palette-group-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-faint); margin: 8px 0 4px; }
 .palette-block {

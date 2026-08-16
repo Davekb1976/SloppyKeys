@@ -1125,18 +1125,21 @@
       });
     });
     gridEl.innerHTML = items.map((img) => `
-      <div class="im-card">
+      <div class="im-card${img.missing ? " im-card-missing" : ""}">
         <div class="im-card-header">
           <span class="im-card-cat">${img.catKey}</span>
           <span class="im-card-name">${img.name}</span>
-          <button class="im-card-add" data-cat="${img.catKey}" data-name="${img.name}" title="Capture &amp; add variant">+</button>
+          ${img.missing ? '<span class="im-missing-badge">MISSING</span>' : ''}
+          <button class="im-card-add" data-cat="${img.catKey}" data-name="${img.name}" title="Capture &amp; add">+</button>
         </div>
-        <img class="im-card-thumb" src="${img.data_uri}" alt="${img.name}">
+        ${img.missing
+          ? '<div class="im-card-missing-body">Capture from Roblox to add this template</div>'
+          : `<img class="im-card-thumb" src="${img.data_uri}" alt="${img.name}">`}
         <div class="im-card-slider">
           <span>Match</span>
           <input type="range" min="0.50" max="1.00" step="0.01" value="${img.threshold}" data-name="${img.name}">
           <span class="im-val">${img.threshold.toFixed(2)}</span>
-          <button class="btn btn--sm" data-test-image="${img.catKey}/${img.file}" title="Test search">Test</button>
+          ${!img.missing ? `<button class="btn btn--sm" data-test-image="${img.catKey}/${img.file}" title="Test search">Test</button>` : ''}
         </div>
       </div>
     `).join("");

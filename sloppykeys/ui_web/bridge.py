@@ -607,29 +607,61 @@ class Api:
         categories = []
         images_root = os.path.join(self._app_root, "assets")
 
+        # Collect all expected template paths so we can mark missing ones
+        from sloppykeys.content.nav_images import expected_paths
+        expected = set()
+        try:
+            expected = set(expected_paths())
+        except Exception:
+            pass
+
+        found_paths = set()
+
         for key, label in IMAGE_CATEGORIES.items():
             folder = os.path.join(images_root, key)
-            if not os.path.isdir(folder):
-                continue
             names = []
             # Walk recursively to find all PNGs (some categories have subfolders)
-            for dirpath, _dirs, files in os.walk(folder):
-                for fname in sorted(files):
-                    if not fname.lower().endswith(".png"):
-                        continue
-                    name = fname[:-4]
-                    path = os.path.join(dirpath, fname)
-                    try:
-                        with open(path, "rb") as f:
-                            b64 = base64.b64encode(f.read()).decode("ascii")
-                        names.append({
-                            "name": name,
-                            "file": fname,
-                            "data_uri": f"data:image/png;base64,{b64}",
-                            "threshold": float(thresholds.get(name, default_threshold)),
-                        })
-                    except OSError:
-                        continue
+            if os.path.isdir(folder):
+                for dirpath, _dirs, files in os.walk(folder):
+                    for fname in sorted(files):
+                        if not fname.lower().endswith(".png"):
+                            continue
+                        name = fname[:-4]
+                        path = os.path.join(dirpath, fname)
+                        rel = os.path.relpath(path, self._app_root).replace("\\", "/")
+                        found_paths.add(rel)
+                        try:
+                            with open(path, "rb") as f:
+                                b64 = base64.b64encode(f.read()).decode("ascii")
+                            names.append({
+                                "name": name,
+                                "file": fname,
+                                "data_uri": f"data:image/png;base64,{b64}",
+                                "threshold": float(thresholds.get(name, default_threshold)),
+                                "missing": False,
+                            })
+                        except OSError:
+                            continue
+
+            # Add missing expected templates for this category
+            prefix = f"assets/{key}/"
+            for ep in sorted(expected):
+                if not ep.startswith(prefix):
+                    continue
+                rel_full = ep
+                if rel_full in found_paths:
+                    continue
+                # This template is expected but missing
+                fname = os.path.basename(ep)
+                name = fname[:-4] if fname.endswith(".png") else fname
+                names.append({
+                    "name": name,
+                    "file": fname,
+                    "data_uri": "",
+                    "threshold": float(thresholds.get(name, default_threshold)),
+                    "missing": True,
+                })
+
             if names:
                 categories.append({"key": key, "label": label, "names": names})
 
