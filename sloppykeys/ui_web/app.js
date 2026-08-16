@@ -358,13 +358,16 @@
         let fields = "";
         let removable = !isPinned;
         if (b.type === "walk_path") {
-          fields = `<select class="setting-select" data-field="mode" style="width:80px;height:22px;font-size:10px;">
-            <option value="auto"${b.mode === "auto" ? " selected" : ""}>Auto</option>
-            <option value="custom"${b.mode === "custom" ? " selected" : ""}>Custom</option>
-          </select>`;
+          // Pinned walk path: icon + Auto/Custom toggle + Sprint + Record
+          fields = `<svg class="pinned-walk-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4m-10-10h4m12 0h4"/></svg>
+            <button class="btn btn--sm${b.mode === "auto" ? " btn--primary" : ""}" onclick="setWalkPathMode('${phase}',${i},'auto')">Auto</button>
+            <button class="btn btn--sm${b.mode === "custom" ? " btn--primary" : ""}" onclick="setWalkPathMode('${phase}',${i},'custom')">Custom</button>
+            <label style="font-size:10px;color:var(--text-muted);display:flex;align-items:center;gap:3px;"><input type="checkbox" ${b.sprint ? "checked" : ""} data-field="sprint" style="width:auto;height:auto;"> Sprint</label>`;
           if (b.mode === "custom") {
-            fields += `<input placeholder="path name" value="${b.pathName || ""}" data-field="pathName" style="width:90px;">`;
+            fields += `<select class="setting-select" data-field="pathName" style="width:90px;height:22px;font-size:10px;" id="sel-walkpath-${phase}-${i}"><option value="">Pick path...</option></select>
+              <button class="btn btn--sm" id="btn-walkrec-${phase}-${i}">Rec</button>`;
           }
+          fields += `<span class="block-once-badge">RUNS ONCE</span>`;
         } else if (b.type === "place_unit") fields = `<input placeholder="name" value="${b.params?.name || ""}" data-field="params.name"><input placeholder="x" value="${b.params?.x || 0}" data-field="params.x" type="number"><input placeholder="y" value="${b.params?.y || 0}" data-field="params.y" type="number"><button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button>`;
         else if (b.type === "wait_ms") fields = `<input placeholder="ms" value="${b.params?.ms || 500}" data-field="params.ms" type="number">`;
         else if (b.type === "wait_wave") fields = `<input placeholder="wave" value="${b.params?.wave || 1}" data-field="params.wave" type="number">`;
@@ -372,10 +375,9 @@
         else if (b.type === "click") fields = `<input placeholder="x" value="${b.params?.x || 0}" data-field="params.x" type="number"><input placeholder="y" value="${b.params?.y || 0}" data-field="params.y" type="number"><button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button>`;
         else if (b.type === "send_key") fields = `<input placeholder="key" value="${b.key || ""}" data-field="key" style="width:40px;"><input placeholder="hold ms" value="${b.params?.hold_ms || 0}" data-field="params.hold_ms" type="number">`;
         else if (b.type === "upgrade_unit" || b.type === "sell_unit" || b.type === "target_priority") fields = `<input placeholder="x" value="${b.params?.x || 0}" data-field="params.x" type="number" style="width:40px;"><input placeholder="y" value="${b.params?.y || 0}" data-field="params.y" type="number" style="width:40px;"><button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button>${b.type === "upgrade_unit" ? `<input placeholder="times" value="${b.params?.times || 1}" data-field="params.times" type="number" style="width:40px;">` : ""}`;
-        else if (b.type === "walk") fields = `<input placeholder="path name" value="${b.pathName || ""}" data-field="pathName" style="width:100px;"><button class="btn btn--sm" id="btn-walk-rec-${phase}-${i}">Rec</button>`;
+        else if (b.type === "walk") fields = `<button class="btn btn--sm" id="btn-walk-rec-${phase}-${i}">Rec</button><select class="setting-select" data-field="pathName" style="width:100px;height:22px;font-size:10px;" id="sel-walk-${phase}-${i}"><option value="">Pick path...</option></select><label style="font-size:10px;color:var(--text-muted);display:flex;align-items:center;gap:3px;"><input type="checkbox" ${b.sprint ? "checked" : ""} data-field="sprint" style="width:auto;height:auto;"> Sprint</label>`;
         else if (b.type === "record") fields = `<select class="setting-select" data-field="recordingName" style="width:110px;height:22px;font-size:10px;" id="sel-rec-${phase}-${i}"><option value="">Select...</option></select><button class="btn btn--sm" id="btn-record-${phase}-${i}">Rec</button><button class="btn btn--sm" id="btn-test-rec-${phase}-${i}">Test</button><button class="btn btn--sm btn--danger" id="btn-del-rec-${phase}-${i}" title="Delete recording">✕</button>`;
         else if (b.type === "detect") {
-          // Detect block: rendered as a nested container with then/else zones
           const thenBlocks = (b.then || []);
           const elseBlocks = (b.else || []);
           return `<div class="block-row block-detect" data-phase="${phase}" data-idx="${i}" data-type="detect">
@@ -386,7 +388,11 @@
               <label style="font-size:10px;color:var(--text-muted);display:flex;align-items:center;gap:3px;">
                 <input type="checkbox" ${b.loop ? "checked" : ""} data-field="loop" style="width:auto;height:auto;"> Loop
               </label>
-              <span class="block-remove" data-phase="${phase}" data-idx="${i}">&times;</span>
+              <span class="block-actions">
+                <span class="block-once${b.once ? " on" : ""}" data-phase="${phase}" data-idx="${i}" title="Run Once">1×</span>
+                <span class="block-clone" data-phase="${phase}" data-idx="${i}" title="Clone">⊕</span>
+                <span class="block-remove" data-phase="${phase}" data-idx="${i}">&times;</span>
+              </span>
             </div>
             <div class="detect-branches">
               <div class="detect-branch">
@@ -404,10 +410,16 @@
             </div>
           </div>`;
         }
+        // Block actions: Once toggle + Clone + Remove (not on pinned)
+        const actions = isPinned ? "" : `<span class="block-actions">
+          <span class="block-once${b.once ? " on" : ""}" data-phase="${phase}" data-idx="${i}" title="Run Once">1×</span>
+          <span class="block-clone" data-phase="${phase}" data-idx="${i}" title="Clone">⊕</span>
+          <span class="block-remove" data-phase="${phase}" data-idx="${i}">&times;</span>
+        </span>`;
         return `<div class="block-row${isPinned ? " pinned" : ""}" data-phase="${phase}" data-idx="${i}" data-type="${b.type}" draggable="${isPinned ? "false" : "true"}">
           <span class="block-type">${b.type.replace(/_/g, " ")}</span>
           <span class="block-fields">${fields}</span>
-          ${removable ? `<span class="block-remove" data-phase="${phase}" data-idx="${i}">&times;</span>` : ""}
+          ${actions}
         </div>`;
       }).join("");
 
@@ -459,6 +471,33 @@
           } else {
             opPhases[ph].splice(idx, 1);
           }
+          opDirty = true;
+          renderPhases();
+        });
+      });
+
+      // Wire clone buttons
+      zone.querySelectorAll(".block-clone").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const ph = btn.dataset.phase;
+          const idx = parseInt(btn.dataset.idx);
+          const original = opPhases[ph][idx];
+          const clone = JSON.parse(JSON.stringify(original));
+          delete clone.once; // cloned blocks start without "once"
+          opPhases[ph].splice(idx + 1, 0, clone);
+          opDirty = true;
+          renderPhases();
+        });
+      });
+
+      // Wire once toggle buttons
+      zone.querySelectorAll(".block-once").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const ph = btn.dataset.phase;
+          const idx = parseInt(btn.dataset.idx);
+          opPhases[ph][idx].once = !opPhases[ph][idx].once;
           opDirty = true;
           renderPhases();
         });
@@ -596,6 +635,19 @@
         const idx = parseInt(parts[3]);
         const current = opPhases[ph][idx].recordingName || "";
         populateRecordingSelect(sel, current);
+      });
+      // Populate walk path dropdowns (both walk_path custom and walk blocks)
+      zone.querySelectorAll("[id^='sel-walkpath-'], [id^='sel-walk-']").forEach((sel) => {
+        const parts = sel.id.split("-");
+        const ph = parts[1] === "walkpath" ? parts[2] : parts[2];
+        const idx = parseInt(parts[1] === "walkpath" ? parts[3] : parts[3]);
+        // For sel-walkpath-<phase>-<idx> and sel-walk-<phase>-<idx>
+        const idParts = sel.id.replace("sel-", "").split("-");
+        const prefix = idParts[0]; // "walkpath" or "walk"
+        const phKey = idParts[1];
+        const idxNum = parseInt(idParts[2]);
+        const current = opPhases[phKey]?.[idxNum]?.pathName || "";
+        populateWalkPathSelect(sel, current);
       });
     });
   }
@@ -1385,6 +1437,13 @@
 
   // ---- Recording helpers ----
   let _cachedRecordings = null;
+  let _cachedWalkPaths = null;
+
+  window.setWalkPathMode = function(phase, idx, mode) {
+    opPhases[phase][idx].mode = mode;
+    opDirty = true;
+    renderPhases();
+  };
 
   async function populateRecordingSelect(sel, current) {
     if (!window.pywebview || !pywebview.api) return;
@@ -1393,6 +1452,17 @@
     }
     const names = _cachedRecordings || [];
     sel.innerHTML = '<option value="">Select...</option>' + names.map(n =>
+      `<option value="${n}"${n === current ? " selected" : ""}>${n}</option>`
+    ).join("");
+  }
+
+  async function populateWalkPathSelect(sel, current) {
+    if (!window.pywebview || !pywebview.api) return;
+    if (!_cachedWalkPaths) {
+      _cachedWalkPaths = await pywebview.api.list_walk_paths();
+    }
+    const names = _cachedWalkPaths || [];
+    sel.innerHTML = '<option value="">Pick path...</option>' + names.map(n =>
       `<option value="${n}"${n === current ? " selected" : ""}>${n}</option>`
     ).join("");
   }
