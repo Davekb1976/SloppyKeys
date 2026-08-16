@@ -611,7 +611,7 @@ class Api:
         from sloppykeys.content.nav_images import expected_paths
         expected = set()
         try:
-            expected = set(expected_paths())
+            expected = set(p.replace("\\", "/") for p in expected_paths())
         except Exception:
             pass
 
