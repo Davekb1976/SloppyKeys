@@ -495,22 +495,24 @@ class Api:
             if not os.path.isdir(folder):
                 continue
             names = []
-            for fname in sorted(os.listdir(folder)):
-                if not fname.lower().endswith(".png"):
-                    continue
-                name = fname[:-4]
-                path = os.path.join(folder, fname)
-                try:
-                    with open(path, "rb") as f:
-                        b64 = base64.b64encode(f.read()).decode("ascii")
-                    names.append({
-                        "name": name,
-                        "file": fname,
-                        "data_uri": f"data:image/png;base64,{b64}",
-                        "threshold": float(thresholds.get(name, default_threshold)),
-                    })
-                except OSError:
-                    continue
+            # Walk recursively to find all PNGs (some categories have subfolders)
+            for dirpath, _dirs, files in os.walk(folder):
+                for fname in sorted(files):
+                    if not fname.lower().endswith(".png"):
+                        continue
+                    name = fname[:-4]
+                    path = os.path.join(dirpath, fname)
+                    try:
+                        with open(path, "rb") as f:
+                            b64 = base64.b64encode(f.read()).decode("ascii")
+                        names.append({
+                            "name": name,
+                            "file": fname,
+                            "data_uri": f"data:image/png;base64,{b64}",
+                            "threshold": float(thresholds.get(name, default_threshold)),
+                        })
+                    except OSError:
+                        continue
             if names:
                 categories.append({"key": key, "label": label, "names": names})
 

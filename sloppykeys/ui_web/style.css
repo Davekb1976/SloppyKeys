@@ -448,9 +448,10 @@ input:focus, select:focus {
 
 /* ---- Image Manager ---- */
 .im-grid {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
   overflow-y: auto; overflow-x: hidden;
   flex: 1; min-height: 0; align-content: start;
+  padding-right: 4px; /* scrollbar space */
 }
 .im-card { border: 1px solid var(--border); background: var(--surface-panel); padding: 10px; display: flex; flex-direction: column; gap: 6px; }
 .im-card-header { display: flex; align-items: center; gap: 6px; }
