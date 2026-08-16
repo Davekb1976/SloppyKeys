@@ -313,30 +313,14 @@
   });
 
   // Task queue presets: save/load/delete
-  document.getElementById("btn-save-queue").addEventListener("click", () => {
-    if (!window.pywebview || !pywebview.api || !tasks.length) return;
-    // Show the save queue modal
-    document.getElementById("save-queue-modal").style.display = "flex";
-    const input = document.getElementById("save-queue-name");
-    input.value = "";
-    setTimeout(() => input.focus(), 50);
-  });
-
-  document.getElementById("save-queue-confirm").addEventListener("click", async () => {
-    const input = document.getElementById("save-queue-name");
-    const name = input.value.trim();
-    if (!name || !window.pywebview || !pywebview.api) return;
-    document.getElementById("save-queue-modal").style.display = "none";
+  document.getElementById("btn-save-queue").addEventListener("click", async () => {
+    if (!window.pywebview || !pywebview.api) return;
+    const nameInput = document.getElementById("queue-preset-name");
+    const name = nameInput.value.trim();
+    if (!name) { window.addLog("[Queue] Enter a preset name first."); nameInput.focus(); return; }
     const r = await pywebview.api.save_task_preset(name, tasks);
     if (r.ok) { window.addLog("Queue saved: " + name); loadQueuePresets(); }
-  });
-
-  document.getElementById("save-queue-name").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") document.getElementById("save-queue-confirm").click();
-  });
-
-  document.getElementById("save-queue-cancel").addEventListener("click", () => {
-    document.getElementById("save-queue-modal").style.display = "none";
+    else window.addLog("[Queue] Save failed.");
   });
 
   const queuePresetLoad = document.getElementById("queue-preset-load");
@@ -351,22 +335,25 @@
       selectedTaskId = null;
       renderTaskList();
       showBuilderEmpty();
+      document.getElementById("queue-preset-name").value = name;
       window.addLog("Queue loaded: " + name);
     }
     queuePresetLoad.value = "";
   });
 
   document.getElementById("btn-del-queue-preset").addEventListener("click", async () => {
-    const name = queuePresetLoad.value || queuePresetLoad.options[queuePresetLoad.selectedIndex]?.text;
-    if (!name || name === "Load Queue..." || !window.pywebview || !pywebview.api) return;
+    const nameInput = document.getElementById("queue-preset-name");
+    const name = nameInput.value.trim();
+    if (!name || !window.pywebview || !pywebview.api) { window.addLog("[Queue] Enter or load a preset name to delete."); return; }
     const r = await pywebview.api.delete_task_preset(name);
-    if (r.ok) { window.addLog("Queue preset deleted: " + name); loadQueuePresets(); }
+    if (r.ok) { window.addLog("Preset deleted: " + name); nameInput.value = ""; loadQueuePresets(); }
+    else window.addLog("[Queue] Preset not found.");
   });
 
   async function loadQueuePresets() {
     if (!window.pywebview || !pywebview.api) return;
     const names = await pywebview.api.list_task_presets();
-    queuePresetLoad.innerHTML = '<option value="">Load Queue...</option>' + (names || []).map(n => `<option value="${n}">${n}</option>`).join("");
+    queuePresetLoad.innerHTML = '<option value="">Load...</option>' + (names || []).map(n => `<option value="${n}">${n}</option>`).join("");
   }
 
   document.getElementById("btn-remove-task").addEventListener("click", () => {

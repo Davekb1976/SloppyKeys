@@ -238,9 +238,10 @@
           </div>
           <div class="panel-toolbar">
             <button class="btn btn--sm" id="btn-add-task">+ Add Task</button>
-            <button class="btn btn--sm" id="btn-save-queue">Save Queue</button>
-            <select class="setting-select" id="queue-preset-load" style="width:120px;"><option value="">Load Queue...</option></select>
-            <button class="btn btn--sm btn--danger" id="btn-del-queue-preset" title="Delete selected preset">✕</button>
+            <input type="text" class="setting-input" id="queue-preset-name" placeholder="Preset name" style="width:110px;">
+            <button class="btn btn--sm" id="btn-save-queue">Save</button>
+            <select class="setting-select" id="queue-preset-load" style="width:120px;"><option value="">Load...</option></select>
+            <button class="btn btn--sm btn--danger" id="btn-del-queue-preset" title="Delete preset">✕</button>
             <button class="btn btn--sm btn--danger" id="btn-clear-tasks" style="margin-left:auto;">Clear All</button>
           </div>
           <div class="panel-body">
@@ -464,22 +465,6 @@
 
 <!-- Save recording name modal -->
 <div class="modal-overlay" id="rec-name-modal" style="display:none;">
-
-<!-- Save queue preset name modal -->
-<div class="modal-overlay" id="save-queue-modal" style="display:none;">
-  <div class="modal-box" style="width:360px; display:flex; flex-direction:column;">
-    <div class="modal-header">
-      <span class="modal-title">Save Task Queue</span>
-      <button class="modal-close" id="save-queue-cancel">&times;</button>
-    </div>
-    <div class="modal-body" style="padding:16px; display:flex; flex-direction:column; gap:12px;">
-      <input type="text" class="setting-input" id="save-queue-name" placeholder="Preset name..." style="width:100%;">
-      <div style="display:flex; gap:8px; justify-content:flex-end;">
-        <button class="btn btn--sm btn--primary" id="save-queue-confirm">Save</button>
-      </div>
-    </div>
-  </div>
-</div>
   <div class="modal-box" style="width:380px; display:flex; flex-direction:column;">
     <div class="modal-header">
       <span class="modal-title">Save Recording</span>
