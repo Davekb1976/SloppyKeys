@@ -225,6 +225,13 @@ class MacroController:
 
                 self._log(f"Task {i}/{len(tasks)}: {mode} / {map_name} / {stage} × {repeat}")
 
+                # Challenge mode has its own flow
+                if mode == "Challenge":
+                    self._run_challenge_task(task)
+                    if self._checkpoint():
+                        return (True, f"stopped after {self._cycle} cycles")
+                    continue
+
                 for rep in range(repeat):
                     if self._checkpoint():
                         return (True, f"stopped after {self._cycle} cycles")
@@ -850,6 +857,132 @@ class MacroController:
                         return
                     self._execute_block(eb)
                     time.sleep(TICK_SLEEP)
+
+    def _run_challenge_task(self, task: dict) -> None:
+        """Execute a Challenge task: scan the panel, pick a ready slot, run it."""
+        from sloppykeys.macro.challenge import ChallengeScanner, ChallengeTracker
+        from sloppykeys.content.challenge import challenge_maps, SLOTS
+
+        challenge_macros = task.get("challenge_macros", {})
+        challenge_slots = task.get("challenge_slots", [True, True, True])
+
+        self._log("  Challenge: scanning panel...")
+
+        # Navigate to the challenge panel
+        ok = self._navigate_to_challenge()
+        if not ok:
+            self._log("  Challenge: couldn't reach the challenge panel.")
+            return
+
+        # Scan the panel with OCR
+        scanner = ChallengeScanner(self._engine, self._rect, log=self._log)
+        reads = scanner.scan()
+
+        if not reads:
+            self._log("  Challenge: panel scan returned nothing.")
+            return
+
+        # Find a ready slot
+        for read in reads:
+            if self._checkpoint():
+                return
+            slot_idx = read.slot - 1
+            if slot_idx >= len(challenge_slots) or not challenge_slots[slot_idx]:
+                continue  # slot disabled by user
+            if not read.is_candidate():
+                self._log(f"  Challenge slot {read.slot}: not runnable ({read.summary()})")
+                continue
+
+            # Determine which macro to use based on the detected map
+            map_name = read.map_name or ""
+            macro_name = challenge_macros.get(map_name, "")
+            self._log(f"  Challenge slot {read.slot}: {map_name} — macro '{macro_name or 'none'}'")
+
+            if not macro_name:
+                self._log(f"  Challenge slot {read.slot}: no macro assigned for {map_name} — skipping")
+                continue
+
+            # Click the slot to enter
+            from sloppykeys.content.challenge import row_click, SELECT_STAGE_CLICK, START_CLICK
+            click_pos = row_click(read.slot)
+            if click_pos is None:
+                self._log(f"  Challenge slot {read.slot}: no click position — skipping")
+                continue
+
+            # Click the challenge row
+            screen_pos = self._client_to_screen(click_pos[0], click_pos[1])
+            if screen_pos:
+                from sloppykeys.macro.input_scripts import nudge_click_script
+                self._ahk.run(nudge_click_script(screen_pos[0], screen_pos[1]), wait=True, timeout=5.0)
+                time.sleep(1.0)
+
+            # Click Select Stage
+            ss_pos = self._client_to_screen(SELECT_STAGE_CLICK[0], SELECT_STAGE_CLICK[1])
+            if ss_pos:
+                self._ahk.run(nudge_click_script(ss_pos[0], ss_pos[1]), wait=True, timeout=5.0)
+                time.sleep(1.0)
+
+            # Click Start
+            st_pos = self._client_to_screen(START_CLICK[0], START_CLICK[1])
+            if st_pos:
+                self._ahk.run(nudge_click_script(st_pos[0], st_pos[1]), wait=True, timeout=5.0)
+                time.sleep(1.0)
+
+            # Wait for match to load
+            ok, msg = self._nav.wait_for_match_ready()
+            if not ok:
+                self._log(f"  Challenge: stage didn't load — {msg}")
+                return
+
+            self._run_camera()
+
+            # Load and run the macro operation
+            op = load_operation(self._app_root, macro_name)
+            phases = op.get("phases", {})
+
+            # Pre Start
+            self._run_phase_linear(phases.get("pre_start", []))
+            if self._checkpoint():
+                return
+
+            # Start Game
+            self._placer.park()
+            ok, msg = self._nav.click_start_game()
+            if ok:
+                self._stats.start_stage()
+                self._log(f"  Start Game: {msg or 'ok'}")
+            else:
+                self._log(f"  Start Game failed: {msg}")
+
+            if self._checkpoint():
+                return
+
+            # Match loop
+            battle_blocks = phases.get("battle", [])
+            loop_a = phases.get("loop_a", [])
+            loop_b = phases.get("loop_b", [])
+            self._run_match(battle_blocks, loop_a, loop_b)
+
+            self._cycle += 1
+            break  # one challenge per pass
+
+    def _navigate_to_challenge(self) -> bool:
+        """Navigate lobby to the challenge panel: Play → Challenge card → wait for panel."""
+        steps = [
+            ("Play", lambda: self._nav.click_play()),
+            ("Challenge", lambda: self._nav.open_gamemode("Challenge")),
+        ]
+        for name, action in steps:
+            if self._checkpoint():
+                return False
+            ok, msg = action()
+            self._log(f"  {name}: {msg or ('ok' if ok else 'failed')}")
+            if not ok:
+                return False
+            time.sleep(self._nav.click_settle)
+        # Wait for the challenge panel to appear (give it time to load)
+        time.sleep(2.0)
+        return True
 
     def _capture_screenshot(self) -> bytes | None:
         """Capture the current Roblox screen as PNG bytes for webhook attachment."""
