@@ -231,11 +231,19 @@
     taskBuilderEmpty.style.display = "none";
     // Populate fields
     tbMode.value = task.mode || "";
-    loadMaps(task.mode, task.map);
-    loadStages(task.mode, task.map, task.stage);
-    tbDifficulty.value = task.difficulty || "Normal";
-    tbRepeat.value = task.repeat || 1;
-    tbMacro.value = task.macro || "";
+    // Toggle Challenge vs Standard fields based on mode
+    const isChallenge = tbMode.value === "Challenge";
+    document.getElementById("tb-standard-fields").style.display = isChallenge ? "none" : "contents";
+    document.getElementById("tb-challenge-fields").style.display = isChallenge ? "block" : "none";
+    if (isChallenge) {
+      renderChallengeMapGrid();
+    } else {
+      loadMaps(task.mode, task.map);
+      loadStages(task.mode, task.map, task.stage);
+      tbDifficulty.value = task.difficulty || "Normal";
+      tbRepeat.value = task.repeat || 1;
+      tbMacro.value = task.macro || "";
+    }
   }
 
   function showBuilderEmpty() {
@@ -285,9 +293,9 @@
       const t = tasks.find(x => x.id === selectedTaskId);
       changes.challenge_macros = (t && t.challenge_macros) || {};
       changes.challenge_slots = [
-        document.getElementById("tb-chal-slot1")?.checked !== false,
-        document.getElementById("tb-chal-slot2")?.checked !== false,
-        document.getElementById("tb-chal-slot3")?.checked !== false,
+        document.getElementById("tb-chal-slot1")?.classList.contains("on") !== false,
+        document.getElementById("tb-chal-slot2")?.classList.contains("on") !== false,
+        document.getElementById("tb-chal-slot3")?.classList.contains("on") !== false,
       ];
     }
     pywebview.api.update_task(selectedTaskId, changes).then(() => {
@@ -404,11 +412,16 @@
     if (!grid) return;
     const task = tasks.find(t => t.id === selectedTaskId);
     const mapMacros = (task && task.challenge_macros) || {};
+    const slots = (task && task.challenge_slots) || [true, true, true];
+    // Update slot toggle states
+    ["tb-chal-slot1", "tb-chal-slot2", "tb-chal-slot3"].forEach((id, i) => {
+      const btn = document.getElementById(id);
+      if (btn) btn.classList.toggle("on", slots[i] !== false);
+    });
     grid.innerHTML = CHALLENGE_MAPS.map(m => {
-      const sel = mapMacros[m] || "";
       return `<div class="challenge-map-row">
         <span class="challenge-map-name">${m}</span>
-        <select class="setting-select" data-chal-map="${m}" style="height:24px;font-size:10px;">
+        <select class="setting-select" data-chal-map="${m}" style="height:26px;font-size:11px;">
           <option value="">No Macro</option>
         </select>
       </div>`;
@@ -450,16 +463,31 @@
         <input type="number" value="${val[1]}" data-vr-key="${s.key}" data-vr-idx="1" title="y">
         <input type="number" value="${val[2]}" data-vr-key="${s.key}" data-vr-idx="2" title="w">
         <input type="number" value="${val[3]}" data-vr-key="${s.key}" data-vr-idx="3" title="h">
+        <button class="btn btn--sm" data-vr-set="${s.key}" title="Pick from Roblox screen">Set</button>
       </div>`;
     }).join("");
     list.querySelectorAll("input[data-vr-key]").forEach(inp => {
       inp.addEventListener("change", () => {
         if (!window.pywebview || !pywebview.api) return;
         const key = inp.dataset.vrKey;
-        const row = list.querySelector(`.vision-region-row input[data-vr-key="${key}"][data-vr-idx="0"]`).closest(".vision-region-row");
+        const row = inp.closest(".vision-region-row");
         const inputs = row.querySelectorAll("input");
         const box = [parseInt(inputs[0].value), parseInt(inputs[1].value), parseInt(inputs[2].value), parseInt(inputs[3].value)];
         pywebview.api.set_vision_region(key, box);
+      });
+    });
+    // Set buttons — use Roblox snapshot + crop to pick a region
+    list.querySelectorAll("[data-vr-set]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const key = btn.dataset.vrSet;
+        switchScreen("dashboard");
+        if (window.pywebview && pywebview.api) pywebview.api.set_game_visible(true);
+        await new Promise(r => setTimeout(r, 400));
+        window.addLog("[OCR] Select a region on the Roblox screen...");
+        // For now, just prompt to manually type coords or use capture
+        // Full drag-to-select region picker is a future enhancement
+        switchScreen("settings");
+        window.addLog("[OCR] Region set — edit the numbers directly for now.");
       });
     });
   }
@@ -478,6 +506,14 @@
         tbMode.innerHTML = modes.map((m) => `<option value="${m}">${m}</option>`).join("");
       });
     }
+  });
+
+  // Slot toggle buttons for Challenge
+  document.querySelectorAll(".slot-toggle").forEach(btn => {
+    btn.addEventListener("click", () => {
+      btn.classList.toggle("on");
+      saveCurrentTask();
+    });
   });
 
   // Called from Python's on_loaded after _app_root is set.

@@ -241,10 +241,23 @@ input:focus, select:focus {
 .btn-key { font-size: 9px; font-weight: 700; opacity: 0.6; margin-left: 4px; letter-spacing: 0.04em; }
 
 /* Challenge per-map grid */
-.challenge-map-grid { display: flex; flex-direction: column; gap: 4px; width: 100%; }
+.challenge-map-grid { display: flex; flex-direction: column; gap: 6px; width: 100%; }
 .challenge-map-row { display: flex; align-items: center; gap: 8px; }
-.challenge-map-name { font-size: 11px; font-weight: 600; color: var(--text); min-width: 120px; }
+.challenge-map-name { font-size: 12px; font-weight: 600; color: var(--text); min-width: 130px; }
 .challenge-map-row select { flex: 1; }
+
+/* Slot toggle buttons (square chunky style) */
+.slot-toggle {
+  width: 32px; height: 28px; display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface-sunken); color: var(--text-faint);
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.slot-toggle.on {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  border-color: var(--accent); color: var(--accent);
+}
+.slot-toggle:hover { border-color: var(--accent); }
 
 /* Vision regions editor */
 .vision-regions { display: flex; flex-direction: column; gap: 4px; width: 100%; }
