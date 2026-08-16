@@ -429,7 +429,8 @@ class Api:
             return {"ok": False, "reason": str(exc)}
 
     def get_roblox_snapshot(self) -> dict:
-        """Capture the live Roblox window as a base64 PNG for position picking."""
+        """Capture the live Roblox window as a base64 PNG for position picking.
+        Also caches the raw BGR array for save_image_crop."""
         import base64
 
         try:
@@ -454,7 +455,10 @@ class Api:
         with mss.mss() as sct:
             img = np.array(sct.grab(monitor))
 
-        ok, buf = cv2.imencode(".png", img[:, :, :3])
+        bgr = img[:, :, :3].copy()
+        self._cached_snapshot = bgr  # cache for save_image_crop
+
+        ok, buf = cv2.imencode(".png", bgr)
         if not ok:
             return {"ok": False, "reason": "encode failed"}
         b64 = base64.b64encode(buf.tobytes()).decode("ascii")
@@ -533,43 +537,30 @@ class Api:
         return {"ok": True}
 
     def save_image_crop(self, category: str, name: str, x: int, y: int, w: int, h: int) -> dict:
-        """Crop the last Roblox snapshot and save it as a variant for `name`."""
+        """Crop from the cached snapshot and save it as a variant for `name`."""
         if not self._app_root:
             return {"ok": False, "reason": "no app root"}
+        if not hasattr(self, '_cached_snapshot') or self._cached_snapshot is None:
+            return {"ok": False, "reason": "no cached snapshot — capture first"}
         try:
             import cv2
             import numpy as np
-            import mss
         except ImportError:
-            return {"ok": False, "reason": "cv2/mss not available"}
+            return {"ok": False, "reason": "cv2 not available"}
 
-        # Capture fresh (the snapshot from get_roblox_snapshot isn't cached)
-        hwnd = find_roblox_window()
-        if not hwnd:
-            return {"ok": False, "reason": "Roblox not found"}
-        from sloppykeys.core.win32.roblox_window import client_to_screen, client_size
-
-        origin = client_to_screen(hwnd, 0, 0)
-        size = client_size(hwnd)
-        if not origin or not size:
-            return {"ok": False, "reason": "couldn't read geometry"}
-
-        monitor = {"left": origin[0], "top": origin[1], "width": size[0], "height": size[1]}
-        with mss.mss() as sct:
-            full = np.array(sct.grab(monitor))[:, :, :3]
-
-        # Crop
+        full = self._cached_snapshot
         x, y, w, h = int(x), int(y), int(w), int(h)
         if w < 4 or h < 4:
             return {"ok": False, "reason": "selection too small"}
+        if y + h > full.shape[0] or x + w > full.shape[1]:
+            return {"ok": False, "reason": "selection out of bounds"}
         crop = full[y:y+h, x:x+w]
         if crop.size == 0:
             return {"ok": False, "reason": "crop is empty"}
 
-        # Save to images/<category>/<name>_variant_<n>.png
+        # Save to images/<category>/<name>_<n>.png
         folder = os.path.join(self._app_root, "images", category)
         os.makedirs(folder, exist_ok=True)
-        # Find next available variant number
         existing = [f for f in os.listdir(folder) if f.startswith(name) and f.endswith(".png")]
         idx = len(existing) + 1
         filename = f"{name}_{idx}.png"

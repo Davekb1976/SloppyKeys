@@ -777,21 +777,43 @@
       canvas.height = Math.floor(img.naturalHeight * scale);
       canvas.dataset.scale = scale;
 
+      let zoom = scale;
+      let panX = 0, panY = 0;
+
       function drawCrop() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.save();
+        ctx.translate(panX, panY);
+        ctx.scale(zoom / scale, zoom / scale);
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         if (cropRect) {
           const s = scale;
           ctx.strokeStyle = "#8b5cf6";
-          ctx.lineWidth = 2;
+          ctx.lineWidth = 2 / (zoom / scale);
           ctx.strokeRect(cropRect.x * s, cropRect.y * s, cropRect.w * s, cropRect.h * s);
           ctx.fillStyle = "rgba(139, 92, 246, 0.15)";
           ctx.fillRect(cropRect.x * s, cropRect.y * s, cropRect.w * s, cropRect.h * s);
         }
+        ctx.restore();
       }
       drawCrop();
 
-      // Mouse drag to draw crop rectangle
+      // Scroll wheel zoom
+      canvas.addEventListener("wheel", (e) => {
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        const oldZoom = zoom;
+        const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+        zoom = Math.max(scale * 0.5, Math.min(scale * 5, zoom * factor));
+        // Zoom toward cursor
+        panX = mx - (mx - panX) * (zoom / oldZoom);
+        panY = my - (my - panY) * (zoom / oldZoom);
+        drawCrop();
+      }, { passive: false });
+
+      // Mouse drag to draw crop rectangle (accounts for zoom + pan)
       canvas.addEventListener("mousedown", (e) => {
         const rect = canvas.getBoundingClientRect();
         cropStart = { x: e.clientX - rect.left, y: e.clientY - rect.top };
@@ -802,12 +824,20 @@
         const rect = canvas.getBoundingClientRect();
         const cx = e.clientX - rect.left;
         const cy = e.clientY - rect.top;
-        const s = parseFloat(canvas.dataset.scale);
-        const x = Math.round(Math.min(cropStart.x, cx) / s);
-        const y = Math.round(Math.min(cropStart.y, cy) / s);
-        const w = Math.round(Math.abs(cx - cropStart.x) / s);
-        const h = Math.round(Math.abs(cy - cropStart.y) / s);
-        cropRect = { x, y, w, h };
+        // Convert screen coords to image coords (undo zoom + pan)
+        const toImg = (sx, sy) => {
+          const ix = (sx - panX) / (zoom / scale) / scale;
+          const iy = (sy - panY) / (zoom / scale) / scale;
+          return [Math.round(ix * img.naturalWidth / canvas.width * scale), Math.round(iy * img.naturalHeight / canvas.height * scale)];
+        };
+        // Simpler: at base scale, canvas px / scale = image px. With zoom:
+        const imgX1 = Math.round((Math.min(cropStart.x, cx) - panX) / zoom * img.naturalWidth);
+        const imgY1 = Math.round((Math.min(cropStart.y, cy) - panY) / zoom * img.naturalHeight);
+        const imgX2 = Math.round((Math.max(cropStart.x, cx) - panX) / zoom * img.naturalWidth);
+        const imgY2 = Math.round((Math.max(cropStart.y, cy) - panY) / zoom * img.naturalHeight);
+        const w = Math.max(0, imgX2 - imgX1);
+        const h = Math.max(0, imgY2 - imgY1);
+        cropRect = { x: Math.max(0, imgX1), y: Math.max(0, imgY1), w, h };
         drawCrop();
         document.getElementById("crop-readout").textContent = `${w}×${h}`;
         document.getElementById("crop-save").disabled = (w < 4 || h < 4);
