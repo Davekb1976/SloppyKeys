@@ -720,19 +720,18 @@ class Api:
     # ---- Internal ----
 
     def _reload(self) -> None:
-        """Reload settings and refresh the controller's delays/keybinds from disk."""
-        if not self._app_root:
-            return
-        from sloppykeys.config.delays import DelaysStore
-
-        delays = DelaysStore(self._app_root).all()
-        if self._ctrl:
-            self._ctrl._nav.apply_delays(delays)
-            self._ctrl._placer.apply_delays(delays)
-        self._log_to_ui("Reloaded settings from disk.")
-        # Tell the frontend to re-read settings
+        """Reload: restart the entire macro process."""
+        self._log_to_ui("Reloading...")
+        self._running = False
+        self._release_game()
+        # Relaunch ourselves as a new process, then exit.
+        import subprocess
+        subprocess.Popen(
+            [sys.executable, "-m", "sloppykeys"],
+            cwd=self._app_root or os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        )
         if self._window:
-            self._window.evaluate_js("window.onBackendReady && window.onBackendReady();")
+            self._window.destroy()
 
     def _host_hwnd(self) -> int | None:
         if self._hwnd and is_window(self._hwnd):
