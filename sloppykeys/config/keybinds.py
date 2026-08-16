@@ -17,13 +17,10 @@ GAME_KEYS_KEY = "game_keys"
 
 # Action id -> human label, in display order.
 ACTIONS: dict[str, str] = {
-    # Start and stop are separate keys, not one toggle. With a toggle, pressing it to
-    # start a run you thought had stopped stops it instead, and there is no way to be
-    # sure which state you are in before you press.
     "start_stop": "Start",
+    "pause": "Pause",
     "stop": "Stop",
     "reload": "Reload",
-    "open_tester": "Open Macro Tester",
     "image_manager": "Image Manager",
     "compact_mode": "Compact Mode",
 }
@@ -97,9 +94,9 @@ class Keybind:
 
 DEFAULTS: dict[str, Keybind] = {
     "start_stop": Keybind(0x70),            # F1
-    "stop": Keybind(0x71),                  # F2
-    "reload": Keybind(0x72),                # F3
-    "open_tester": Keybind(0x54, ctrl=True),  # Ctrl + T
+    "pause": Keybind(0x71),                 # F2
+    "stop": Keybind(0x72),                  # F3
+    "reload": Keybind(0x73),                # F4
     "image_manager": Keybind(0x75),         # F6
     "compact_mode": Keybind(0x76),          # F7
 }

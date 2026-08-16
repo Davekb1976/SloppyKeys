@@ -219,8 +219,12 @@ input:focus, select:focus {
 /* Status */
 .status-grid { display: flex; flex-direction: column; }
 .status-hero { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-3); }
-.status-dot { width: 8px; height: 8px; border-radius: 0; background: var(--text-faint); flex-shrink: 0; }
-.status-dot.running { background: var(--teal); box-shadow: 0 0 6px var(--teal); }
+.status-dot { width: 8px; height: 8px; border-radius: 0; background: var(--text-faint); flex-shrink: 0; transition: background 0.2s, box-shadow 0.2s; }
+.status-dot.running { background: var(--teal); box-shadow: 0 0 8px var(--teal); animation: dot-pulse 1.2s ease-in-out infinite; }
+.status-dot.paused { background: var(--amber); box-shadow: 0 0 6px var(--amber); animation: dot-pulse 1.2s ease-in-out infinite; }
+.status-dot.stopped { background: var(--text-faint); box-shadow: none; animation: none; }
+@keyframes dot-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+.btn-key { font-size: 9px; font-weight: 700; opacity: 0.6; margin-left: 4px; letter-spacing: 0.04em; }
 .status-action { font-size: 18px; font-weight: 700; color: var(--text); }
 .status-row {
   display: flex; align-items: center; justify-content: space-between;

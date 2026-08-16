@@ -101,19 +101,33 @@
     macroPaused = phase === "paused";
     // Update pause button label
     const pauseText = btnPause.lastChild;
-    if (pauseText && pauseText.nodeType === 3) pauseText.textContent = macroPaused ? " Resume" : " Pause";
-    statAction.textContent = running ? (macroPaused ? "Paused" : phase) : "Idle";
+    if (pauseText && pauseText.nodeType === 3) pauseText.textContent = macroPaused ? " Resume F2" : " Pause F2";
+    // Status dot
+    const dot = document.getElementById("status-dot");
+    dot.className = "status-dot" + (running ? (macroPaused ? " paused" : " running") : " stopped");
+    // Status text
+    statAction.textContent = running ? (macroPaused ? "Paused" : "Running") : "Idle";
     statGamemode.textContent = target || "—";
     statCycle.textContent = String(cycle);
     // Sync compact strip
     const csAction = document.getElementById("compact-action");
-    if (csAction) csAction.textContent = running ? (macroPaused ? "Paused" : target || phase) : "Idle";
+    if (csAction) csAction.textContent = running ? (macroPaused ? "Paused" : target || "Running") : "Idle";
     const csStart = document.getElementById("cs-start");
     const csPause = document.getElementById("cs-pause");
     const csStop = document.getElementById("cs-stop");
     if (csStart) csStart.disabled = running;
     if (csPause) csPause.disabled = !running;
     if (csStop) csStop.disabled = !running;
+  };
+
+  // Called from Python after a match result is recorded.
+  window.onMatchResult = function (won, wins, losses) {
+    document.getElementById("stat-wins").textContent = String(wins);
+    document.getElementById("stat-losses").textContent = String(losses);
+    const total = wins + losses;
+    const rate = total > 0 ? Math.round(wins * 100 / total) + "%" : "—";
+    document.getElementById("stat-winrate").textContent = rate;
+    document.getElementById("stat-last").textContent = won ? "Win" : "Loss";
   };
 
   // ---- Game slot geometry ----

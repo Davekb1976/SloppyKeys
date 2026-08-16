@@ -920,7 +920,7 @@ class Api:
             self._push_status()
 
     def _push_status(self) -> None:
-        """Push macro state to the frontend."""
+        """Push macro state + stats to the frontend."""
         if self._window is None:
             return
         status = self.get_macro_status()
@@ -929,6 +929,14 @@ class Api:
             f'window.onMacroStatus && window.onMacroStatus({running_js}, {status["cycle"]}, '
             f'"{status["target"]}", "{status["phase"]}");'
         )
+        # Also push latest stats
+        if self._ctrl:
+            snap = self._ctrl._stats.snapshot()
+            won_js = '"Win"' if snap.last_run == "Win" else '"Loss"'
+            self._window.evaluate_js(
+                f'window.onMatchResult && window.onMatchResult({snap.last_run == "Win"}, '
+                f'{snap.wins}, {snap.losses});'
+            )
 
     def _log_to_ui(self, msg: str) -> None:
         """Push a log line to the frontend."""
@@ -975,6 +983,20 @@ class Api:
                     elif self._ctrl and self._ctrl.is_running:
                         self._log_to_ui("Already running — use the stop key.")
                 self._key_down["start"] = start_down
+
+                # Pause key — rising edge
+                pause_kb = keybinds.get("pause")
+                pause_down = kb_pressed(pause_kb)
+                if pause_down and not self._key_down.get("pause", False):
+                    if self._ctrl and self._ctrl.is_running:
+                        if self._ctrl._paused:
+                            self._ctrl.resume()
+                            self._log_to_ui("Resumed.")
+                        else:
+                            self._ctrl.pause()
+                            self._log_to_ui("Paused.")
+                        self._push_status()
+                self._key_down["pause"] = pause_down
 
                 # Stop key — rising edge
                 stop_down = kb_pressed(stop_kb)
