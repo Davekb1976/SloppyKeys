@@ -349,13 +349,20 @@ class MacroController:
         return True
 
     def _run_camera(self) -> None:
-        """Camera setup."""
+        """Camera setup — zoom in, pitch down, zoom out."""
         from sloppykeys.macro.camera import camera_setup_script
-        from sloppykeys.core.win32.display import refresh_hz_for_window
 
-        hwnd = rbx.find_roblox_window()
-        hz = refresh_hz_for_window(hwnd) if hwnd else 60
-        script = camera_setup_script(hz)
+        rect = self._rect()
+        if rect is None:
+            self._log("  Camera: skipped (no Roblox rect)")
+            return
+
+        # Centre of the viewport in screen coordinates
+        vx, vy, vw, vh = rect
+        center_x = vx + vw // 2
+        center_y = vy + vh // 2
+
+        script = camera_setup_script(center_x, center_y)
         ok, msg = self._ahk.run(script, wait=True, timeout=15.0)
         self._log(f"  Camera: {msg or ('ok' if ok else 'failed')}")
 
