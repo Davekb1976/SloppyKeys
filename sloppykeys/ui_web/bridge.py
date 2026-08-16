@@ -167,22 +167,18 @@ class Api:
     def set_game_visible(self, visible: bool) -> None:
         """Only the Dashboard shows the game.
 
-        Hiding it with ShowWindow(SW_HIDE) is the only reliable way to keep it
-        from showing through on other screens: the game is topmost and our
-        window is in the normal band, so demoting alone doesn't cover it when
-        nothing else sits between them. ShowWindow is outside-the-window only.
+        Instead of SW_HIDE (which removes the window from the taskbar), just
+        demote/promote in the z-order. The game is already behind our window in
+        the normal band — demoting from topmost is enough to cover it, and the
+        taskbar icon stays.
         """
         self._game_visible = bool(visible)
         if not self._docked or not is_window(self._game_hwnd) or self._game_hwnd is None:
             return
-        SW_HIDE = 0
-        SW_SHOWNOACTIVATE = 4
         if visible:
-            user32.ShowWindow(self._game_hwnd, SW_SHOWNOACTIVATE)
             set_topmost(self._game_hwnd, True)
         else:
             set_topmost(self._game_hwnd, False)
-            user32.ShowWindow(self._game_hwnd, SW_HIDE)
 
     def report_slot(self, x: float, y: float, w: float, h: float) -> None:
         """The page tells us where the game slot actually rendered."""
