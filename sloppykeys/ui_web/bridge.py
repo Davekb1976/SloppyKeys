@@ -331,6 +331,42 @@ class Api:
         apply_region_overrides({})
         return {"ok": True}
 
+    def test_ocr_region(self, key: str, box: list) -> dict:
+        """Capture the Roblox screen and OCR the given region. Returns the text read."""
+        if not self._app_root:
+            return {"ok": False, "reason": "no app root"}
+        try:
+            import mss
+            import numpy as np
+            from sloppykeys.core.ocr import OcrReader
+            from sloppykeys.core.win32.roblox_window import find_roblox_window, client_to_screen, client_size
+
+            hwnd = find_roblox_window()
+            if not hwnd:
+                return {"ok": False, "reason": "Roblox not found"}
+            origin = client_to_screen(hwnd, 0, 0)
+            size = client_size(hwnd)
+            if not origin or not size:
+                return {"ok": False, "reason": "can't read Roblox geometry"}
+
+            # box is in 1152×756 client space — convert to screen coords
+            vx, vy = origin
+            vw, vh = size
+            x = vx + int(box[0] * vw / 1152)
+            y = vy + int(box[1] * vh / 756)
+            w = int(box[2] * vw / 1152)
+            h = int(box[3] * vh / 756)
+
+            with mss.mss() as sct:
+                mon = {"left": x, "top": y, "width": max(1, w), "height": max(1, h)}
+                img = np.array(sct.grab(mon))[:, :, :3]
+
+            ocr = OcrReader()
+            text = ocr.read_text(img)
+            return {"ok": True, "text": text.strip(), "confidence": ""}
+        except Exception as exc:
+            return {"ok": False, "reason": str(exc)}
+
     # ---- Game Keybinds (in-game keys the macro presses) ----
 
     def get_game_keybinds(self) -> dict:

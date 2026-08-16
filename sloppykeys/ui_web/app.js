@@ -463,7 +463,7 @@
         <input type="number" value="${val[1]}" data-vr-key="${s.key}" data-vr-idx="1" title="y">
         <input type="number" value="${val[2]}" data-vr-key="${s.key}" data-vr-idx="2" title="w">
         <input type="number" value="${val[3]}" data-vr-key="${s.key}" data-vr-idx="3" title="h">
-        <button class="btn btn--sm" data-vr-set="${s.key}" title="Pick from Roblox screen">Set</button>
+        <button class="btn btn--sm" data-vr-set="${s.key}" title="Test OCR on this region">Test</button>
       </div>`;
     }).join("");
     list.querySelectorAll("input[data-vr-key]").forEach(inp => {
@@ -476,18 +476,22 @@
         pywebview.api.set_vision_region(key, box);
       });
     });
-    // Set buttons — use Roblox snapshot + crop to pick a region
+    // Set buttons — test OCR on that region against the live screen
     list.querySelectorAll("[data-vr-set]").forEach(btn => {
       btn.addEventListener("click", async () => {
+        if (!window.pywebview || !pywebview.api) return;
         const key = btn.dataset.vrSet;
-        switchScreen("dashboard");
-        if (window.pywebview && pywebview.api) pywebview.api.set_game_visible(true);
-        await new Promise(r => setTimeout(r, 400));
-        window.addLog("[OCR] Select a region on the Roblox screen...");
-        // For now, just prompt to manually type coords or use capture
-        // Full drag-to-select region picker is a future enhancement
-        switchScreen("settings");
-        window.addLog("[OCR] Region set — edit the numbers directly for now.");
+        const row = btn.closest(".vision-region-row");
+        const inputs = row.querySelectorAll("input");
+        const box = [parseInt(inputs[0].value), parseInt(inputs[1].value), parseInt(inputs[2].value), parseInt(inputs[3].value)];
+        btn.textContent = "...";
+        const r = await pywebview.api.test_ocr_region(key, box);
+        btn.textContent = "Test";
+        if (r.ok) {
+          window.addLog(`[OCR] ${key}: "${r.text}" (confidence: ${r.confidence || "—"})`);
+        } else {
+          window.addLog(`[OCR] ${key}: ${r.reason || "failed to read"}`);
+        }
       });
     });
   }
