@@ -655,6 +655,59 @@ class Api:
             apply_confidence_overrides(thresholds)
         return {"ok": True}
 
+    def test_image_search(self, image_path: str) -> dict:
+        """Test-search one image against the live Roblox screen. Returns match info."""
+        if not self._app_root:
+            return {"ok": False, "best": 0}
+        from sloppykeys.core.image_search import ImageProfile
+        from sloppykeys.core.win32.roblox_window import find_roblox_window, client_to_screen, client_size
+
+        hwnd = find_roblox_window()
+        if not hwnd:
+            return {"ok": False, "best": 0, "reason": "Roblox not found"}
+
+        origin = client_to_screen(hwnd, 0, 0)
+        size = client_size(hwnd)
+        if not origin or not size:
+            return {"ok": False, "best": 0, "reason": "can't read Roblox geometry"}
+
+        rect = (origin[0], origin[1], size[0], size[1])
+        full_path = os.path.join(self._app_root, "assets", image_path)
+        if not os.path.isfile(full_path):
+            return {"ok": False, "best": 0, "reason": f"file not found: {image_path}"}
+
+        # Read threshold from settings
+        settings = UnifiedSettings(self._app_root)
+        thresholds = settings.get("image_thresholds", {})
+        name = os.path.splitext(os.path.basename(image_path))[0]
+        threshold = float(thresholds.get(name, 0.70))
+
+        profile = ImageProfile(name=name, image_path=full_path, confidence=threshold)
+        match = self._engine.find_first([profile], rect)
+
+        if match:
+            return {"ok": True, "score": match.score, "x": match.center_x, "y": match.center_y, "threshold": threshold}
+
+        # Get best score for diagnostics
+        from sloppykeys.core.image_search import best_score
+        score = best_score(self._engine, lambda: rect, full_path)
+        return {"ok": False, "best": score or 0, "threshold": threshold}
+        settings = UnifiedSettings(self._app_root)
+        thresholds = settings.get("image_thresholds", {})
+        if not isinstance(thresholds, dict):
+            thresholds = {}
+        default = 0.70
+        if abs(float(value) - default) < 0.01:
+            thresholds.pop(name, None)
+        else:
+            thresholds[name] = max(0.50, min(1.0, float(value)))
+        settings.set("image_thresholds", thresholds)
+        # Apply live to the search engine
+        if self._ctrl and hasattr(self._ctrl, '_engine'):
+            from sloppykeys.core.image_search import apply_confidence_overrides
+            apply_confidence_overrides(thresholds)
+        return {"ok": True}
+
     def save_image_crop(self, category: str, name: str, x: int, y: int, w: int, h: int) -> dict:
         """Crop from the cached snapshot and save it, OVERWRITING the original image."""
         if not self._app_root:

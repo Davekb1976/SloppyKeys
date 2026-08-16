@@ -1123,6 +1123,7 @@
           <span>Match</span>
           <input type="range" min="0.50" max="1.00" step="0.01" value="${img.threshold}" data-name="${img.name}">
           <span class="im-val">${img.threshold.toFixed(2)}</span>
+          <button class="btn btn--sm" data-test-image="${img.catKey}/${img.file}" title="Test search">Test</button>
         </div>
       </div>
     `).join("");
@@ -1140,10 +1141,33 @@
     gridEl.querySelectorAll(".im-card-add").forEach((btn) => {
       btn.addEventListener("click", () => startImageCapture(btn.dataset.cat, btn.dataset.name));
     });
+    // Wire test buttons
+    gridEl.querySelectorAll("[data-test-image]").forEach((btn) => {
+      btn.addEventListener("click", () => testImageSearch(btn.dataset.testImage));
+    });
   }
 
   // ---- Image capture + crop flow ----
   let cropTarget = null; // {category, name}
+
+  async function testImageSearch(imagePath) {
+    if (!window.pywebview || !pywebview.api) return;
+    // Hide modal, show game
+    imModal.style.display = "none";
+    if (pywebview.api.set_game_visible) pywebview.api.set_game_visible(true);
+    switchScreen("dashboard");
+    await new Promise(r => setTimeout(r, 400));
+    window.addLog("[Image Test] Searching for: " + imagePath);
+    const r = await pywebview.api.test_image_search(imagePath);
+    if (r.ok) {
+      window.addLog(`[Image Test] Found! Score: ${r.score.toFixed(3)} at (${r.x}, ${r.y})`);
+    } else {
+      window.addLog(`[Image Test] Not found. Best: ${r.best ? r.best.toFixed(3) : "—"} (threshold: ${r.threshold || 0.70})`);
+    }
+    // Return to image manager
+    if (pywebview.api.set_game_visible) pywebview.api.set_game_visible(false);
+    imModal.style.display = "flex";
+  }
   let cropImage = null;
   let cropRect = null; // {x, y, w, h} in image coords
   let cropDragging = false;
