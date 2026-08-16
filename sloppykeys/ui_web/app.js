@@ -322,21 +322,21 @@
     });
   });
 
-  // Populate gamemodes in the task builder mode dropdown + load queue
+  // Populate gamemodes in the task builder mode dropdown
   window.addEventListener("pywebviewready", () => {
-    loadTasks();
     if (window.pywebview && pywebview.api && pywebview.api.get_gamemodes) {
       pywebview.api.get_gamemodes().then((modes) => {
         tbMode.innerHTML = modes.map((m) => `<option value="${m}">${m}</option>`).join("");
       });
     }
-    loadOperationList();
   });
 
   // Called from Python's on_loaded after _app_root is set.
   window.onBackendReady = function () {
     loadSettings();
     loadGameKeybinds();
+    loadOperationList();
+    loadTasks();
   };
 
   // ---- Macro Manager ----
@@ -814,6 +814,11 @@
     const data = await pywebview.api.load_operation(name);
     opName.value = data.name || name;
     opPhases = data.phases || { pre_start: [], battle: [], loop_a: [], loop_b: [] };
+    // Ensure pinned walk_path block exists in pre_start
+    if (!opPhases.pre_start || !opPhases.pre_start.length || opPhases.pre_start[0].type !== "walk_path") {
+      const walkBlock = { type: "walk_path", params: {}, mode: "auto", pathName: "", sprint: false };
+      opPhases.pre_start = [walkBlock, ...(opPhases.pre_start || [])];
+    }
     opDirty = false;
     renderPhases();
     opLoad.value = "";
