@@ -627,12 +627,19 @@
   let imCategory = "all";
   const imModal = document.getElementById("im-modal");
 
+  // Helper: restore game only if on Dashboard
+  function restoreGameIfDashboard() {
+    const dash = document.getElementById("screen-dashboard");
+    if (dash && dash.classList.contains("active") && window.pywebview && pywebview.api) {
+      pywebview.api.set_game_visible(true);
+    }
+  }
+
   window.openImageManager = async function () {
     // Toggle: if already open, close it
     if (imModal.style.display === "flex") {
       imModal.style.display = "none";
-      // Restore game if on dashboard
-      if (window.pywebview && pywebview.api) pywebview.api.set_game_visible(true);
+      restoreGameIfDashboard();
       return;
     }
     // Hide the game so the modal isn't behind it
@@ -648,8 +655,7 @@
 
   document.getElementById("im-close").addEventListener("click", () => {
     imModal.style.display = "none";
-    // Restore game visibility
-    if (window.pywebview && pywebview.api) pywebview.api.set_game_visible(true);
+    restoreGameIfDashboard();
   });
   document.getElementById("im-capture").addEventListener("click", async () => {
     if (!window.pywebview || !pywebview.api) return;
@@ -932,7 +938,7 @@
 
   document.getElementById("pos-close").addEventListener("click", () => {
     posModal.style.display = "none";
-    if (window.pywebview && pywebview.api) pywebview.api.set_game_visible(true);
+    restoreGameIfDashboard();
   });
   document.getElementById("pos-back").addEventListener("click", () => {
     posGrid.style.display = "";
