@@ -22,5 +22,10 @@ Tracks the migration from PySide6 to pywebview + HTML/CSS/JS.
 | | Wire macro controls (Start/Stop) to the existing runner | Clicking Start in the new UI should start a run the same as F1 does | done |
 | | Extract runner control from window.py into a headless controller | The runner, navigator, task director, and settings are tangled into a 4000-line QWidget; a standalone controller lets both UIs drive them | done |
 | 2026-08-15 | Gamemode selector wired in the Dashboard | Dropdowns for Gamemode/Map/Act populated from the backend; Start button uses the selection to call start_macro | replaced |
-| | Block drag polish: colored borders, hover highlights, reorder, cross-phase moves, dashed placeholder | Blocks placed in phases get colored left borders matching their type; hover highlights; drag to reorder within a phase or move between phases; dashed outline indicator during drag | next |
+| | Block drag polish: colored borders, hover highlights, reorder, cross-phase moves, dashed placeholder | Blocks placed in phases get colored left borders matching their type; hover highlights; drag to reorder within a phase or move between phases; dashed outline indicator during drag | done |
+| 2026-08-15 | Detect block with nested then/else drop zones | Detect renders as a container with two nested zones; blocks dropped inside branch on found/not-found | done |
+| 2026-08-15 | Record block added to palette and execution | Records mouse+keyboard input via polling; replays through AHK | done |
+| 2026-08-15 | Walk path recording and replay system | WASD poll at 30ms logs transitions; replay generates timed AHK key script | done |
+| 2026-08-15 | Auto-reopen Roblox on crash mid-run | Controller detects game gone, relaunches via deep link, resumes from lobby | done |
+| 2026-08-15 | Webhook match result with screenshot | Win/loss sends Discord embed with stage info, session stats, and a captured PNG | done |
 | | Wire remaining screens (Planner, Queue, Route, Settings) | Full-page screens are placeholder divs; need real content from the backend | next |
