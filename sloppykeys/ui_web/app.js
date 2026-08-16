@@ -354,11 +354,17 @@
         return;
       }
       zone.innerHTML = blocks.map((b, i) => {
+        const isPinned = b.type === "walk_path";
         let fields = "";
-        let removable = true;
+        let removable = !isPinned;
         if (b.type === "walk_path") {
-          fields = `<span style="font-size:11px; color:var(--teal);">Auto</span>`;
-          removable = false; // pinned
+          fields = `<select class="setting-select" data-field="mode" style="width:80px;height:22px;font-size:10px;">
+            <option value="auto"${b.mode === "auto" ? " selected" : ""}>Auto</option>
+            <option value="custom"${b.mode === "custom" ? " selected" : ""}>Custom</option>
+          </select>`;
+          if (b.mode === "custom") {
+            fields += `<input placeholder="path name" value="${b.pathName || ""}" data-field="pathName" style="width:90px;">`;
+          }
         } else if (b.type === "place_unit") fields = `<input placeholder="name" value="${b.params?.name || ""}" data-field="params.name"><input placeholder="x" value="${b.params?.x || 0}" data-field="params.x" type="number"><input placeholder="y" value="${b.params?.y || 0}" data-field="params.y" type="number"><button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button>`;
         else if (b.type === "wait_ms") fields = `<input placeholder="ms" value="${b.params?.ms || 500}" data-field="params.ms" type="number">`;
         else if (b.type === "wait_wave") fields = `<input placeholder="wave" value="${b.params?.wave || 1}" data-field="params.wave" type="number">`;
@@ -366,7 +372,39 @@
         else if (b.type === "click") fields = `<input placeholder="x" value="${b.params?.x || 0}" data-field="params.x" type="number"><input placeholder="y" value="${b.params?.y || 0}" data-field="params.y" type="number"><button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button>`;
         else if (b.type === "send_key") fields = `<input placeholder="key" value="${b.key || ""}" data-field="key" style="width:40px;"><input placeholder="hold ms" value="${b.params?.hold_ms || 0}" data-field="params.hold_ms" type="number">`;
         else if (b.type === "upgrade_unit" || b.type === "sell_unit" || b.type === "target_priority") fields = `<input placeholder="#" value="${b.params?.index || 1}" data-field="params.index" type="number" style="width:40px;">`;
-        return `<div class="block-row" data-phase="${phase}" data-idx="${i}">
+        else if (b.type === "walk") fields = `<input placeholder="path name" value="${b.pathName || ""}" data-field="pathName" style="width:100px;"><button class="btn btn--sm" id="btn-walk-rec-${phase}-${i}">Rec</button>`;
+        else if (b.type === "record") fields = `<input placeholder="recording name" value="${b.recordingName || ""}" data-field="recordingName" style="width:100px;"><button class="btn btn--sm" id="btn-record-${phase}-${i}">Rec</button>`;
+        else if (b.type === "detect") {
+          // Detect block: rendered as a nested container with then/else zones
+          const thenBlocks = (b.then || []);
+          const elseBlocks = (b.else || []);
+          return `<div class="block-row block-detect" data-phase="${phase}" data-idx="${i}" data-type="detect">
+            <div class="detect-header">
+              <span class="block-type">detect</span>
+              <input placeholder="image" value="${b.image || ""}" data-field="image" style="width:80px;">
+              <input placeholder="threshold" value="${b.threshold || 0.8}" data-field="threshold" type="number" step="0.05" style="width:55px;">
+              <label style="font-size:10px;color:var(--text-muted);display:flex;align-items:center;gap:3px;">
+                <input type="checkbox" ${b.loop ? "checked" : ""} data-field="loop" style="width:auto;height:auto;"> Loop
+              </label>
+              <span class="block-remove" data-phase="${phase}" data-idx="${i}">&times;</span>
+            </div>
+            <div class="detect-branches">
+              <div class="detect-branch">
+                <span class="detect-branch-label then-label">Then (found)</span>
+                <div class="detect-dropzone" data-phase="${phase}" data-parent="${i}" data-branch="then">
+                  ${thenBlocks.length ? thenBlocks.map((tb, ti) => `<div class="block-row" data-phase="${phase}" data-parent="${i}" data-branch="then" data-idx="${ti}" data-type="${tb.type}" draggable="true"><span class="block-type">${tb.type.replace(/_/g," ")}</span><span class="block-remove" data-phase="${phase}" data-parent="${i}" data-branch="then" data-idx="${ti}">&times;</span></div>`).join("") : '<div class="phase-placeholder" style="padding:6px;">Drop here</div>'}
+                </div>
+              </div>
+              <div class="detect-branch">
+                <span class="detect-branch-label else-label">Else (not found)</span>
+                <div class="detect-dropzone" data-phase="${phase}" data-parent="${i}" data-branch="else">
+                  ${elseBlocks.length ? elseBlocks.map((eb, ei) => `<div class="block-row" data-phase="${phase}" data-parent="${i}" data-branch="else" data-idx="${ei}" data-type="${eb.type}" draggable="true"><span class="block-type">${eb.type.replace(/_/g," ")}</span><span class="block-remove" data-phase="${phase}" data-parent="${i}" data-branch="else" data-idx="${ei}">&times;</span></div>`).join("") : '<div class="phase-placeholder" style="padding:6px;">Drop here</div>'}
+                </div>
+              </div>
+            </div>
+          </div>`;
+        }
+        return `<div class="block-row${isPinned ? " pinned" : ""}" data-phase="${phase}" data-idx="${i}" data-type="${b.type}" draggable="${isPinned ? "false" : "true"}">
           <span class="block-type">${b.type.replace(/_/g, " ")}</span>
           <span class="block-fields">${fields}</span>
           ${removable ? `<span class="block-remove" data-phase="${phase}" data-idx="${i}">&times;</span>` : ""}
@@ -374,33 +412,155 @@
       }).join("");
 
       // Wire inline field edits
-      zone.querySelectorAll("input[data-field]").forEach((inp) => {
+      zone.querySelectorAll("input[data-field], select[data-field]").forEach((inp) => {
         inp.addEventListener("change", (e) => {
           const row = e.target.closest(".block-row");
           const ph = row.dataset.phase;
           const idx = parseInt(row.dataset.idx);
+          const parentIdx = row.dataset.parent !== undefined ? parseInt(row.dataset.parent) : null;
+          const branch = row.dataset.branch || null;
           const field = e.target.dataset.field;
-          const val = e.target.type === "number" ? Number(e.target.value) : e.target.value;
+          let val;
+          if (e.target.type === "number") val = Number(e.target.value);
+          else if (e.target.type === "checkbox") val = e.target.checked;
+          else val = e.target.value;
+
+          let targetBlock;
+          if (parentIdx !== null && branch) {
+            targetBlock = opPhases[ph][parentIdx][branch]?.[idx];
+          } else {
+            targetBlock = opPhases[ph][idx];
+          }
+          if (!targetBlock) return;
+
           if (field.startsWith("params.")) {
             const key = field.split(".")[1];
-            opPhases[ph][idx].params = opPhases[ph][idx].params || {};
-            opPhases[ph][idx].params[key] = val;
+            targetBlock.params = targetBlock.params || {};
+            targetBlock.params[key] = val;
           } else {
-            opPhases[ph][idx][field] = val;
+            targetBlock[field] = val;
           }
           opDirty = true;
+          // Re-render if mode changed (walk_path shows/hides path name input)
+          if (field === "mode") renderPhases();
         });
       });
 
-      // Wire remove buttons
+      // Wire remove buttons (including nested detect branches)
       zone.querySelectorAll(".block-remove").forEach((btn) => {
         btn.addEventListener("click", (e) => {
           e.stopPropagation();
           const ph = btn.dataset.phase;
+          const parentIdx = btn.dataset.parent !== undefined ? parseInt(btn.dataset.parent) : null;
+          const branch = btn.dataset.branch || null;
           const idx = parseInt(btn.dataset.idx);
-          opPhases[ph].splice(idx, 1);
+          if (parentIdx !== null && branch) {
+            opPhases[ph][parentIdx][branch].splice(idx, 1);
+          } else {
+            opPhases[ph].splice(idx, 1);
+          }
           opDirty = true;
           renderPhases();
+        });
+      });
+
+      // Wire drag reorder on block rows
+      zone.querySelectorAll(".block-row[draggable='true']").forEach((row) => {
+        row.addEventListener("dragstart", (e) => {
+          e.stopPropagation();
+          row.classList.add("dragging");
+          e.dataTransfer.setData("application/x-block-move", JSON.stringify({
+            phase: row.dataset.phase,
+            idx: parseInt(row.dataset.idx)
+          }));
+          e.dataTransfer.effectAllowed = "move";
+        });
+        row.addEventListener("dragend", () => {
+          row.classList.remove("dragging");
+          zone.querySelectorAll(".drop-placeholder").forEach((p) => p.remove());
+        });
+        row.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const moveData = e.dataTransfer.types.includes("application/x-block-move");
+          if (!moveData) return;
+          // Show placeholder
+          const rect = row.getBoundingClientRect();
+          const midY = rect.top + rect.height / 2;
+          const after = e.clientY > midY;
+          zone.querySelectorAll(".drop-placeholder").forEach((p) => p.remove());
+          const placeholder = document.createElement("div");
+          placeholder.className = "drop-placeholder";
+          if (after) row.after(placeholder);
+          else row.before(placeholder);
+        });
+        row.addEventListener("dragleave", (e) => {
+          if (!row.contains(e.relatedTarget)) {
+            zone.querySelectorAll(".drop-placeholder").forEach((p) => p.remove());
+          }
+        });
+        row.addEventListener("drop", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          zone.querySelectorAll(".drop-placeholder").forEach((p) => p.remove());
+          const raw = e.dataTransfer.getData("application/x-block-move");
+          if (!raw) return;
+          const src = JSON.parse(raw);
+          const rect = row.getBoundingClientRect();
+          const midY = rect.top + rect.height / 2;
+          const after = e.clientY > midY;
+          const destPhase = row.dataset.phase;
+          const destIdx = parseInt(row.dataset.idx) + (after ? 1 : 0);
+
+          // Remove from source
+          const [moved] = opPhases[src.phase].splice(src.idx, 1);
+          if (!moved) return;
+          // Adjust dest index if same phase and removing shifted it
+          let insertIdx = destIdx;
+          if (src.phase === destPhase && src.idx < destIdx) insertIdx--;
+          opPhases[destPhase].splice(insertIdx, 0, moved);
+          opDirty = true;
+          renderPhases();
+        });
+      });
+
+      // Wire detect branch drop zones
+      zone.querySelectorAll(".detect-dropzone").forEach((dz) => {
+        dz.addEventListener("dragover", (e) => { e.preventDefault(); dz.classList.add("drag-over"); });
+        dz.addEventListener("dragleave", () => { dz.classList.remove("drag-over"); });
+        dz.addEventListener("drop", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dz.classList.remove("drag-over");
+          const type = e.dataTransfer.getData("text/plain");
+          if (!type || type === "detect" || type === "walk_path") return; // no nesting detects or walk_path
+          const parentIdx = parseInt(dz.dataset.parent);
+          const branch = dz.dataset.branch;
+          const ph = dz.dataset.phase;
+          const block = { type, params: {} };
+          if (!opPhases[ph][parentIdx][branch]) opPhases[ph][parentIdx][branch] = [];
+          opPhases[ph][parentIdx][branch].push(block);
+          opDirty = true;
+          renderPhases();
+        });
+      });
+
+      // Wire walk recording buttons
+      zone.querySelectorAll("[id^='btn-walk-rec-']").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const parts = btn.id.split("-");
+          const ph = parts[3];
+          const idx = parseInt(parts[4]);
+          startWalkRecording(ph, idx);
+        });
+      });
+      // Wire input recording buttons
+      zone.querySelectorAll("[id^='btn-record-']").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const parts = btn.id.split("-");
+          const ph = parts[2];
+          const idx = parseInt(parts[3]);
+          startInputRecording(ph, idx);
         });
       });
     });
@@ -420,6 +580,22 @@
     zone.addEventListener("drop", (e) => {
       e.preventDefault();
       zone.classList.remove("drag-over");
+      zone.querySelectorAll(".drop-placeholder").forEach((p) => p.remove());
+
+      // Cross-phase block move (reorder from another phase or within when dropped on empty area)
+      const moveRaw = e.dataTransfer.getData("application/x-block-move");
+      if (moveRaw) {
+        const src = JSON.parse(moveRaw);
+        const [moved] = opPhases[src.phase].splice(src.idx, 1);
+        if (moved) {
+          opPhases[phase].push(moved);
+          opDirty = true;
+          renderPhases();
+        }
+        return;
+      }
+
+      // New block from palette
       const type = e.dataTransfer.getData("text/plain");
       if (!type) return;
       const block = { type, params: {} };
@@ -430,6 +606,9 @@
       else if (type === "click") block.params = { x: 0, y: 0 };
       else if (type === "send_key") { block.key = ""; block.params = { hold_ms: 0 }; }
       else if (type === "upgrade_unit" || type === "sell_unit" || type === "target_priority") block.params = { index: 1 };
+      else if (type === "walk") { block.pathName = ""; block.params = {}; }
+      else if (type === "record") { block.recordingName = ""; block.params = {}; }
+      else if (type === "detect") { block.image = ""; block.threshold = 0.8; block.loop = false; block.then = []; block.else = []; }
       opPhases[phase].push(block);
       opDirty = true;
       renderPhases();
@@ -1130,4 +1309,56 @@
   });
 
   renderPhases();
+
+  // ---- Walk Path Recording ----
+  let walkRecording = false;
+  async function startWalkRecording(phase, idx) {
+    if (!window.pywebview || !pywebview.api) return;
+    if (walkRecording) {
+      // Stop recording
+      const result = await pywebview.api.stop_walk_recording();
+      walkRecording = false;
+      if (result.ok) {
+        opPhases[phase][idx].pathName = result.name;
+        opDirty = true;
+        renderPhases();
+        window.addLog("Walk path saved: " + result.name);
+      }
+    } else {
+      // Start recording
+      const name = opPhases[phase][idx].pathName || `walk_${Date.now()}`;
+      const r = await pywebview.api.start_walk_recording(name);
+      if (r.ok) {
+        walkRecording = true;
+        window.addLog("Recording walk path... press Rec again to stop.");
+        const btn = document.getElementById(`btn-walk-rec-${phase}-${idx}`);
+        if (btn) { btn.textContent = "Stop"; btn.style.color = "var(--rose)"; }
+      }
+    }
+  }
+
+  // ---- Input Recording (Record block) ----
+  let inputRecording = false;
+  async function startInputRecording(phase, idx) {
+    if (!window.pywebview || !pywebview.api) return;
+    if (inputRecording) {
+      const result = await pywebview.api.stop_input_recording();
+      inputRecording = false;
+      if (result.ok) {
+        opPhases[phase][idx].recordingName = result.name;
+        opDirty = true;
+        renderPhases();
+        window.addLog("Input recording saved: " + result.name);
+      }
+    } else {
+      const name = opPhases[phase][idx].recordingName || `rec_${Date.now()}`;
+      const r = await pywebview.api.start_input_recording(name);
+      if (r.ok) {
+        inputRecording = true;
+        window.addLog("Recording input... press Rec again to stop.");
+        const btn = document.getElementById(`btn-record-${phase}-${idx}`);
+        if (btn) { btn.textContent = "Stop"; btn.style.color = "var(--rose)"; }
+      }
+    }
+  }
 })();
