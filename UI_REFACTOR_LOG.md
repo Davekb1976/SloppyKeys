@@ -21,5 +21,6 @@ Tracks the migration from PySide6 to pywebview + HTML/CSS/JS.
 | 2026-08-15 | Game slot rect reported from the DOM to the backend | The cutout is measured where the slot rendered rather than duplicated as a constant | done |
 | | Wire macro controls (Start/Stop) to the existing runner | Clicking Start in the new UI should start a run the same as F1 does | done |
 | | Extract runner control from window.py into a headless controller | The runner, navigator, task director, and settings are tangled into a 4000-line QWidget; a standalone controller lets both UIs drive them | done |
-| 2026-08-15 | Gamemode selector wired in the Dashboard | Dropdowns for Gamemode/Map/Act populated from the backend; Start button uses the selection to call start_macro | done |
+| 2026-08-15 | Gamemode selector wired in the Dashboard | Dropdowns for Gamemode/Map/Act populated from the backend; Start button uses the selection to call start_macro | replaced |
+| | Block drag polish: colored borders, hover highlights, reorder, cross-phase moves, dashed placeholder | Blocks placed in phases get colored left borders matching their type; hover highlights; drag to reorder within a phase or move between phases; dashed outline indicator during drag | next |
 | | Wire remaining screens (Planner, Queue, Route, Settings) | Full-page screens are placeholder divs; need real content from the backend | next |
