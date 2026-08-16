@@ -427,11 +427,11 @@ class MacroController:
             if outcome is not None:
                 result, msg = outcome
                 if result == OUTCOME_WON:
-                    self._stats.record_win()
+                    self._stats.record(won=True)
                     self._log(f"  Win! ({msg})")
                     self._send_webhook_result("win")
                 elif result == OUTCOME_LOST:
-                    self._stats.record_loss()
+                    self._stats.record(won=False)
                     self._log(f"  Loss. ({msg})")
                     self._send_webhook_result("loss")
                 else:

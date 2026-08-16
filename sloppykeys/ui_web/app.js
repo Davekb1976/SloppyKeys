@@ -48,8 +48,11 @@
   const LOG_MAX = 500;
 
   window.addLog = function (line) {
+    // Remove highlight from previous newest line
+    const prev = logList.querySelector(".log-line.newest");
+    if (prev) prev.classList.remove("newest");
     const div = document.createElement("div");
-    div.className = "log-line";
+    div.className = "log-line newest";
     div.textContent = "> " + line;
     logList.appendChild(div);
     while (logList.childElementCount > LOG_MAX) logList.removeChild(logList.firstElementChild);
