@@ -264,12 +264,12 @@
           </div>
           <div class="panel-body">
             <div id="task-builder" class="task-builder" style="display:none;">
-              <div class="setting-group">
-                <div class="setting-row">
+              <div class="setting-group" style="display:grid; grid-template-columns:1fr 1fr; gap:10px 20px;">
+                <div class="setting-row" style="grid-column:1/3;">
                   <div class="setting-info"><span class="setting-label">Mode</span></div>
-                  <select class="setting-select" id="tb-mode"></select>
+                  <select class="setting-select" id="tb-mode" style="width:160px;"></select>
                 </div>
-                <div id="tb-standard-fields">
+                <div id="tb-standard-fields" style="display:contents;">
                   <div class="setting-row">
                     <div class="setting-info"><span class="setting-label">Map</span></div>
                     <select class="setting-select" id="tb-map"><option value="">—</option></select>
@@ -289,34 +289,32 @@
                     <div class="setting-info"><span class="setting-label">Repeat</span></div>
                     <input type="number" class="setting-input" id="tb-repeat" min="1" max="999" value="1" style="width:70px;">
                   </div>
-                  <div class="setting-row">
+                  <div class="setting-row" style="grid-column:1/3;">
                     <div class="setting-info">
                       <span class="setting-label">Macro Operation</span>
-                      <span class="setting-desc">The macro's Team Loadout comes from its template (Macro Manager tab).</span>
+                      <span class="setting-desc">The block-based routine to run (Macro Manager tab)</span>
                     </div>
                     <select class="setting-select" id="tb-macro"><option value="">No Macro</option></select>
                   </div>
                 </div>
-                <!-- Challenge-specific fields (shown when mode=Challenge) -->
-                <div id="tb-challenge-fields" style="display:none;">
-                  <div class="setting-row" style="flex-direction:column; align-items:flex-start; gap:8px;">
-                    <div class="setting-info">
-                      <span class="setting-label">Per-Map Macro Operations</span>
-                      <span class="setting-desc">Assign a macro for each map the challenge can land on</span>
-                    </div>
-                    <div id="tb-challenge-maps" class="challenge-map-grid"></div>
+                <!-- Challenge-specific fields -->
+                <div id="tb-challenge-fields" style="display:none; grid-column:1/3;">
+                  <div class="setting-info" style="margin-bottom:8px;">
+                    <span class="setting-label">Per-Map Macro Operations</span>
+                    <span class="setting-desc">Assign a macro for each map the challenge can land on</span>
                   </div>
-                  <div class="setting-row">
+                  <div id="tb-challenge-maps" class="challenge-map-grid"></div>
+                  <div class="setting-row" style="margin-top:12px;">
                     <div class="setting-info"><span class="setting-label">Slots Enabled</span><span class="setting-desc">#1, #2, #3 challenge slots</span></div>
-                    <div style="display:flex; gap:8px;">
-                      <label style="font-size:11px; display:flex; align-items:center; gap:3px;"><input type="checkbox" id="tb-chal-slot1" checked> #1</label>
-                      <label style="font-size:11px; display:flex; align-items:center; gap:3px;"><input type="checkbox" id="tb-chal-slot2" checked> #2</label>
-                      <label style="font-size:11px; display:flex; align-items:center; gap:3px;"><input type="checkbox" id="tb-chal-slot3" checked> #3</label>
+                    <div style="display:flex; gap:12px;">
+                      <label style="font-size:12px; display:flex; align-items:center; gap:4px;"><input type="checkbox" id="tb-chal-slot1" checked> #1</label>
+                      <label style="font-size:12px; display:flex; align-items:center; gap:4px;"><input type="checkbox" id="tb-chal-slot2" checked> #2</label>
+                      <label style="font-size:12px; display:flex; align-items:center; gap:4px;"><input type="checkbox" id="tb-chal-slot3" checked> #3</label>
                     </div>
                   </div>
                 </div>
               </div>
-              <div class="task-builder-actions">
+              <div class="task-builder-actions" style="margin-top:16px;">
                 <button class="btn btn--sm" id="btn-clone-task">Clone Task</button>
                 <button class="btn btn--sm btn--danger" id="btn-remove-task" style="margin-left:auto;">Remove Task</button>
               </div>
@@ -358,7 +356,7 @@
         <button class="settings-nav-btn" data-cat="delays">Delays</button>
         <button class="settings-nav-btn" data-cat="webhook">Webhook</button>
         <button class="settings-nav-btn" data-cat="debug">Debug</button>
-        <button class="settings-nav-btn" data-cat="vision">Vision</button>
+        <button class="settings-nav-btn" data-cat="vision">OCR</button>
       </nav>
       <div class="settings-content" id="settings-content">
         <!-- General -->
@@ -481,7 +479,7 @@
 
         <!-- Vision (OCR regions) -->
         <div class="settings-category" data-cat="vision">
-          <div class="page-header"><span class="page-title">Vision / OCR Regions</span></div>
+          <div class="page-header"><span class="page-title">OCR Regions</span></div>
           <div class="setting-group">
             <div class="setting-row" style="flex-direction:column; align-items:flex-start; gap:6px;">
               <div class="setting-info">

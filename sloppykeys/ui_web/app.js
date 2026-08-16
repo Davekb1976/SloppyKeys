@@ -300,8 +300,8 @@
   // Cascade: mode → maps, map → stages
   tbMode.addEventListener("change", () => {
     const isChallenge = tbMode.value === "Challenge";
-    document.getElementById("tb-standard-fields").style.display = isChallenge ? "none" : "";
-    document.getElementById("tb-challenge-fields").style.display = isChallenge ? "" : "none";
+    document.getElementById("tb-standard-fields").style.display = isChallenge ? "none" : "contents";
+    document.getElementById("tb-challenge-fields").style.display = isChallenge ? "block" : "none";
     if (isChallenge) {
       renderChallengeMapGrid();
     } else {
