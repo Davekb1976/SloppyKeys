@@ -73,7 +73,12 @@
     <div class="dash-layout">
       <!-- Left: game + log -->
       <div class="dash-left">
-        <div id="game-slot" class="game-slot"></div>
+        <div id="game-slot" class="game-slot">
+          <div class="game-slot-overlay">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            <span class="game-slot-size">1152 × 756</span>
+          </div>
+        </div>
         <!-- Compact strip: only visible in compact mode -->
         <div class="compact-strip" id="compact-strip">
           <span class="compact-status" id="compact-action">Idle</span>
