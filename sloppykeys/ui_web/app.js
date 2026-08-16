@@ -313,12 +313,30 @@
   });
 
   // Task queue presets: save/load/delete
-  document.getElementById("btn-save-queue").addEventListener("click", async () => {
+  document.getElementById("btn-save-queue").addEventListener("click", () => {
     if (!window.pywebview || !pywebview.api || !tasks.length) return;
-    const name = prompt("Save task queue as:");
-    if (!name || !name.trim()) return;
-    const r = await pywebview.api.save_task_preset(name.trim(), tasks);
-    if (r.ok) { window.addLog("Queue saved: " + name.trim()); loadQueuePresets(); }
+    // Show the save queue modal
+    document.getElementById("save-queue-modal").style.display = "flex";
+    const input = document.getElementById("save-queue-name");
+    input.value = "";
+    setTimeout(() => input.focus(), 50);
+  });
+
+  document.getElementById("save-queue-confirm").addEventListener("click", async () => {
+    const input = document.getElementById("save-queue-name");
+    const name = input.value.trim();
+    if (!name || !window.pywebview || !pywebview.api) return;
+    document.getElementById("save-queue-modal").style.display = "none";
+    const r = await pywebview.api.save_task_preset(name, tasks);
+    if (r.ok) { window.addLog("Queue saved: " + name); loadQueuePresets(); }
+  });
+
+  document.getElementById("save-queue-name").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") document.getElementById("save-queue-confirm").click();
+  });
+
+  document.getElementById("save-queue-cancel").addEventListener("click", () => {
+    document.getElementById("save-queue-modal").style.display = "none";
   });
 
   const queuePresetLoad = document.getElementById("queue-preset-load");
