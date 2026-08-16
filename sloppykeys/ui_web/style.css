@@ -370,7 +370,8 @@ input:focus, select:focus {
 
 /* ---- Macro Manager ---- */
 .phases-container { flex: 1; overflow-y: auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
-.phase-section { border: 1px solid var(--border); background: var(--surface-panel); }
+.phase-section { border: 1px solid var(--border); background: var(--surface-panel); transition: border-color 0.2s, box-shadow 0.2s; }
+.phase-section.drag-active { border-color: color-mix(in srgb, var(--accent) 60%, var(--border)); box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 15%, transparent); }
 .phase-header {
   display: flex; align-items: center; gap: 8px; padding: 6px 10px;
   border-bottom: 1px solid var(--border); cursor: pointer;
@@ -385,14 +386,12 @@ input:focus, select:focus {
 .phase-label { font-size: 12px; font-weight: 600; color: var(--text); }
 .phase-count { font-size: 10px; color: var(--text-faint); margin-left: auto; }
 .phase-dropzone {
-  min-height: 70px; padding: 8px; display: flex; flex-direction: column; gap: 4px;
-  border: 1px dashed color-mix(in srgb, var(--accent) 30%, var(--border));
-  transition: border-color 0.15s, background 0.15s;
+  min-height: 64px; padding: 8px; display: flex; flex-direction: column; gap: 4px;
+  border-radius: 0; transition: background 0.15s;
 }
 .phase-dropzone.drag-over {
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
-  border-color: var(--accent);
-  border-style: dashed;
+  outline: 2px dashed var(--accent); outline-offset: -2px;
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
 }
 .phase-placeholder { font-size: 11px; color: var(--text-faint); text-align: center; padding: 12px; }
 .block-row {
@@ -430,12 +429,15 @@ input:focus, select:focus {
 .block-row .block-remove { color: var(--text-faint); cursor: pointer; font-size: 14px; }
 .block-row .block-remove:hover { color: var(--rose); }
 
-/* Drop placeholder line between blocks */
+/* Drop placeholder — a real element that opens a gap where the block will land */
 .drop-placeholder {
-  height: 3px; background: var(--accent); border-radius: 2px;
-  margin: 2px 0;
-  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 50%, transparent);
+  height: 0; margin: 0; box-sizing: border-box;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border: 1.5px dashed color-mix(in srgb, var(--accent) 55%, transparent);
+  opacity: 0;
+  transition: height 0.15s ease, opacity 0.15s ease, margin 0.15s ease;
 }
+.drop-placeholder.open { height: 36px; margin: 3px 0; opacity: 1; }
 
 /* Block type color coding */
 .block-row[data-type="place_unit"],
