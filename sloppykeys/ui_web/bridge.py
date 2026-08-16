@@ -338,12 +338,19 @@ class Api:
         try:
             import mss
             import numpy as np
+            import cv2
             from sloppykeys.core.ocr import OcrReader
-            from sloppykeys.core.win32.roblox_window import find_roblox_window, client_to_screen, client_size
+            from sloppykeys.core.win32.roblox_window import client_to_screen, client_size, is_window
 
-            hwnd = find_roblox_window()
+            # Use the tracked game HWND (works even when hidden for screen capture)
+            hwnd = self._game_hwnd
+            if not hwnd or not is_window(hwnd):
+                # Fallback: try finding it
+                from sloppykeys.core.win32.roblox_window import find_roblox_window
+                hwnd = find_roblox_window()
             if not hwnd:
-                return {"ok": False, "reason": "Roblox not found"}
+                return {"ok": False, "reason": "Roblox not found — is it running?"}
+
             origin = client_to_screen(hwnd, 0, 0)
             size = client_size(hwnd)
             if not origin or not size:
@@ -354,18 +361,37 @@ class Api:
             vw, vh = size
             x = vx + int(box[0] * vw / 1152)
             y = vy + int(box[1] * vh / 756)
-            w = int(box[2] * vw / 1152)
-            h = int(box[3] * vh / 756)
+            w = max(1, int(box[2] * vw / 1152))
+            h = max(1, int(box[3] * vh / 756))
 
             with mss.mss() as sct:
-                mon = {"left": x, "top": y, "width": max(1, w), "height": max(1, h)}
-                img = np.array(sct.grab(mon))[:, :, :3]
+                mon = {"left": x, "top": y, "width": w, "height": h}
+                img = np.array(sct.grab(mon))[:, :, :3].copy()
 
+            # Use RapidOCR read_line (recognition only, no detection)
             ocr = OcrReader()
-            text = ocr.read_text(img)
-            return {"ok": True, "text": text.strip(), "confidence": ""}
+            ok_avail, msg = ocr.available()
+            if not ok_avail:
+                return {"ok": False, "reason": msg}
+            result = ocr.read_line(img)
+            return {"ok": True, "text": result.text or "(empty)", "score": round(result.score, 3)}
         except Exception as exc:
             return {"ok": False, "reason": str(exc)}
+
+    def test_ocr_all(self) -> dict:
+        """Test all OCR regions at once. Returns a dict of key → text read."""
+        if not self._app_root:
+            return {"ok": False, "results": {}}
+        from sloppykeys.content.challenge import region_specs
+        results = {}
+        for key, label, default in region_specs():
+            # Get override or use default
+            settings = UnifiedSettings(self._app_root)
+            regions = settings.get("vision_regions", {})
+            box = list(regions.get(key, default))
+            r = self.test_ocr_region(key, box)
+            results[key] = r.get("text", r.get("reason", "error")) if r.get("ok") else f"[{r.get('reason', 'error')}]"
+        return {"ok": True, "results": results}
 
     # ---- Game Keybinds (in-game keys the macro presses) ----
 

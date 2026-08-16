@@ -488,7 +488,7 @@
         const r = await pywebview.api.test_ocr_region(key, box);
         btn.textContent = "Test";
         if (r.ok) {
-          window.addLog(`[OCR] ${key}: "${r.text}" (confidence: ${r.confidence || "—"})`);
+          window.addLog(`[OCR] ${key}: "${r.text}" (score: ${r.score || "—"})`);
         } else {
           window.addLog(`[OCR] ${key}: ${r.reason || "failed to read"}`);
         }
@@ -501,6 +501,19 @@
     await pywebview.api.reset_vision_regions();
     loadVisionRegions();
     window.addLog("Vision regions reset to defaults.");
+  });
+
+  document.getElementById("btn-vision-test-all").addEventListener("click", async () => {
+    if (!window.pywebview || !pywebview.api) return;
+    window.addLog("[OCR] Testing all regions...");
+    const r = await pywebview.api.test_ocr_all();
+    if (r.ok) {
+      for (const [key, text] of Object.entries(r.results)) {
+        window.addLog(`[OCR] ${key}: "${text}"`);
+      }
+    } else {
+      window.addLog("[OCR] Test all failed.");
+    }
   });
 
   // Populate gamemodes in the task builder mode dropdown
