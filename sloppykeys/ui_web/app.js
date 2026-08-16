@@ -921,6 +921,7 @@
   let posImage = null;  // loaded Image object
   let posCategories = [];
   let posCategory = "";
+  let posLastMap = null; // {category, name, dataUri} — remembered across Set clicks
 
   const posModal = document.getElementById("pos-modal");
   const posTabs = document.getElementById("pos-tabs");
@@ -937,6 +938,14 @@
     // Hide the game so the modal isn't behind it
     if (window.pywebview && pywebview.api) pywebview.api.set_game_visible(false);
     posModal.style.display = "flex";
+
+    // If we have a recently used map, jump straight to the canvas
+    if (posLastMap) {
+      loadPosImage(posLastMap.dataUri);
+      return;
+    }
+
+    // Otherwise show the map grid
     posGrid.style.display = "";
     posCanvasWrap.style.display = "none";
     document.getElementById("pos-back").style.display = "none";
@@ -952,6 +961,7 @@
     restoreGameIfDashboard();
   });
   document.getElementById("pos-back").addEventListener("click", () => {
+    posLastMap = null; // forget the recent map so next Set shows the grid
     posGrid.style.display = "";
     posCanvasWrap.style.display = "none";
     document.getElementById("pos-back").style.display = "none";
@@ -989,7 +999,10 @@
       });
       thumb.addEventListener("click", async () => {
         const r = await pywebview.api.get_map_image(cat, name);
-        if (r.ok) loadPosImage(r.data_uri);
+        if (r.ok) {
+          posLastMap = { category: cat, name, dataUri: r.data_uri };
+          loadPosImage(r.data_uri);
+        }
       });
     });
   }
@@ -998,6 +1011,8 @@
     const img = new Image();
     img.onload = () => {
       posImage = img;
+      posLastMap = posLastMap || {};
+      posLastMap.dataUri = dataUri;
       posGrid.style.display = "none";
       posCanvasWrap.style.display = "";
       document.getElementById("pos-back").style.display = "";
