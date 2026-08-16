@@ -448,6 +448,120 @@
     }
   }
 
+  // ---- OCR Region Picker (snapshot + draw box) ----
+  let ocrRegionKey = null;
+  let ocrRegionRect = null;
+
+  function openRegionPicker(key, dataUri) {
+    ocrRegionKey = key;
+    ocrRegionRect = null;
+    document.getElementById("ocr-region-key").textContent = key;
+    document.getElementById("ocr-region-readout").textContent = "Draw a box";
+    document.getElementById("ocr-region-apply").disabled = true;
+    document.getElementById("ocr-region-modal").style.display = "flex";
+
+    const canvas = document.getElementById("ocr-region-canvas");
+    const wrap = document.getElementById("ocr-region-wrap");
+    const ctx = canvas.getContext("2d");
+    const img = new Image();
+    img.onload = () => {
+      const wrapW = wrap.clientWidth || 860;
+      const wrapH = wrap.clientHeight || 450;
+      const scale = Math.min(wrapW / img.naturalWidth, wrapH / img.naturalHeight, 1);
+      canvas.width = wrapW;
+      canvas.height = wrapH;
+      canvas.dataset.scale = scale;
+      canvas.dataset.natW = img.naturalWidth;
+      canvas.dataset.natH = img.naturalHeight;
+
+      let zoom = 1.0, panX = (wrapW - img.naturalWidth * scale) / 2, panY = (wrapH - img.naturalHeight * scale) / 2;
+      let dragging = false, dragStart = null, panning = false, panStart = null;
+
+      function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.save();
+        ctx.translate(panX, panY);
+        ctx.scale(zoom, zoom);
+        ctx.drawImage(img, 0, 0, img.naturalWidth * scale, img.naturalHeight * scale);
+        if (ocrRegionRect) {
+          ctx.strokeStyle = "#8b5cf6";
+          ctx.lineWidth = 2 / zoom;
+          ctx.strokeRect(ocrRegionRect.x * scale, ocrRegionRect.y * scale, ocrRegionRect.w * scale, ocrRegionRect.h * scale);
+          ctx.fillStyle = "rgba(139, 92, 246, 0.15)";
+          ctx.fillRect(ocrRegionRect.x * scale, ocrRegionRect.y * scale, ocrRegionRect.w * scale, ocrRegionRect.h * scale);
+        }
+        ctx.restore();
+      }
+      draw();
+
+      function screenToImage(sx, sy) {
+        return [Math.round((sx - panX) / zoom / scale), Math.round((sy - panY) / zoom / scale)];
+      }
+
+      canvas.onwheel = (e) => {
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+        const oldZoom = zoom;
+        zoom = Math.max(0.5, Math.min(5, zoom * (e.deltaY < 0 ? 1.15 : 1/1.15)));
+        panX = mx - (mx - panX) * (zoom / oldZoom);
+        panY = my - (my - panY) * (zoom / oldZoom);
+        draw();
+      };
+      canvas.onmousedown = (e) => {
+        if (e.button === 1) { panning = true; panStart = {x: e.clientX - panX, y: e.clientY - panY}; e.preventDefault(); return; }
+        if (e.button === 0) {
+          const rect = canvas.getBoundingClientRect();
+          dragStart = {x: e.clientX - rect.left, y: e.clientY - rect.top};
+          dragging = true;
+        }
+      };
+      canvas.onmousemove = (e) => {
+        if (panning && panStart) { panX = e.clientX - panStart.x; panY = e.clientY - panStart.y; draw(); return; }
+        if (!dragging || !dragStart) return;
+        const rect = canvas.getBoundingClientRect();
+        const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
+        const [ix1, iy1] = screenToImage(Math.min(dragStart.x, cx), Math.min(dragStart.y, cy));
+        const [ix2, iy2] = screenToImage(Math.max(dragStart.x, cx), Math.max(dragStart.y, cy));
+        const w = Math.max(0, ix2 - ix1), h = Math.max(0, iy2 - iy1);
+        ocrRegionRect = {x: Math.max(0, ix1), y: Math.max(0, iy1), w, h};
+        draw();
+        document.getElementById("ocr-region-readout").textContent = `${ocrRegionRect.x}, ${ocrRegionRect.y}, ${w}×${h}`;
+        document.getElementById("ocr-region-apply").disabled = (w < 2 || h < 2);
+      };
+      canvas.onmouseup = (e) => { if (e.button === 1) panning = false; if (e.button === 0) dragging = false; };
+      canvas.oncontextmenu = (e) => e.preventDefault();
+    };
+    img.src = dataUri;
+  }
+
+  document.getElementById("ocr-region-apply").addEventListener("click", () => {
+    if (!ocrRegionRect || !ocrRegionKey) return;
+    document.getElementById("ocr-region-modal").style.display = "none";
+    // Write the coords back to the region inputs
+    const row = document.querySelector(`.vision-region-row input[data-vr-key="${ocrRegionKey}"]`)?.closest(".vision-region-row");
+    if (row) {
+      const inputs = row.querySelectorAll("input");
+      inputs[0].value = ocrRegionRect.x;
+      inputs[1].value = ocrRegionRect.y;
+      inputs[2].value = ocrRegionRect.w;
+      inputs[3].value = ocrRegionRect.h;
+      // Save
+      if (window.pywebview && pywebview.api) {
+        pywebview.api.set_vision_region(ocrRegionKey, [ocrRegionRect.x, ocrRegionRect.y, ocrRegionRect.w, ocrRegionRect.h]);
+      }
+    }
+    window.addLog(`[OCR] Region set for ${ocrRegionKey}: ${ocrRegionRect.x},${ocrRegionRect.y} ${ocrRegionRect.w}×${ocrRegionRect.h}`);
+    ocrRegionKey = null; ocrRegionRect = null;
+  });
+
+  document.getElementById("ocr-region-cancel").addEventListener("click", () => {
+    document.getElementById("ocr-region-modal").style.display = "none";
+  });
+  document.getElementById("ocr-region-cancel-btn").addEventListener("click", () => {
+    document.getElementById("ocr-region-modal").style.display = "none";
+  });
+
   // ---- Vision regions ----
   async function loadVisionRegions() {
     if (!window.pywebview || !pywebview.api) return;
@@ -463,8 +577,7 @@
         <input type="number" value="${val[1]}" data-vr-key="${s.key}" data-vr-idx="1" title="y">
         <input type="number" value="${val[2]}" data-vr-key="${s.key}" data-vr-idx="2" title="w">
         <input type="number" value="${val[3]}" data-vr-key="${s.key}" data-vr-idx="3" title="h">
-        <button class="btn btn--sm" data-vr-set="${s.key}" title="Set region from Roblox">Set</button>
-        <button class="btn btn--sm" data-vr-test="${s.key}" title="Test OCR on this region">Test</button>
+        <button class="btn btn--sm" data-vr-set="${s.key}" title="Set from Roblox screenshot">Set</button>
       </div>`;
     }).join("");
     list.querySelectorAll("input[data-vr-key]").forEach(inp => {
@@ -482,34 +595,11 @@
       btn.addEventListener("click", async () => {
         if (!window.pywebview || !pywebview.api) return;
         const key = btn.dataset.vrSet;
-        // Capture a Roblox snapshot for region picking
-        const snap = await pywebview.api.get_roblox_snapshot();
-        if (!snap.ok) { window.addLog("[OCR] Capture failed: " + (snap.reason || "error")); return; }
-        // Open a crop view inline — reuse the position picker's canvas approach
-        window._ocrRegionTarget = key;
-        window._ocrRegionSnap = snap.data_uri;
-        window.addLog("[OCR] Draw a box on the snapshot to set the region for: " + key);
-        // For now, log instruction — full drag-to-crop region picker to be built
-        // (same infrastructure as Image Manager crop)
-        window.addLog("[OCR] Edit the x/y/w/h numbers directly for now. Full crop picker coming soon.");
-      });
-    });
-    // Test buttons — run OCR on the region
-    list.querySelectorAll("[data-vr-test]").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        if (!window.pywebview || !pywebview.api) return;
-        const key = btn.dataset.vrTest;
-        const row = btn.closest(".vision-region-row");
-        const inputs = row.querySelectorAll("input");
-        const box = [parseInt(inputs[0].value), parseInt(inputs[1].value), parseInt(inputs[2].value), parseInt(inputs[3].value)];
         btn.textContent = "...";
-        const r = await pywebview.api.test_ocr_region(key, box);
-        btn.textContent = "Test";
-        if (r.ok) {
-          window.addLog(`[OCR] ${key}: "${r.text}" (score: ${r.score || "—"})`);
-        } else {
-          window.addLog(`[OCR] ${key}: ${r.reason || "failed"}`);
-        }
+        const snap = await pywebview.api.get_roblox_snapshot();
+        btn.textContent = "Set";
+        if (!snap.ok) { window.addLog("[OCR] Capture failed — is Roblox visible?"); return; }
+        openRegionPicker(key, snap.data_uri);
       });
     });
   }

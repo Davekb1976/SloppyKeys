@@ -486,6 +486,7 @@
                 <span class="setting-name">Challenge Panel Regions</span>
                 <span class="setting-desc">Crop boxes for OCR reading of the challenge panel (x, y, w, h in 1152×756 space)</span>
               </div>
+              <div style="font-size:10px; color:var(--amber); padding:4px 8px; border:1px solid color-mix(in srgb, var(--amber) 30%, var(--border)); margin-bottom:4px;">⚠ Navigate to the Challenge panel in Roblox before using Set or Test All</div>
               <div id="vision-regions-list" class="vision-regions"></div>
               <button class="btn btn--sm" id="btn-vision-reset">Reset to Defaults</button>
               <button class="btn btn--sm" id="btn-vision-test-all">Test All</button>
@@ -495,6 +496,29 @@
       </div>
     </div>
   </div>
+
+<!-- OCR Region Picker Modal -->
+<div class="modal-overlay" id="ocr-region-modal" style="display:none;">
+  <div class="modal-box" style="width:900px; height:600px; display:flex; flex-direction:column;">
+    <div class="modal-header">
+      <span class="modal-title">Set OCR Region</span>
+      <span id="ocr-region-key" style="font-size:11px; color:var(--text-muted); margin-left:8px;"></span>
+      <span class="pos-readout" id="ocr-region-readout" style="margin-left:auto;">Draw a box</span>
+      <button class="modal-close" id="ocr-region-cancel">&times;</button>
+    </div>
+    <div class="modal-body" style="flex:1; min-height:0; display:flex; flex-direction:column; gap:8px;">
+      <div style="font-size:10px; color:var(--text-faint);">Left-click drag to select region · Scroll to zoom · Middle-click to pan</div>
+      <div id="ocr-region-wrap" style="flex:1; position:relative; overflow:hidden; border:1px solid var(--border);">
+        <canvas id="ocr-region-canvas" style="cursor:crosshair; display:block; width:100%; height:100%;"></canvas>
+      </div>
+      <div style="display:flex; gap:8px; justify-content:flex-end;">
+        <button class="btn btn--sm" id="ocr-region-cancel-btn">Cancel</button>
+        <button class="btn btn--sm btn--primary" id="ocr-region-apply" disabled>Apply</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="rec-popout" style="display:none;">
   <span class="rec-dot"></span>
   <span id="rec-popout-text">Recording input inside the game window</span>
