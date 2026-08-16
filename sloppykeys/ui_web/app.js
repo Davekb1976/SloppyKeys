@@ -592,12 +592,18 @@
         });
       });
 
-      // Wire walk recording buttons
-      zone.querySelectorAll("[id^='btn-walk-rec-']").forEach((btn) => {
+      // Wire walk recording buttons (both walk blocks and walk_path custom)
+      zone.querySelectorAll("[id^='btn-walk-rec-'], [id^='btn-walkrec-']").forEach((btn) => {
         btn.addEventListener("click", () => {
-          const parts = btn.id.split("-");
-          const ph = parts[3];
-          const idx = parseInt(parts[4]);
+          const id = btn.id;
+          let ph, idx;
+          if (id.startsWith("btn-walkrec-")) {
+            const parts = id.replace("btn-walkrec-", "").split("-");
+            ph = parts[0]; idx = parseInt(parts[1]);
+          } else {
+            const parts = id.replace("btn-walk-rec-", "").split("-");
+            ph = parts[0]; idx = parseInt(parts[1]);
+          }
           startWalkRecording(ph, idx);
         });
       });
@@ -1324,19 +1330,27 @@
     posCtx.scale(posZoom, posZoom);
     posCtx.drawImage(posImage, 0, 0, posImage.naturalWidth * scale, posImage.naturalHeight * scale);
 
-    // Draw ALL placed units as numbered markers (amber for others, purple for current)
-    let unitNum = 0;
+    // Draw ALL blocks with x/y coords as numbered markers
+    const COORD_TYPES = ["place_unit", "upgrade_unit", "sell_unit", "target_priority", "click"];
+    const TYPE_COLORS = {
+      place_unit: "rgba(139, 92, 246, 0.7)",     // purple
+      upgrade_unit: "rgba(34, 197, 94, 0.7)",    // teal/green
+      sell_unit: "rgba(239, 68, 68, 0.7)",       // rose
+      target_priority: "rgba(96, 165, 250, 0.7)", // blue
+      click: "rgba(232, 162, 58, 0.7)",          // amber
+    };
+    let markerNum = 0;
     PHASES.forEach((phase) => {
       (opPhases[phase] || []).forEach((b, idx) => {
-        if (b.type !== "place_unit") return;
-        unitNum++;
+        if (!COORD_TYPES.includes(b.type)) return;
+        markerNum++;
         const x = (b.params?.x || 0) * scale;
         const y = (b.params?.y || 0) * scale;
         if (!x && !y) return;
         const isCurrent = posTarget && posTarget.phase === phase && posTarget.idx === idx;
         posCtx.beginPath();
         posCtx.arc(x, y, 8 / posZoom, 0, Math.PI * 2);
-        posCtx.fillStyle = isCurrent ? "rgba(139, 92, 246, 0.8)" : "rgba(232, 162, 58, 0.7)";
+        posCtx.fillStyle = isCurrent ? "rgba(139, 92, 246, 0.9)" : (TYPE_COLORS[b.type] || "rgba(232, 162, 58, 0.7)");
         posCtx.fill();
         posCtx.strokeStyle = "#fff";
         posCtx.lineWidth = 2 / posZoom;
@@ -1346,7 +1360,7 @@
         posCtx.font = `bold ${Math.round(10 / posZoom)}px sans-serif`;
         posCtx.textAlign = "center";
         posCtx.textBaseline = "middle";
-        posCtx.fillText(String(unitNum), x, y);
+        posCtx.fillText(String(markerNum), x, y);
       });
     });
     posCtx.restore();
@@ -1410,27 +1424,39 @@
 
   // ---- Walk Path Recording ----
   let walkRecording = false;
+  let walkRecPhase = null, walkRecIdx = null;
+
   async function startWalkRecording(phase, idx) {
     if (!window.pywebview || !pywebview.api) return;
     if (walkRecording) {
       // Stop recording
       const result = await pywebview.api.stop_walk_recording();
       walkRecording = false;
+      document.getElementById("rec-popout").style.display = "none";
       if (result.ok) {
         opPhases[phase][idx].pathName = result.name;
         opDirty = true;
-        renderPhases();
+        _cachedWalkPaths = null;
         window.addLog("Walk path saved: " + result.name);
       }
+      // Switch back to planner
+      switchScreen("planner");
+      renderPhases();
     } else {
-      // Start recording
+      // Start recording: switch to dashboard
+      walkRecPhase = phase;
+      walkRecIdx = idx;
+      switchScreen("dashboard");
+      await new Promise(r => setTimeout(r, 300));
       const name = opPhases[phase][idx].pathName || `walk_${Date.now()}`;
       const r = await pywebview.api.start_walk_recording(name);
       if (r.ok) {
         walkRecording = true;
-        window.addLog("Recording walk path... press Rec again to stop.");
-        const btn = document.getElementById(`btn-walk-rec-${phase}-${idx}`);
-        if (btn) { btn.textContent = "Stop"; btn.style.color = "var(--rose)"; }
+        document.getElementById("rec-popout").style.display = "flex";
+        document.getElementById("rec-popout-text").textContent = "Recording walk path (WASD + Shift)";
+        window.addLog("Recording walk path — move in Roblox, then click Stop.");
+      } else {
+        switchScreen("planner");
       }
     }
   }
@@ -1549,10 +1575,12 @@
     }
   }
 
-  // Stop button in the recording popout
+  // Stop button in the recording popout (handles both input recording and walk recording)
   document.getElementById("rec-stop-btn").addEventListener("click", () => {
     if (inputRecording && recordingBlockPhase !== null) {
       startInputRecording(recordingBlockPhase, recordingBlockIdx);
+    } else if (walkRecording && walkRecPhase !== null) {
+      startWalkRecording(walkRecPhase, walkRecIdx);
     }
   });
 
