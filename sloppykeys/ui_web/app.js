@@ -312,6 +312,45 @@
     });
   });
 
+  // Task queue presets: save/load/delete
+  document.getElementById("btn-save-queue").addEventListener("click", async () => {
+    if (!window.pywebview || !pywebview.api || !tasks.length) return;
+    const name = prompt("Save task queue as:");
+    if (!name || !name.trim()) return;
+    const r = await pywebview.api.save_task_preset(name.trim(), tasks);
+    if (r.ok) { window.addLog("Queue saved: " + name.trim()); loadQueuePresets(); }
+  });
+
+  const queuePresetLoad = document.getElementById("queue-preset-load");
+  queuePresetLoad.addEventListener("change", async () => {
+    const name = queuePresetLoad.value;
+    if (!name || !window.pywebview || !pywebview.api) return;
+    const r = await pywebview.api.load_task_preset(name);
+    if (r.ok && r.tasks) {
+      tasks = r.tasks;
+      await pywebview.api.clear_tasks();
+      for (const t of tasks) await pywebview.api.add_task(t);
+      selectedTaskId = null;
+      renderTaskList();
+      showBuilderEmpty();
+      window.addLog("Queue loaded: " + name);
+    }
+    queuePresetLoad.value = "";
+  });
+
+  document.getElementById("btn-del-queue-preset").addEventListener("click", async () => {
+    const name = queuePresetLoad.value || queuePresetLoad.options[queuePresetLoad.selectedIndex]?.text;
+    if (!name || name === "Load Queue..." || !window.pywebview || !pywebview.api) return;
+    const r = await pywebview.api.delete_task_preset(name);
+    if (r.ok) { window.addLog("Queue preset deleted: " + name); loadQueuePresets(); }
+  });
+
+  async function loadQueuePresets() {
+    if (!window.pywebview || !pywebview.api) return;
+    const names = await pywebview.api.list_task_presets();
+    queuePresetLoad.innerHTML = '<option value="">Load Queue...</option>' + (names || []).map(n => `<option value="${n}">${n}</option>`).join("");
+  }
+
   document.getElementById("btn-remove-task").addEventListener("click", () => {
     if (!selectedTaskId || !window.pywebview || !pywebview.api) return;
     pywebview.api.remove_task(selectedTaskId).then(() => {
@@ -337,6 +376,7 @@
     loadGameKeybinds();
     loadOperationList();
     loadTasks();
+    loadQueuePresets();
   };
 
   // ---- Macro Manager ----

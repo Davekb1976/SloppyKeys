@@ -325,6 +325,95 @@ class Api:
             return []
         return UnifiedSettings(self._app_root).get_tasks()
 
+    # ---- Task Queue Presets ----
+
+    def list_task_presets(self) -> list:
+        """Names of all saved task queue presets."""
+        if not self._app_root:
+            return []
+        folder = os.path.join(self._app_root, "presets")
+        if not os.path.isdir(folder):
+            return []
+        import json as _json
+        names = []
+        for f in sorted(os.listdir(folder)):
+            if f.endswith(".json"):
+                try:
+                    with open(os.path.join(folder, f), "r", encoding="utf-8") as fh:
+                        data = _json.load(fh)
+                    names.append(data.get("name", f[:-5]))
+                except (OSError, ValueError):
+                    names.append(f[:-5])
+        return names
+
+    def save_task_preset(self, name: str, tasks: list) -> dict:
+        """Save the current task queue as a named preset."""
+        if not self._app_root:
+            return {"ok": False}
+        import json as _json, re as _re
+        folder = os.path.join(self._app_root, "presets")
+        os.makedirs(folder, exist_ok=True)
+        slug = _re.sub(r"[^A-Za-z0-9 _\-]", "", name or "").strip() or "preset"
+        path = os.path.join(folder, f"{slug}.json")
+        payload = {"name": name, "tasks": tasks}
+        tmp = path + ".tmp"
+        try:
+            with open(tmp, "w", encoding="utf-8") as f:
+                _json.dump(payload, f, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, path)
+            return {"ok": True}
+        except OSError:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+            return {"ok": False}
+
+    def load_task_preset(self, name: str) -> dict:
+        """Load a saved task queue preset by name."""
+        if not self._app_root:
+            return {"ok": False, "tasks": []}
+        import json as _json, re as _re
+        folder = os.path.join(self._app_root, "presets")
+        # Find by display name
+        if os.path.isdir(folder):
+            for f in os.listdir(folder):
+                if not f.endswith(".json"):
+                    continue
+                path = os.path.join(folder, f)
+                try:
+                    with open(path, "r", encoding="utf-8") as fh:
+                        data = _json.load(fh)
+                    if data.get("name") == name:
+                        return {"ok": True, "tasks": data.get("tasks", [])}
+                except (OSError, ValueError):
+                    continue
+        return {"ok": False, "tasks": []}
+
+    def delete_task_preset(self, name: str) -> dict:
+        """Delete a task queue preset by name."""
+        if not self._app_root:
+            return {"ok": False}
+        import json as _json
+        folder = os.path.join(self._app_root, "presets")
+        if not os.path.isdir(folder):
+            return {"ok": False}
+        for f in os.listdir(folder):
+            if not f.endswith(".json"):
+                continue
+            path = os.path.join(folder, f)
+            try:
+                with open(path, "r", encoding="utf-8") as fh:
+                    data = _json.load(fh)
+                if data.get("name") == name:
+                    os.remove(path)
+                    return {"ok": True}
+            except (OSError, ValueError):
+                continue
+        return {"ok": False}
+
     def add_task(self, task: dict) -> dict:
         """Append a new task to the queue. Assigns an id if missing."""
         if not self._app_root:
