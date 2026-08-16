@@ -294,14 +294,19 @@ class InputRecorder:
                 self._buttons_down.discard(button)
                 self._events.append({"t": self._elapsed(now), "type": "up", "button": button})
                 return
-            # DOWN
+            # DOWN — always emit a move at the click position right before the
+            # down, even if the move throttle would have suppressed it. This
+            # guarantees that during replay, the cursor is exactly where the
+            # click needs to land (Roblox acts on its last processed move).
             if button in self._buttons_down:
-                # Heal orphaned down
                 self._events.append({"t": self._elapsed(now), "type": "up", "button": button})
             ref = self._screen_to_ref(*pos)
             if ref is None or not self._in_bounds(*ref):
                 self._buttons_down.discard(button)
                 return
+            # Force a move event at this position (click target)
+            self._events.append({"t": self._elapsed(now), "type": "move", "x": round(ref[0], 1), "y": round(ref[1], 1)})
+            self._last_move_t = self._elapsed(now)
             self._buttons_down.add(button)
             self._events.append({"t": self._elapsed(now), "type": "down", "button": button})
 
@@ -407,6 +412,11 @@ def replay_recording(
                 button = ev.get("button", "left")
                 if button in held_buttons:
                     mouse_lib.release(button)
+                # Settle: give Roblox one frame to process the cursor position.
+                # Without this, Roblox clicks at the PREVIOUS position because
+                # it reads cursor pos once per rendered frame, and the move that
+                # just happened hasn't been consumed yet.
+                time.sleep(0.018)  # ~1 frame at 60Hz
                 mouse_lib.press(button)
                 held_buttons.add(button)
             elif etype == "up":
