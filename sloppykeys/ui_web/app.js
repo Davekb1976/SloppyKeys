@@ -81,11 +81,7 @@
 
   btnPause.addEventListener("click", () => {
     if (!window.pywebview || !pywebview.api) return;
-    if (macroPaused) {
-      pywebview.api.resume_macro();
-    } else {
-      pywebview.api.pause_macro();
-    }
+    pywebview.api.toggle_pause();
   });
 
   btnStop.addEventListener("click", () => {
@@ -159,8 +155,7 @@
   });
   document.getElementById("cs-pause").addEventListener("click", () => {
     if (!window.pywebview || !pywebview.api) return;
-    if (macroPaused) pywebview.api.resume_macro();
-    else pywebview.api.pause_macro();
+    pywebview.api.toggle_pause();
   });
   document.getElementById("cs-stop").addEventListener("click", () => {
     if (window.pywebview && pywebview.api) pywebview.api.stop_macro();

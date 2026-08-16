@@ -893,6 +893,17 @@ class Api:
         self._push_status()
         return {"ok": True}
 
+    def toggle_pause(self) -> dict:
+        """Toggle pause/resume. The server decides the state, not the client."""
+        if self._ctrl is None or not self._ctrl.is_running:
+            return {"ok": False}
+        if self._ctrl._paused:
+            self._ctrl.resume()
+        else:
+            self._ctrl.pause()
+        self._push_status()
+        return {"ok": True, "paused": self._ctrl._paused}
+
     def get_macro_status(self) -> dict:
         """Poll macro state from JS."""
         if self._ctrl is None:
@@ -986,7 +997,7 @@ class Api:
                         self._log_to_ui("Already running — use the stop key.")
                 self._key_down["start"] = start_down
 
-                # Pause key — rising edge
+                # Pause key — rising edge (toggle)
                 pause_kb = keybinds.get("pause")
                 pause_down = kb_pressed(pause_kb)
                 if pause_down and not self._key_down.get("pause", False):
