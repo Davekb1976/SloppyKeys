@@ -659,7 +659,7 @@ class Api:
         """Test-search one image against the live Roblox screen. Returns match info."""
         if not self._app_root:
             return {"ok": False, "best": 0}
-        from sloppykeys.core.image_search import ImageProfile
+        from sloppykeys.core.image_search import ImageProfile, ImageSearchEngine, best_score
         from sloppykeys.core.win32.roblox_window import find_roblox_window, client_to_screen, client_size
 
         hwnd = find_roblox_window()
@@ -682,31 +682,20 @@ class Api:
         name = os.path.splitext(os.path.basename(image_path))[0]
         threshold = float(thresholds.get(name, 0.70))
 
+        # Use the controller's engine if available, else create a temporary one
+        engine = self._ctrl._engine if self._ctrl else ImageSearchEngine(self._app_root)
+
         profile = ImageProfile(name=name, image_path=full_path, confidence=threshold)
-        match = self._engine.find_first([profile], rect)
+        match = engine.find_first([profile], rect)
 
         if match:
             return {"ok": True, "score": match.score, "x": match.center_x, "y": match.center_y, "threshold": threshold}
 
-        # Get best score for diagnostics
-        from sloppykeys.core.image_search import best_score
-        score = best_score(self._engine, lambda: rect, full_path)
-        return {"ok": False, "best": score or 0, "threshold": threshold}
-        settings = UnifiedSettings(self._app_root)
-        thresholds = settings.get("image_thresholds", {})
-        if not isinstance(thresholds, dict):
-            thresholds = {}
-        default = 0.70
-        if abs(float(value) - default) < 0.01:
-            thresholds.pop(name, None)
-        else:
-            thresholds[name] = max(0.50, min(1.0, float(value)))
-        settings.set("image_thresholds", thresholds)
-        # Apply live to the search engine
-        if self._ctrl and hasattr(self._ctrl, '_engine'):
-            from sloppykeys.core.image_search import apply_confidence_overrides
-            apply_confidence_overrides(thresholds)
-        return {"ok": True}
+        # Get best score for diagnostics (search with minimum threshold)
+        low_profile = ImageProfile(name=name, image_path=full_path, confidence=0.01)
+        low_match = engine.find_first([low_profile], rect)
+        best = low_match.score if low_match else 0
+        return {"ok": False, "best": best, "threshold": threshold}
 
     def save_image_crop(self, category: str, name: str, x: int, y: int, w: int, h: int) -> dict:
         """Crop from the cached snapshot and save it, OVERWRITING the original image."""
