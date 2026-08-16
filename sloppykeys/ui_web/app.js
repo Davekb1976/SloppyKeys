@@ -451,6 +451,7 @@
   // ---- OCR Region Picker (snapshot + draw box) ----
   let ocrRegionKey = null;
   let ocrRegionRect = null;
+  let ocrCachedSnapshot = null; // cached Roblox screenshot for Set buttons
 
   function openRegionPicker(key, dataUri) {
     ocrRegionKey = key;
@@ -561,6 +562,17 @@
   document.getElementById("ocr-region-cancel-btn").addEventListener("click", () => {
     document.getElementById("ocr-region-modal").style.display = "none";
   });
+  document.getElementById("ocr-region-recapture").addEventListener("click", async () => {
+    if (!window.pywebview || !pywebview.api || !ocrRegionKey) return;
+    document.getElementById("ocr-region-modal").style.display = "none";
+    switchScreen("dashboard");
+    await new Promise(r => setTimeout(r, 400));
+    const snap = await pywebview.api.get_roblox_snapshot();
+    switchScreen("settings");
+    if (!snap.ok) { window.addLog("[OCR] Recapture failed."); return; }
+    ocrCachedSnapshot = snap.data_uri;
+    openRegionPicker(ocrRegionKey, ocrCachedSnapshot);
+  });
 
   // ---- Vision regions ----
   async function loadVisionRegions() {
@@ -595,16 +607,20 @@
       btn.addEventListener("click", async () => {
         if (!window.pywebview || !pywebview.api) return;
         const key = btn.dataset.vrSet;
+        // Use cached snapshot if available, otherwise capture
+        if (ocrCachedSnapshot) {
+          openRegionPicker(key, ocrCachedSnapshot);
+          return;
+        }
         btn.textContent = "...";
-        // Show the game so we can capture it
         switchScreen("dashboard");
         await new Promise(r => setTimeout(r, 400));
         const snap = await pywebview.api.get_roblox_snapshot();
-        // Switch back to settings immediately
         switchScreen("settings");
         btn.textContent = "Set";
         if (!snap.ok) { window.addLog("[OCR] Capture failed — is Roblox running?"); return; }
-        openRegionPicker(key, snap.data_uri);
+        ocrCachedSnapshot = snap.data_uri;
+        openRegionPicker(key, ocrCachedSnapshot);
       });
     });
   }
@@ -616,9 +632,14 @@
     window.addLog("Vision regions reset to defaults.");
   });
 
-  document.getElementById("btn-vision-test-all").addEventListener("click", () => {
+  document.getElementById("btn-vision-test-all").addEventListener("click", async () => {
     if (!window.pywebview || !pywebview.api) return;
+    // Show game so OCR can capture from it
+    switchScreen("dashboard");
+    await new Promise(r => setTimeout(r, 500));
     pywebview.api.test_ocr_all();
+    // Switch back after a short delay (test runs on background thread)
+    setTimeout(() => switchScreen("settings"), 1000);
   });
 
   // Populate gamemodes in the task builder mode dropdown
