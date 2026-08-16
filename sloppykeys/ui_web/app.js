@@ -100,8 +100,9 @@
     btnStop.disabled = !running;
     macroPaused = phase === "paused";
     // Update pause button label
-    const pauseText = btnPause.lastChild;
-    if (pauseText && pauseText.nodeType === 3) pauseText.textContent = macroPaused ? " Resume F2" : " Pause F2";
+    btnPause.innerHTML = macroPaused
+      ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg> Resume <span class="btn-key">F2</span>'
+      : '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="4" width="4" height="16"/><rect x="15" y="4" width="4" height="16"/></svg> Pause <span class="btn-key">F2</span>';
     // Status dot
     const dot = document.getElementById("status-dot");
     dot.className = "status-dot" + (running ? (macroPaused ? " paused" : " running") : " stopped");
