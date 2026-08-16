@@ -660,6 +660,22 @@ class Api:
         t.join(timeout=120.0)
         return {"ok": True}
 
+    def test_walk_path(self, name: str) -> dict:
+        """Replay a saved walk path via AHK (for testing)."""
+        if not self._app_root:
+            return {"ok": False, "reason": "no app root"}
+        from sloppykeys.macro.recording import replay_walk_script
+        from sloppykeys.core.ahk import AhkBridge
+
+        script = replay_walk_script(self._app_root, name)
+        if not script:
+            return {"ok": False, "reason": f"path '{name}' is empty or not found"}
+        ahk = AhkBridge()
+        if not ahk.available():
+            return {"ok": False, "reason": "AutoHotkey not found"}
+        ok, msg = ahk.run(script, wait=True, timeout=60.0)
+        return {"ok": ok, "reason": msg if not ok else ""}
+
     def delete_recording(self, name: str) -> dict:
         """Delete a saved recording by name."""
         if not self._app_root:

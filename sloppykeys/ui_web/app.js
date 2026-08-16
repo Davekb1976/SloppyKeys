@@ -365,7 +365,8 @@
             <label style="font-size:10px;color:var(--text-muted);display:flex;align-items:center;gap:3px;"><input type="checkbox" ${b.sprint ? "checked" : ""} data-field="sprint" style="width:auto;height:auto;"> Sprint</label>`;
           if (b.mode === "custom") {
             fields += `<select class="setting-select" data-field="pathName" style="width:90px;height:22px;font-size:10px;" id="sel-walkpath-${phase}-${i}"><option value="">Pick path...</option></select>
-              <button class="btn btn--sm" id="btn-walkrec-${phase}-${i}">Rec</button>`;
+              <button class="btn btn--sm" id="btn-walkrec-${phase}-${i}">Rec</button>
+              <button class="btn btn--sm" id="btn-walktest-${phase}-${i}">Test</button>`;
           }
           fields += `<span class="block-once-badge">RUNS ONCE</span>`;
         } else if (b.type === "place_unit") fields = `<input placeholder="name" value="${b.params?.name || ""}" data-field="params.name"><input placeholder="x" value="${b.params?.x || 0}" data-field="params.x" type="number"><input placeholder="y" value="${b.params?.y || 0}" data-field="params.y" type="number"><button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button>`;
@@ -375,7 +376,7 @@
         else if (b.type === "click") fields = `<input placeholder="x" value="${b.params?.x || 0}" data-field="params.x" type="number"><input placeholder="y" value="${b.params?.y || 0}" data-field="params.y" type="number"><button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button>`;
         else if (b.type === "send_key") fields = `<input placeholder="key" value="${b.key || ""}" data-field="key" style="width:40px;"><input placeholder="hold ms" value="${b.params?.hold_ms || 0}" data-field="params.hold_ms" type="number">`;
         else if (b.type === "upgrade_unit" || b.type === "sell_unit" || b.type === "target_priority") fields = `<input placeholder="x" value="${b.params?.x || 0}" data-field="params.x" type="number" style="width:40px;"><input placeholder="y" value="${b.params?.y || 0}" data-field="params.y" type="number" style="width:40px;"><button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button>${b.type === "upgrade_unit" ? `<input placeholder="times" value="${b.params?.times || 1}" data-field="params.times" type="number" style="width:40px;">` : ""}`;
-        else if (b.type === "walk") fields = `<button class="btn btn--sm" id="btn-walk-rec-${phase}-${i}">Rec</button><select class="setting-select" data-field="pathName" style="width:100px;height:22px;font-size:10px;" id="sel-walk-${phase}-${i}"><option value="">Pick path...</option></select><label style="font-size:10px;color:var(--text-muted);display:flex;align-items:center;gap:3px;"><input type="checkbox" ${b.sprint ? "checked" : ""} data-field="sprint" style="width:auto;height:auto;"> Sprint</label>`;
+        else if (b.type === "walk") fields = `<button class="btn btn--sm" id="btn-walk-rec-${phase}-${i}">Rec</button><button class="btn btn--sm" id="btn-walktest-${phase}-${i}">Test</button><select class="setting-select" data-field="pathName" style="width:100px;height:22px;font-size:10px;" id="sel-walk-${phase}-${i}"><option value="">Pick path...</option></select><label style="font-size:10px;color:var(--text-muted);display:flex;align-items:center;gap:3px;"><input type="checkbox" ${b.sprint ? "checked" : ""} data-field="sprint" style="width:auto;height:auto;"> Sprint</label>`;
         else if (b.type === "record") fields = `<select class="setting-select" data-field="recordingName" style="width:110px;height:22px;font-size:10px;" id="sel-rec-${phase}-${i}"><option value="">Select...</option></select><button class="btn btn--sm" id="btn-record-${phase}-${i}">Rec</button><button class="btn btn--sm" id="btn-test-rec-${phase}-${i}">Test</button><button class="btn btn--sm btn--danger" id="btn-del-rec-${phase}-${i}" title="Delete recording">✕</button>`;
         else if (b.type === "detect") {
           const thenBlocks = (b.then || []);
@@ -605,6 +606,15 @@
             ph = parts[0]; idx = parseInt(parts[1]);
           }
           startWalkRecording(ph, idx);
+        });
+      });
+      // Wire walk test buttons
+      zone.querySelectorAll("[id^='btn-walktest-']").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const parts = btn.id.replace("btn-walktest-", "").split("-");
+          const ph = parts[0];
+          const idx = parseInt(parts[1]);
+          testWalkPath(ph, idx);
         });
       });
       // Wire input recording buttons
@@ -1497,14 +1507,25 @@
     const name = opPhases[phase][idx].recordingName || "";
     if (!name) { window.addLog("[Record] No recording selected to test."); return; }
     if (!window.pywebview || !pywebview.api) return;
-    // Switch to dashboard so Roblox is visible for the replay
     switchScreen("dashboard");
     await new Promise(r => setTimeout(r, 300));
     window.addLog("[Record] Testing: " + name);
     const r = await pywebview.api.test_recording(name);
     if (r.ok) window.addLog("[Record] Replay finished.");
     else window.addLog("[Record] Replay failed: " + (r.reason || "error"));
-    // Switch back to the Macro Manager
+    switchScreen("planner");
+  }
+
+  async function testWalkPath(phase, idx) {
+    const name = opPhases[phase][idx].pathName || "";
+    if (!name) { window.addLog("[Walk] No path selected to test."); return; }
+    if (!window.pywebview || !pywebview.api) return;
+    switchScreen("dashboard");
+    await new Promise(r => setTimeout(r, 300));
+    window.addLog("[Walk] Testing: " + name);
+    const r = await pywebview.api.test_walk_path(name);
+    if (r.ok) window.addLog("[Walk] Replay finished.");
+    else window.addLog("[Walk] Replay failed: " + (r.reason || "error"));
     switchScreen("planner");
   }
 
