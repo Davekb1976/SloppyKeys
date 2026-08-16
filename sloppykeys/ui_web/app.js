@@ -1046,21 +1046,32 @@
     posCtx.translate(posPanX, posPanY);
     posCtx.scale(posZoom, posZoom);
     posCtx.drawImage(posImage, 0, 0, posImage.naturalWidth * scale, posImage.naturalHeight * scale);
-    // Draw existing mark
-    if (posTarget) {
-      const block = opPhases[posTarget.phase][posTarget.idx];
-      const x = (block.params?.x || 0) * scale;
-      const y = (block.params?.y || 0) * scale;
-      if (x || y) {
+
+    // Draw ALL placed units as numbered markers (amber for others, purple for current)
+    let unitNum = 0;
+    PHASES.forEach((phase) => {
+      (opPhases[phase] || []).forEach((b, idx) => {
+        if (b.type !== "place_unit") return;
+        unitNum++;
+        const x = (b.params?.x || 0) * scale;
+        const y = (b.params?.y || 0) * scale;
+        if (!x && !y) return;
+        const isCurrent = posTarget && posTarget.phase === phase && posTarget.idx === idx;
         posCtx.beginPath();
-        posCtx.arc(x, y, 6 / posZoom, 0, Math.PI * 2);
-        posCtx.fillStyle = "rgba(139, 92, 246, 0.7)";
+        posCtx.arc(x, y, 8 / posZoom, 0, Math.PI * 2);
+        posCtx.fillStyle = isCurrent ? "rgba(139, 92, 246, 0.8)" : "rgba(232, 162, 58, 0.7)";
         posCtx.fill();
         posCtx.strokeStyle = "#fff";
         posCtx.lineWidth = 2 / posZoom;
         posCtx.stroke();
-      }
-    }
+        // Number label
+        posCtx.fillStyle = "#fff";
+        posCtx.font = `bold ${Math.round(10 / posZoom)}px sans-serif`;
+        posCtx.textAlign = "center";
+        posCtx.textBaseline = "middle";
+        posCtx.fillText(String(unitNum), x, y);
+      });
+    });
     posCtx.restore();
   }
 
