@@ -17,7 +17,7 @@ GAME_KEYS_KEY = "game_keys"
 
 # Action id -> human label, in display order.
 ACTIONS: dict[str, str] = {
-    "start_stop": "Start",
+    "start": "Start",
     "pause": "Pause",
     "stop": "Stop",
     "reload": "Reload",
@@ -93,7 +93,7 @@ class Keybind:
 
 
 DEFAULTS: dict[str, Keybind] = {
-    "start_stop": Keybind(0x70),            # F1
+    "start": Keybind(0x70),                 # F1
     "pause": Keybind(0x71),                 # F2
     "stop": Keybind(0x72),                  # F3
     "reload": Keybind(0x73),                # F4

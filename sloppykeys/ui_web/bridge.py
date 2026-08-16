@@ -965,7 +965,7 @@ class Api:
         if self._app_root is None:
             return
         keybinds = KeybindStore(self._app_root)
-        start_kb = keybinds.get("start_stop")
+        start_kb = keybinds.get("start")
         stop_kb = keybinds.get("stop")
 
         def kb_pressed(kb) -> bool:
