@@ -1007,22 +1007,30 @@
     img.src = dataUri;
   }
 
+  let posZoom = 1.0, posPanX = 0, posPanY = 0, posPanning = false, posPanStart = null;
+
   function fitPosCanvas() {
     if (!posImage) return;
     const wrap = posCanvasWrap;
     const w = wrap.clientWidth || 860;
-    const h = wrap.clientHeight || 560;
+    const h = wrap.clientHeight || 450;
     const scale = Math.min(w / posImage.naturalWidth, h / posImage.naturalHeight, 1);
-    posCanvas.width = Math.floor(posImage.naturalWidth * scale);
-    posCanvas.height = Math.floor(posImage.naturalHeight * scale);
+    posCanvas.width = w;
+    posCanvas.height = h;
     posCanvas.dataset.scale = scale;
+    posZoom = 1.0;
+    posPanX = (w - posImage.naturalWidth * scale) / 2;
+    posPanY = (h - posImage.naturalHeight * scale) / 2;
   }
 
   function drawPosCanvas() {
     if (!posImage) return;
     const scale = parseFloat(posCanvas.dataset.scale) || 1;
     posCtx.clearRect(0, 0, posCanvas.width, posCanvas.height);
-    posCtx.drawImage(posImage, 0, 0, posCanvas.width, posCanvas.height);
+    posCtx.save();
+    posCtx.translate(posPanX, posPanY);
+    posCtx.scale(posZoom, posZoom);
+    posCtx.drawImage(posImage, 0, 0, posImage.naturalWidth * scale, posImage.naturalHeight * scale);
     // Draw existing mark
     if (posTarget) {
       const block = opPhases[posTarget.phase][posTarget.idx];
@@ -1030,22 +1038,60 @@
       const y = (block.params?.y || 0) * scale;
       if (x || y) {
         posCtx.beginPath();
-        posCtx.arc(x, y, 6, 0, Math.PI * 2);
+        posCtx.arc(x, y, 6 / posZoom, 0, Math.PI * 2);
         posCtx.fillStyle = "rgba(139, 92, 246, 0.7)";
         posCtx.fill();
         posCtx.strokeStyle = "#fff";
-        posCtx.lineWidth = 2;
+        posCtx.lineWidth = 2 / posZoom;
         posCtx.stroke();
       }
     }
+    posCtx.restore();
   }
+
+  // Scroll wheel zoom
+  posCanvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const rect = posCanvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const oldZoom = posZoom;
+    const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+    posZoom = Math.max(0.5, Math.min(5.0, posZoom * factor));
+    posPanX = mx - (mx - posPanX) * (posZoom / oldZoom);
+    posPanY = my - (my - posPanY) * (posZoom / oldZoom);
+    drawPosCanvas();
+  }, { passive: false });
+
+  // Middle mouse pan + left click to set position
+  posCanvas.addEventListener("mousedown", (e) => {
+    if (e.button === 1) {
+      e.preventDefault();
+      posPanning = true;
+      posPanStart = { x: e.clientX - posPanX, y: e.clientY - posPanY };
+    }
+  });
+  posCanvas.addEventListener("mousemove", (e) => {
+    if (posPanning && posPanStart) {
+      posPanX = e.clientX - posPanStart.x;
+      posPanY = e.clientY - posPanStart.y;
+      drawPosCanvas();
+    }
+  });
+  posCanvas.addEventListener("mouseup", (e) => {
+    if (e.button === 1) posPanning = false;
+  });
+  posCanvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
   posCanvas.addEventListener("click", (e) => {
     if (!posTarget || !posImage) return;
     const rect = posCanvas.getBoundingClientRect();
     const scale = parseFloat(posCanvas.dataset.scale) || 1;
-    const x = Math.round((e.clientX - rect.left) / scale);
-    const y = Math.round((e.clientY - rect.top) / scale);
+    // Convert screen coords to image coords (undo pan + zoom + scale)
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+    const x = Math.round((sx - posPanX) / posZoom / scale);
+    const y = Math.round((sy - posPanY) / posZoom / scale);
     // Write back to the block
     const block = opPhases[posTarget.phase][posTarget.idx];
     block.params = block.params || {};

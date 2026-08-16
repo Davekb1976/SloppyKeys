@@ -451,7 +451,7 @@
 </div>
 
 <div class="modal-overlay" id="pos-modal" style="display:none;">
-  <div class="modal-box" style="width:900px; max-height:90vh; display:flex; flex-direction:column;">
+  <div class="modal-box" style="width:900px; height:600px; display:flex; flex-direction:column;">
     <div class="modal-header">
       <span class="modal-title">Set Position</span>
       <button class="modal-close" id="pos-close">&times;</button>
@@ -468,8 +468,8 @@
       </div>
       <!-- Map grid OR canvas -->
       <div id="pos-grid" class="pos-grid" style="flex:1; overflow-y:auto;"></div>
-      <div id="pos-canvas-wrap" style="flex:1; display:none; position:relative; overflow:hidden;">
-        <canvas id="pos-canvas" style="cursor:crosshair;"></canvas>
+      <div id="pos-canvas-wrap" style="flex:1; display:none; position:relative; overflow:hidden; min-height:400px; border:1px solid var(--border);">
+        <canvas id="pos-canvas" style="cursor:crosshair; display:block; width:100%; height:100%;"></canvas>
       </div>
     </div>
   </div>
