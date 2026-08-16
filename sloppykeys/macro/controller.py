@@ -368,27 +368,261 @@ class MacroController:
             time.sleep(TICK_SLEEP)
 
     def _run_match(self, battle: list, loop_a: list, loop_b: list) -> None:
-        """Tick battle once through + loops until outcome detected.
+        """Tick-based match execution: Battle runs once through, Loop A/B repeat
+        continuously, all interleaved with outcome detection.
 
-        Uses wait_for_outcome which blocks and polls internally at 200ms.
-        This is the simpler approach: just call it with the full timeout and
-        let it handle keep-alive clicks and the win/loss detection loop.
+        Each tick: advance Battle by one block (if not exhausted), then Loop A by
+        one, then Loop B by one, then poll for win/loss. This cooperative approach
+        means Victory/Defeat detection runs between every block execution.
         """
-        # Run battle blocks linearly before waiting for outcome
-        self._run_phase_linear(battle)
+        self._battle_started_at = time.time()
+        self._battle_leave_requested = False
 
-        self._log("  Waiting for match result...")
-        outcome, msg = self._placer.wait_for_outcome()
-        if outcome == OUTCOME_WON:
-            self._stats.record_win()
-            self._log(f"  Win! ({msg})")
-            self._send_webhook_result("win")
-        elif outcome == OUTCOME_LOST:
-            self._stats.record_loss()
-            self._log(f"  Loss. ({msg})")
-            self._send_webhook_result("loss")
+        # Flatten into indexable lists with per-loop state
+        battle_idx = 0
+        loop_a_idx = 0
+        loop_b_idx = 0
+
+        self._log("  Match started — running blocks...")
+
+        while not self._stop_requested:
+            if self._checkpoint():
+                return
+
+            # Check for leave-at-minute (scans all phases for a leave block)
+            if self._battle_leave_requested:
+                self._log("  Left match (Leave at Minute).")
+                return
+
+            # Advance Battle by one block (if not exhausted)
+            if battle_idx < len(battle):
+                block = battle[battle_idx]
+                done = self._execute_battle_block(block)
+                if done:
+                    battle_idx += 1
+
+            # Advance Loop A by one block (wraps around)
+            if loop_a:
+                block = loop_a[loop_a_idx]
+                done = self._execute_battle_block(block)
+                if done:
+                    loop_a_idx = (loop_a_idx + 1) % len(loop_a)
+
+            # Advance Loop B by one block (wraps around)
+            if loop_b:
+                block = loop_b[loop_b_idx]
+                done = self._execute_battle_block(block)
+                if done:
+                    loop_b_idx = (loop_b_idx + 1) % len(loop_b)
+
+            # Poll for outcome (win/loss)
+            outcome = self._check_outcome()
+            if outcome is not None:
+                result, msg = outcome
+                if result == OUTCOME_WON:
+                    self._stats.record_win()
+                    self._log(f"  Win! ({msg})")
+                    self._send_webhook_result("win")
+                elif result == OUTCOME_LOST:
+                    self._stats.record_loss()
+                    self._log(f"  Loss. ({msg})")
+                    self._send_webhook_result("loss")
+                else:
+                    self._log(f"  Match ended: {msg}")
+                return
+
+            time.sleep(TICK_SLEEP)
+
+    def _check_outcome(self) -> tuple[str, str] | None:
+        """Non-blocking check for win/loss. Returns (outcome, msg) or None."""
+        from sloppykeys.core.image_search import ImageProfile
+        rect = self._rect()
+        if rect is None:
+            return None
+
+        win_path = os.path.join(self._app_root, "assets", "match", "game_won.png")
+        loss_path = os.path.join(self._app_root, "assets", "match", "game_lost.png")
+
+        profiles = []
+        if os.path.isfile(win_path):
+            profiles.append(ImageProfile(name="win", image_path=win_path, confidence=0.70))
+        if os.path.isfile(loss_path):
+            profiles.append(ImageProfile(name="loss", image_path=loss_path, confidence=0.70))
+
+        if not profiles:
+            return None
+
+        match = self._engine.find_first(profiles, rect)
+        if match is None:
+            return None
+
+        if match.profile_name == "win":
+            return (OUTCOME_WON, f"matched at {match.score:.2f}")
         else:
-            self._log(f"  Match ended: {msg}")
+            return (OUTCOME_LOST, f"matched at {match.score:.2f}")
+
+    def _execute_battle_block(self, block: dict) -> bool:
+        """Execute one block in a tick-based context. Returns True when done
+        (move to next block), False to retry this block next tick."""
+        btype = block.get("type", "")
+        params = block.get("params", {})
+
+        if btype == "upgrade_unit":
+            return self._tick_upgrade_unit(block)
+        elif btype == "sell_unit":
+            return self._tick_sell_unit(block)
+        elif btype == "target_priority":
+            return self._tick_target_priority(block)
+        elif btype == "wait_wave":
+            return self._tick_wait_wave(block)
+        elif btype == "leave_at_minute":
+            return self._tick_leave_at_minute(block)
+        else:
+            # All other blocks are one-shot (execute and move on)
+            self._execute_block(block)
+            return True
+
+    def _unit_click_position(self, block: dict) -> tuple[int, int] | None:
+        """Resolve a unit block's click position from its index.
+
+        Unit index refers to the Nth place_unit block across all phases. We look
+        up the stored position from the operation's pre_start phase. If not found,
+        use params.x/y as fallback.
+        """
+        params = block.get("params", {})
+        x = int(params.get("x", 0))
+        y = int(params.get("y", 0))
+        if x and y:
+            return (x, y)
+        # ponytail: index-based lookup from placed units would go here once
+        # we track placed positions during pre_start execution.
+        return None
+
+    def _tick_upgrade_unit(self, block: dict) -> bool:
+        """Click the unit, press T to upgrade. Repeats up to `times`."""
+        params = block.get("params", {})
+        times = max(1, int(params.get("times", 1) or 1))
+
+        # Track state across ticks
+        if not hasattr(self, '_upgrade_state'):
+            self._upgrade_state = {}
+        state = self._upgrade_state.setdefault(id(block), {"remaining": times})
+
+        pos = self._unit_click_position(block)
+        if pos is None:
+            self._log("    [block] upgrade: no unit position — skipping")
+            return True
+
+        from sloppykeys.macro.input_scripts import nudge_click_script, key_script, SPREAD_TIGHT
+        # Click the unit to select it
+        self._ahk.run(nudge_click_script(pos[0], pos[1], spread=SPREAD_TIGHT), wait=True, timeout=5.0)
+        time.sleep(0.4)
+        # Press T to upgrade
+        self._ahk.run(key_script("t"), wait=True, timeout=3.0)
+        time.sleep(0.3)
+
+        state["remaining"] -= 1
+        if state["remaining"] <= 0:
+            del self._upgrade_state[id(block)]
+            return True
+        return False  # more upgrades to do — retry next tick
+
+    def _tick_sell_unit(self, block: dict) -> bool:
+        """Click the unit, press X to sell. One-shot."""
+        pos = self._unit_click_position(block)
+        if pos is None:
+            self._log("    [block] sell: no unit position — skipping")
+            return True
+
+        from sloppykeys.macro.input_scripts import nudge_click_script, key_script, SPREAD_TIGHT
+        self._ahk.run(nudge_click_script(pos[0], pos[1], spread=SPREAD_TIGHT), wait=True, timeout=5.0)
+        time.sleep(0.4)
+        self._ahk.run(key_script("x"), wait=True, timeout=3.0)
+        return True
+
+    def _tick_target_priority(self, block: dict) -> bool:
+        """Click the unit, press R to cycle priority. One-shot."""
+        pos = self._unit_click_position(block)
+        if pos is None:
+            self._log("    [block] target priority: no unit position — skipping")
+            return True
+
+        from sloppykeys.macro.input_scripts import nudge_click_script, key_script, SPREAD_TIGHT
+        self._ahk.run(nudge_click_script(pos[0], pos[1], spread=SPREAD_TIGHT), wait=True, timeout=5.0)
+        time.sleep(0.4)
+        self._ahk.run(key_script("r"), wait=True, timeout=3.0)
+        time.sleep(0.2)
+        return True
+
+    def _tick_wait_wave(self, block: dict) -> bool:
+        """Wait until the wave counter reaches the target. Polls OCR every 2s."""
+        params = block.get("params", {})
+        target = max(1, int(params.get("wave", 1) or 1))
+
+        # Throttle: only check every 2 seconds
+        if not hasattr(self, '_wave_check_time'):
+            self._wave_check_time = 0.0
+        now = time.time()
+        if now < self._wave_check_time:
+            return False  # not time to check yet
+
+        self._wave_check_time = now + 2.0
+
+        # Try to read the wave number via OCR
+        try:
+            from sloppykeys.core.ocr import OcrReader
+            import mss
+            import numpy as np
+
+            rect = self._rect()
+            if rect is None:
+                return False
+            # Wave HUD is in the top-center area of the viewport
+            # Approximate region: x=420..580, y=15..55 in 1152x756 space
+            vx, vy, vw, vh = rect
+            wave_x = vx + int(420 * vw / 1152)
+            wave_y = vy + int(15 * vh / 756)
+            wave_w = int(160 * vw / 1152)
+            wave_h = int(40 * vh / 756)
+
+            with mss.mss() as sct:
+                mon = {"left": wave_x, "top": wave_y, "width": wave_w, "height": wave_h}
+                img = np.array(sct.grab(mon))[:, :, :3]
+
+            ocr = OcrReader()
+            text = ocr.read_text(img)
+            # Parse "Wave X/Y" or just a number
+            import re
+            numbers = re.findall(r"\d+", text)
+            if numbers:
+                current = int(numbers[0])
+                if current >= target:
+                    self._log(f"    [block] wave {current} reached target {target}")
+                    return True
+        except Exception:
+            pass  # OCR failed, retry next tick
+
+        return False
+
+    def _tick_leave_at_minute(self, block: dict) -> bool:
+        """Check if elapsed stage time exceeds the threshold. If so, leave."""
+        params = block.get("params", {})
+        minutes = max(0, float(params.get("minutes", 10) or 10))
+
+        started = getattr(self, '_battle_started_at', None) or time.time()
+        elapsed_min = (time.time() - started) / 60.0
+
+        if elapsed_min < minutes:
+            return True  # not time yet, but this block is "done" for this tick — passive check
+
+        # Time to leave
+        self._log(f"    [block] leave at minute {minutes:.1f} — elapsed {elapsed_min:.1f}min, leaving")
+        self._battle_leave_requested = True
+        # Try to click the leave button
+        from sloppykeys.macro.input_scripts import nudge_click_script
+        # Look for the "to lobby" or "return" button — simple approach: press Esc or use a known position
+        # ponytail: for now just set the flag; the lobby navigator handles the actual leave
+        return True
 
     def _send_webhook_result(self, result: str) -> None:
         """Send a Discord webhook notification for a match result with screenshot."""

@@ -371,7 +371,7 @@
         else if (b.type === "leave_at_minute") fields = `<input placeholder="min" value="${b.params?.minutes || 10}" data-field="params.minutes" type="number">`;
         else if (b.type === "click") fields = `<input placeholder="x" value="${b.params?.x || 0}" data-field="params.x" type="number"><input placeholder="y" value="${b.params?.y || 0}" data-field="params.y" type="number"><button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button>`;
         else if (b.type === "send_key") fields = `<input placeholder="key" value="${b.key || ""}" data-field="key" style="width:40px;"><input placeholder="hold ms" value="${b.params?.hold_ms || 0}" data-field="params.hold_ms" type="number">`;
-        else if (b.type === "upgrade_unit" || b.type === "sell_unit" || b.type === "target_priority") fields = `<input placeholder="#" value="${b.params?.index || 1}" data-field="params.index" type="number" style="width:40px;">`;
+        else if (b.type === "upgrade_unit" || b.type === "sell_unit" || b.type === "target_priority") fields = `<input placeholder="x" value="${b.params?.x || 0}" data-field="params.x" type="number" style="width:40px;"><input placeholder="y" value="${b.params?.y || 0}" data-field="params.y" type="number" style="width:40px;"><button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button>${b.type === "upgrade_unit" ? `<input placeholder="times" value="${b.params?.times || 1}" data-field="params.times" type="number" style="width:40px;">` : ""}`;
         else if (b.type === "walk") fields = `<input placeholder="path name" value="${b.pathName || ""}" data-field="pathName" style="width:100px;"><button class="btn btn--sm" id="btn-walk-rec-${phase}-${i}">Rec</button>`;
         else if (b.type === "record") fields = `<select class="setting-select" data-field="recordingName" style="width:110px;height:22px;font-size:10px;" id="sel-rec-${phase}-${i}"><option value="">Select...</option></select><button class="btn btn--sm" id="btn-record-${phase}-${i}">Rec</button><button class="btn btn--sm" id="btn-test-rec-${phase}-${i}">Test</button><button class="btn btn--sm btn--danger" id="btn-del-rec-${phase}-${i}" title="Delete recording">✕</button>`;
         else if (b.type === "detect") {
@@ -651,7 +651,7 @@
       else if (type === "leave_at_minute") block.params = { minutes: 10 };
       else if (type === "click") block.params = { x: 0, y: 0 };
       else if (type === "send_key") { block.key = ""; block.params = { hold_ms: 0 }; }
-      else if (type === "upgrade_unit" || type === "sell_unit" || type === "target_priority") block.params = { index: 1 };
+      else if (type === "upgrade_unit" || type === "sell_unit" || type === "target_priority") block.params = { x: 0, y: 0, times: 1 };
       else if (type === "walk") { block.pathName = ""; block.params = {}; }
       else if (type === "record") { block.recordingName = ""; block.params = {}; }
       else if (type === "detect") { block.image = ""; block.threshold = 0.8; block.loop = false; block.then = []; block.else = []; }
