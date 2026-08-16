@@ -435,7 +435,10 @@ input:focus, select:focus {
 .pos-readout { font-size: 11px; font-weight: 700; color: var(--accent); padding: 4px 8px; border: 1px solid var(--accent); }
 
 /* ---- Image Manager ---- */
-.im-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; overflow-y: auto; flex: 1; min-height: 0; }
+.im-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+  overflow-y: auto; flex: 1; min-height: 0; max-height: 420px;
+}
 .im-card { border: 1px solid var(--border); background: var(--surface-panel); padding: 10px; display: flex; flex-direction: column; gap: 6px; }
 .im-card-header { display: flex; align-items: center; gap: 6px; }
 .im-card-cat { font-size: 9px; font-weight: 700; text-transform: uppercase; padding: 2px 6px; background: var(--accent-soft); color: var(--accent); }
