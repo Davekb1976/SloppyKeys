@@ -280,6 +280,16 @@
       repeat: Math.max(1, parseInt(tbRepeat.value) || 1),
       macro: tbMacro.value,
     };
+    // Challenge-specific: per-map macros + slot enables
+    if (tbMode.value === "Challenge") {
+      const t = tasks.find(x => x.id === selectedTaskId);
+      changes.challenge_macros = (t && t.challenge_macros) || {};
+      changes.challenge_slots = [
+        document.getElementById("tb-chal-slot1")?.checked !== false,
+        document.getElementById("tb-chal-slot2")?.checked !== false,
+        document.getElementById("tb-chal-slot3")?.checked !== false,
+      ];
+    }
     pywebview.api.update_task(selectedTaskId, changes).then(() => {
       const t = tasks.find((x) => x.id === selectedTaskId);
       if (t) Object.assign(t, changes);
@@ -289,8 +299,15 @@
 
   // Cascade: mode → maps, map → stages
   tbMode.addEventListener("change", () => {
-    loadMaps(tbMode.value, "");
-    tbStage.innerHTML = '<option value="">—</option>';
+    const isChallenge = tbMode.value === "Challenge";
+    document.getElementById("tb-standard-fields").style.display = isChallenge ? "none" : "";
+    document.getElementById("tb-challenge-fields").style.display = isChallenge ? "" : "none";
+    if (isChallenge) {
+      renderChallengeMapGrid();
+    } else {
+      loadMaps(tbMode.value, "");
+      tbStage.innerHTML = '<option value="">—</option>';
+    }
     saveCurrentTask();
   });
   tbMap.addEventListener("change", () => {
@@ -379,6 +396,81 @@
     });
   });
 
+  // ---- Challenge per-map macro grid ----
+  const CHALLENGE_MAPS = ["School Grounds", "Flower Forest", "Rose Kingdom", "Fairy King Forest", "King's Tomb"];
+
+  function renderChallengeMapGrid() {
+    const grid = document.getElementById("tb-challenge-maps");
+    if (!grid) return;
+    const task = tasks.find(t => t.id === selectedTaskId);
+    const mapMacros = (task && task.challenge_macros) || {};
+    grid.innerHTML = CHALLENGE_MAPS.map(m => {
+      const sel = mapMacros[m] || "";
+      return `<div class="challenge-map-row">
+        <span class="challenge-map-name">${m}</span>
+        <select class="setting-select" data-chal-map="${m}" style="height:24px;font-size:10px;">
+          <option value="">No Macro</option>
+        </select>
+      </div>`;
+    }).join("");
+    // Populate operation options
+    if (window.pywebview && pywebview.api) {
+      pywebview.api.list_operations().then(names => {
+        grid.querySelectorAll("[data-chal-map]").forEach(sel => {
+          const mapName = sel.dataset.chalMap;
+          const current = mapMacros[mapName] || "";
+          sel.innerHTML = '<option value="">No Macro</option>' + names.map(n =>
+            `<option value="${n}"${n === current ? " selected" : ""}>${n}</option>`
+          ).join("");
+          sel.addEventListener("change", () => {
+            if (!selectedTaskId) return;
+            const t = tasks.find(x => x.id === selectedTaskId);
+            if (!t) return;
+            if (!t.challenge_macros) t.challenge_macros = {};
+            t.challenge_macros[mapName] = sel.value;
+            saveCurrentTask();
+          });
+        });
+      });
+    }
+  }
+
+  // ---- Vision regions ----
+  async function loadVisionRegions() {
+    if (!window.pywebview || !pywebview.api) return;
+    const specs = await pywebview.api.get_vision_region_specs();
+    const overrides = await pywebview.api.get_vision_regions();
+    const list = document.getElementById("vision-regions-list");
+    if (!list || !specs) return;
+    list.innerHTML = specs.map(s => {
+      const val = overrides[s.key] || s.default;
+      return `<div class="vision-region-row">
+        <span class="vr-label">${s.label}</span>
+        <input type="number" value="${val[0]}" data-vr-key="${s.key}" data-vr-idx="0" title="x">
+        <input type="number" value="${val[1]}" data-vr-key="${s.key}" data-vr-idx="1" title="y">
+        <input type="number" value="${val[2]}" data-vr-key="${s.key}" data-vr-idx="2" title="w">
+        <input type="number" value="${val[3]}" data-vr-key="${s.key}" data-vr-idx="3" title="h">
+      </div>`;
+    }).join("");
+    list.querySelectorAll("input[data-vr-key]").forEach(inp => {
+      inp.addEventListener("change", () => {
+        if (!window.pywebview || !pywebview.api) return;
+        const key = inp.dataset.vrKey;
+        const row = list.querySelector(`.vision-region-row input[data-vr-key="${key}"][data-vr-idx="0"]`).closest(".vision-region-row");
+        const inputs = row.querySelectorAll("input");
+        const box = [parseInt(inputs[0].value), parseInt(inputs[1].value), parseInt(inputs[2].value), parseInt(inputs[3].value)];
+        pywebview.api.set_vision_region(key, box);
+      });
+    });
+  }
+
+  document.getElementById("btn-vision-reset").addEventListener("click", async () => {
+    if (!window.pywebview || !pywebview.api) return;
+    await pywebview.api.reset_vision_regions();
+    loadVisionRegions();
+    window.addLog("Vision regions reset to defaults.");
+  });
+
   // Populate gamemodes in the task builder mode dropdown
   window.addEventListener("pywebviewready", () => {
     if (window.pywebview && pywebview.api && pywebview.api.get_gamemodes) {
@@ -395,6 +487,7 @@
     loadOperationList();
     loadTasks();
     loadQueuePresets();
+    loadVisionRegions();
   };
 
   // ---- Macro Manager ----

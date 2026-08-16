@@ -200,10 +200,10 @@ class Api:
     # ---- Gamemode data ----
 
     def get_gamemodes(self) -> list[str]:
-        """Farm-target gamemodes the user can select."""
+        """Gamemodes the user can select (farm targets + Challenge)."""
         from sloppykeys.content.gamemodes import FARM_GAMEMODE_NAMES
 
-        return FARM_GAMEMODE_NAMES
+        return FARM_GAMEMODE_NAMES + ["Challenge"]
 
     def get_maps(self, gamemode: str) -> list[str]:
         """Maps for a gamemode. Events reads from the route store."""
@@ -293,6 +293,43 @@ class Api:
             return {"ok": False}
         ok = UnifiedSettings(self._app_root).set_delay(key, value)
         return {"ok": ok}
+
+    # ---- Game Keybinds (in-game keys the macro presses) ----
+
+    def get_vision_region_specs(self) -> list:
+        """All editable vision regions with key, label, default box."""
+        from sloppykeys.content.challenge import region_specs
+        return [{"key": k, "label": l, "default": list(d)} for k, l, d in region_specs()]
+
+    def get_vision_regions(self) -> dict:
+        """Current region overrides from settings."""
+        if not self._app_root:
+            return {}
+        settings = UnifiedSettings(self._app_root)
+        return settings.get("vision_regions", {})
+
+    def set_vision_region(self, key: str, box: list) -> dict:
+        """Set one vision region override."""
+        if not self._app_root:
+            return {"ok": False}
+        settings = UnifiedSettings(self._app_root)
+        regions = settings.get("vision_regions", {})
+        regions[key] = tuple(box[:4])
+        settings.set("vision_regions", regions)
+        # Apply live
+        from sloppykeys.content.challenge import apply_region_overrides
+        apply_region_overrides(regions)
+        return {"ok": True}
+
+    def reset_vision_regions(self) -> dict:
+        """Clear all region overrides (revert to defaults)."""
+        if not self._app_root:
+            return {"ok": False}
+        settings = UnifiedSettings(self._app_root)
+        settings.set("vision_regions", {})
+        from sloppykeys.content.challenge import apply_region_overrides
+        apply_region_overrides({})
+        return {"ok": True}
 
     # ---- Game Keybinds (in-game keys the macro presses) ----
 

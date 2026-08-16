@@ -269,31 +269,51 @@
                   <div class="setting-info"><span class="setting-label">Mode</span></div>
                   <select class="setting-select" id="tb-mode"></select>
                 </div>
-                <div class="setting-row">
-                  <div class="setting-info"><span class="setting-label">Map</span></div>
-                  <select class="setting-select" id="tb-map"><option value="">—</option></select>
-                </div>
-                <div class="setting-row">
-                  <div class="setting-info"><span class="setting-label">Stage</span></div>
-                  <select class="setting-select" id="tb-stage"><option value="">—</option></select>
-                </div>
-                <div class="setting-row">
-                  <div class="setting-info"><span class="setting-label">Difficulty</span></div>
-                  <select class="setting-select" id="tb-difficulty">
-                    <option value="Normal">Normal</option>
-                    <option value="Hard">Hard</option>
-                  </select>
-                </div>
-                <div class="setting-row">
-                  <div class="setting-info"><span class="setting-label">Repeat</span></div>
-                  <input type="number" class="setting-input" id="tb-repeat" min="1" max="999" value="1" style="width:70px;">
-                </div>
-                <div class="setting-row">
-                  <div class="setting-info">
-                    <span class="setting-label">Macro Operation</span>
-                    <span class="setting-desc">The macro's Team Loadout comes from its template (Macro Manager tab).</span>
+                <div id="tb-standard-fields">
+                  <div class="setting-row">
+                    <div class="setting-info"><span class="setting-label">Map</span></div>
+                    <select class="setting-select" id="tb-map"><option value="">—</option></select>
                   </div>
-                  <select class="setting-select" id="tb-macro"><option value="">No Macro</option></select>
+                  <div class="setting-row">
+                    <div class="setting-info"><span class="setting-label">Stage</span></div>
+                    <select class="setting-select" id="tb-stage"><option value="">—</option></select>
+                  </div>
+                  <div class="setting-row">
+                    <div class="setting-info"><span class="setting-label">Difficulty</span></div>
+                    <select class="setting-select" id="tb-difficulty">
+                      <option value="Normal">Normal</option>
+                      <option value="Hard">Hard</option>
+                    </select>
+                  </div>
+                  <div class="setting-row">
+                    <div class="setting-info"><span class="setting-label">Repeat</span></div>
+                    <input type="number" class="setting-input" id="tb-repeat" min="1" max="999" value="1" style="width:70px;">
+                  </div>
+                  <div class="setting-row">
+                    <div class="setting-info">
+                      <span class="setting-label">Macro Operation</span>
+                      <span class="setting-desc">The macro's Team Loadout comes from its template (Macro Manager tab).</span>
+                    </div>
+                    <select class="setting-select" id="tb-macro"><option value="">No Macro</option></select>
+                  </div>
+                </div>
+                <!-- Challenge-specific fields (shown when mode=Challenge) -->
+                <div id="tb-challenge-fields" style="display:none;">
+                  <div class="setting-row" style="flex-direction:column; align-items:flex-start; gap:8px;">
+                    <div class="setting-info">
+                      <span class="setting-label">Per-Map Macro Operations</span>
+                      <span class="setting-desc">Assign a macro for each map the challenge can land on</span>
+                    </div>
+                    <div id="tb-challenge-maps" class="challenge-map-grid"></div>
+                  </div>
+                  <div class="setting-row">
+                    <div class="setting-info"><span class="setting-label">Slots Enabled</span><span class="setting-desc">#1, #2, #3 challenge slots</span></div>
+                    <div style="display:flex; gap:8px;">
+                      <label style="font-size:11px; display:flex; align-items:center; gap:3px;"><input type="checkbox" id="tb-chal-slot1" checked> #1</label>
+                      <label style="font-size:11px; display:flex; align-items:center; gap:3px;"><input type="checkbox" id="tb-chal-slot2" checked> #2</label>
+                      <label style="font-size:11px; display:flex; align-items:center; gap:3px;"><input type="checkbox" id="tb-chal-slot3" checked> #3</label>
+                    </div>
+                  </div>
                 </div>
               </div>
               <div class="task-builder-actions">
@@ -338,6 +358,7 @@
         <button class="settings-nav-btn" data-cat="delays">Delays</button>
         <button class="settings-nav-btn" data-cat="webhook">Webhook</button>
         <button class="settings-nav-btn" data-cat="debug">Debug</button>
+        <button class="settings-nav-btn" data-cat="vision">Vision</button>
       </nav>
       <div class="settings-content" id="settings-content">
         <!-- General -->
@@ -457,11 +478,24 @@
             </div>
           </div>
         </div>
+
+        <!-- Vision (OCR regions) -->
+        <div class="settings-category" data-cat="vision">
+          <div class="page-header"><span class="page-title">Vision / OCR Regions</span></div>
+          <div class="setting-group">
+            <div class="setting-row" style="flex-direction:column; align-items:flex-start; gap:6px;">
+              <div class="setting-info">
+                <span class="setting-name">Challenge Panel Regions</span>
+                <span class="setting-desc">Crop boxes for OCR reading of the challenge panel (x, y, w, h in 1152×756 space)</span>
+              </div>
+              <div id="vision-regions-list" class="vision-regions"></div>
+              <button class="btn btn--sm" id="btn-vision-reset">Reset to Defaults</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
-
-<!-- Recording popout (bottom-right toast during recording) -->
 <div id="rec-popout" style="display:none;">
   <span class="rec-dot"></span>
   <span id="rec-popout-text">Recording input inside the game window</span>
