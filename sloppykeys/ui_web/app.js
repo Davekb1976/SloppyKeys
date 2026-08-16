@@ -336,6 +336,7 @@
   // Called from Python's on_loaded after _app_root is set.
   window.onBackendReady = function () {
     loadSettings();
+    loadGameKeybinds();
   };
 
   // ---- Macro Manager ----
@@ -953,6 +954,38 @@
     if (!window.pywebview || !pywebview.api) return;
     const r = await pywebview.api.reset_hotkeys();
     if (r.ok) { loadSettings(); window.addLog("Hotkeys reset to defaults."); }
+  });
+
+  // Game keybinds: load + capture
+  async function loadGameKeybinds() {
+    if (!window.pywebview || !pywebview.api) return;
+    try {
+      const s = await pywebview.api.get_settings();
+      const gk = s.game_keybinds || {};
+      document.querySelectorAll("[data-game-key]").forEach((btn) => {
+        const key = btn.dataset.gameKey;
+        if (gk[key]) btn.textContent = gk[key].toUpperCase();
+      });
+    } catch (e) {}
+  }
+
+  document.querySelectorAll("[data-game-key]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      btn.textContent = "...";
+      btn.classList.add("capturing");
+      const handler = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        document.removeEventListener("keydown", handler, true);
+        btn.classList.remove("capturing");
+        const key = e.key.length === 1 ? e.key.toLowerCase() : e.key.toLowerCase();
+        btn.textContent = key.toUpperCase();
+        if (window.pywebview && pywebview.api) {
+          pywebview.api.set_game_keybind(btn.dataset.gameKey, key);
+        }
+      };
+      document.addEventListener("keydown", handler, true);
+    });
   });
 
   wireAutoSave();

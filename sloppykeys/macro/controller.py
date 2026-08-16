@@ -498,13 +498,19 @@ class MacroController:
         # we track placed positions during pre_start execution.
         return None
 
+    def _game_keybind(self, action: str) -> str:
+        """Get the in-game keybind for an action (upgrade, sell, priority, autograde)."""
+        unified = UnifiedSettings(self._app_root)
+        gk = unified.get("game_keybinds", {})
+        defaults = {"upgrade": "t", "sell": "x", "priority": "r", "autograde": "v"}
+        return gk.get(action, defaults.get(action, ""))
+
     def _tick_upgrade_unit(self, block: dict) -> bool:
-        """Click the unit, press T to upgrade. Repeats up to `times`. If autograde is on, press V after."""
+        """Click the unit, press upgrade key. Repeats up to `times`. If autograde is on, press autograde key after."""
         params = block.get("params", {})
         times = max(1, int(params.get("times", 1) or 1))
         autograde = block.get("autograde", False)
 
-        # Track state across ticks
         if not hasattr(self, '_upgrade_state'):
             self._upgrade_state = {}
         state = self._upgrade_state.setdefault(id(block), {"remaining": times})
@@ -515,25 +521,22 @@ class MacroController:
             return True
 
         from sloppykeys.macro.input_scripts import nudge_click_script, key_script, SPREAD_TIGHT
-        # Click the unit to select it
         self._ahk.run(nudge_click_script(pos[0], pos[1], spread=SPREAD_TIGHT), wait=True, timeout=5.0)
         time.sleep(0.4)
-        # Press T to upgrade
-        self._ahk.run(key_script("t"), wait=True, timeout=3.0)
+        self._ahk.run(key_script(self._game_keybind("upgrade")), wait=True, timeout=3.0)
         time.sleep(0.3)
 
         state["remaining"] -= 1
         if state["remaining"] <= 0:
-            # Press V for autograde if enabled
             if autograde:
                 time.sleep(0.2)
-                self._ahk.run(key_script("v"), wait=True, timeout=3.0)
+                self._ahk.run(key_script(self._game_keybind("autograde")), wait=True, timeout=3.0)
             del self._upgrade_state[id(block)]
             return True
-        return False  # more upgrades to do — retry next tick
+        return False
 
     def _tick_sell_unit(self, block: dict) -> bool:
-        """Click the unit, press X to sell. One-shot."""
+        """Click the unit, press sell key. One-shot."""
         pos = self._unit_click_position(block)
         if pos is None:
             self._log("    [block] sell: no unit position — skipping")
@@ -542,11 +545,11 @@ class MacroController:
         from sloppykeys.macro.input_scripts import nudge_click_script, key_script, SPREAD_TIGHT
         self._ahk.run(nudge_click_script(pos[0], pos[1], spread=SPREAD_TIGHT), wait=True, timeout=5.0)
         time.sleep(0.4)
-        self._ahk.run(key_script("x"), wait=True, timeout=3.0)
+        self._ahk.run(key_script(self._game_keybind("sell")), wait=True, timeout=3.0)
         return True
 
     def _tick_target_priority(self, block: dict) -> bool:
-        """Click the unit, press R to cycle priority. One-shot."""
+        """Click the unit, press priority key. One-shot."""
         pos = self._unit_click_position(block)
         if pos is None:
             self._log("    [block] target priority: no unit position — skipping")
@@ -555,7 +558,7 @@ class MacroController:
         from sloppykeys.macro.input_scripts import nudge_click_script, key_script, SPREAD_TIGHT
         self._ahk.run(nudge_click_script(pos[0], pos[1], spread=SPREAD_TIGHT), wait=True, timeout=5.0)
         time.sleep(0.4)
-        self._ahk.run(key_script("r"), wait=True, timeout=3.0)
+        self._ahk.run(key_script(self._game_keybind("priority")), wait=True, timeout=3.0)
         time.sleep(0.2)
         return True
 

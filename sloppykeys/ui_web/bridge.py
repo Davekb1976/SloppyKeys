@@ -294,6 +294,29 @@ class Api:
         ok = UnifiedSettings(self._app_root).set_delay(key, value)
         return {"ok": ok}
 
+    # ---- Game Keybinds (in-game keys the macro presses) ----
+
+    def get_game_keybinds(self) -> dict:
+        """The in-game keybind mapping."""
+        if not self._app_root:
+            return {}
+        settings = UnifiedSettings(self._app_root)
+        return settings.get("game_keybinds", {
+            "upgrade": "t", "sell": "x", "priority": "r", "autograde": "v"
+        })
+
+    def set_game_keybind(self, action: str, key: str) -> dict:
+        """Set one in-game keybind."""
+        if not self._app_root:
+            return {"ok": False}
+        settings = UnifiedSettings(self._app_root)
+        gk = settings.get("game_keybinds", {
+            "upgrade": "t", "sell": "x", "priority": "r", "autograde": "v"
+        })
+        gk[action] = key.lower()
+        settings.set("game_keybinds", gk)
+        return {"ok": True}
+
     # ---- Task Queue ----
 
     def get_tasks(self) -> list:
