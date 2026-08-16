@@ -636,6 +636,30 @@ class Api:
         self._pending_recording_events = None
         return {"ok": True}
 
+    def test_recording(self, name: str) -> dict:
+        """Replay a saved recording immediately (for testing)."""
+        if not self._app_root:
+            return {"ok": False, "reason": "no app root"}
+        from sloppykeys.macro.recording import load_recording, replay_recording
+        from sloppykeys.core.win32.roblox_window import find_roblox_window
+
+        data = load_recording(self._app_root, name)
+        events = data.get("events", [])
+        if not events:
+            return {"ok": False, "reason": f"recording '{name}' is empty or not found"}
+        hwnd = find_roblox_window()
+        if not hwnd:
+            return {"ok": False, "reason": "Roblox not found"}
+        # Run on a thread so it doesn't block the bridge
+        import threading
+        stop = threading.Event()
+        def _run():
+            replay_recording(events, hwnd=hwnd, stop_event=stop)
+        t = threading.Thread(target=_run, daemon=True)
+        t.start()
+        t.join(timeout=120.0)
+        return {"ok": True}
+
     def list_walk_paths(self) -> list:
         """Names of all recorded walk paths."""
         if not self._app_root:

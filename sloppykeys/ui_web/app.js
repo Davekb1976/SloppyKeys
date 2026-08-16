@@ -373,7 +373,7 @@
         else if (b.type === "send_key") fields = `<input placeholder="key" value="${b.key || ""}" data-field="key" style="width:40px;"><input placeholder="hold ms" value="${b.params?.hold_ms || 0}" data-field="params.hold_ms" type="number">`;
         else if (b.type === "upgrade_unit" || b.type === "sell_unit" || b.type === "target_priority") fields = `<input placeholder="#" value="${b.params?.index || 1}" data-field="params.index" type="number" style="width:40px;">`;
         else if (b.type === "walk") fields = `<input placeholder="path name" value="${b.pathName || ""}" data-field="pathName" style="width:100px;"><button class="btn btn--sm" id="btn-walk-rec-${phase}-${i}">Rec</button>`;
-        else if (b.type === "record") fields = `<input placeholder="recording name" value="${b.recordingName || ""}" data-field="recordingName" style="width:100px;"><button class="btn btn--sm" id="btn-record-${phase}-${i}">Rec</button>`;
+        else if (b.type === "record") fields = `<select class="setting-select" data-field="recordingName" style="width:110px;height:22px;font-size:10px;" id="sel-rec-${phase}-${i}"><option value="">Select...</option></select><button class="btn btn--sm" id="btn-record-${phase}-${i}">Rec</button><button class="btn btn--sm" id="btn-test-rec-${phase}-${i}">Test</button>`;
         else if (b.type === "detect") {
           // Detect block: rendered as a nested container with then/else zones
           const thenBlocks = (b.then || []);
@@ -570,6 +570,23 @@
           const idx = parseInt(parts[3]);
           startInputRecording(ph, idx);
         });
+      });
+      // Wire test recording buttons
+      zone.querySelectorAll("[id^='btn-test-rec-']").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const parts = btn.id.split("-");
+          const ph = parts[3];
+          const idx = parseInt(parts[4]);
+          testRecording(ph, idx);
+        });
+      });
+      // Populate recording dropdowns
+      zone.querySelectorAll("[id^='sel-rec-']").forEach((sel) => {
+        const parts = sel.id.split("-");
+        const ph = parts[2];
+        const idx = parseInt(parts[3]);
+        const current = opPhases[ph][idx].recordingName || "";
+        populateRecordingSelect(sel, current);
       });
     });
   }
@@ -1357,6 +1374,30 @@
     }
   }
 
+  // ---- Recording helpers ----
+  let _cachedRecordings = null;
+
+  async function populateRecordingSelect(sel, current) {
+    if (!window.pywebview || !pywebview.api) return;
+    if (!_cachedRecordings) {
+      _cachedRecordings = await pywebview.api.list_input_recordings();
+    }
+    const names = _cachedRecordings || [];
+    sel.innerHTML = '<option value="">Select...</option>' + names.map(n =>
+      `<option value="${n}"${n === current ? " selected" : ""}>${n}</option>`
+    ).join("");
+  }
+
+  async function testRecording(phase, idx) {
+    const name = opPhases[phase][idx].recordingName || "";
+    if (!name) { window.addLog("[Record] No recording selected to test."); return; }
+    if (!window.pywebview || !pywebview.api) return;
+    window.addLog("[Record] Testing: " + name);
+    const r = await pywebview.api.test_recording(name);
+    if (r.ok) window.addLog("[Record] Replay finished.");
+    else window.addLog("[Record] Replay failed: " + (r.reason || "error"));
+  }
+
   // ---- Input Recording (Record block) ----
   let inputRecording = false;
   let recordingBlockPhase = null;
@@ -1423,6 +1464,7 @@
     document.getElementById("rec-name-modal").style.display = "none";
     const result = await pywebview.api.save_pending_recording(name);
     if (result.ok) {
+      _cachedRecordings = null; // refresh dropdown list
       // Wire the name back to the block
       if (recordingBlockPhase !== null && recordingBlockIdx !== null) {
         opPhases[recordingBlockPhase][recordingBlockIdx].recordingName = result.name;
