@@ -504,15 +504,27 @@ class MacroController:
                 self._log(f"    [block] walk (no path name set)")
 
         elif btype == "record":
-            # Replay a recorded input sequence
+            # Replay a recorded input sequence (mouse+keyboard via SendInput)
             rec_name = block.get("recordingName", "")
             if rec_name:
-                from sloppykeys.macro.recording import replay_input_script
-                script = replay_input_script(self._app_root, rec_name)
-                if script:
-                    self._ahk.run(script, wait=True, timeout=60.0)
+                from sloppykeys.macro.recording import load_recording, replay_recording
+                data = load_recording(self._app_root, rec_name)
+                events = data.get("events", [])
+                if events:
+                    self._log(f"    [block] replaying recording '{rec_name}' ({len(events)} events)")
+                    stop = threading.Event()
+                    # Wire stop_requested to the event
+                    def _check_stop():
+                        while not self._stop_requested and not stop.is_set():
+                            time.sleep(0.1)
+                        stop.set()
+                    checker = threading.Thread(target=_check_stop, daemon=True)
+                    checker.start()
+                    hwnd = rbx.find_roblox_window()
+                    replay_recording(events, hwnd=hwnd, stop_event=stop)
+                    stop.set()  # signal checker to exit
                 else:
-                    self._log(f"    [block] recording '{rec_name}' not found or empty")
+                    self._log(f"    [block] recording '{rec_name}' has no events")
             else:
                 self._log(f"    [block] record (no recording name set)")
 

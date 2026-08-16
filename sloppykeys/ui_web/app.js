@@ -1339,26 +1339,99 @@
 
   // ---- Input Recording (Record block) ----
   let inputRecording = false;
+  let recordingBlockPhase = null;
+  let recordingBlockIdx = null;
+
   async function startInputRecording(phase, idx) {
     if (!window.pywebview || !pywebview.api) return;
+
     if (inputRecording) {
+      // Stop recording
+      document.getElementById("rec-popout").style.display = "none";
       const result = await pywebview.api.stop_input_recording();
       inputRecording = false;
-      if (result.ok) {
-        opPhases[phase][idx].recordingName = result.name;
-        opDirty = true;
+
+      if (!result.ok || !result.count) {
+        window.addLog("[Record] Nothing captured — no input detected.");
+        await pywebview.api.discard_pending_recording();
+        recordingBlockPhase = null;
+        recordingBlockIdx = null;
+        // Switch back to planner
+        switchScreen("planner");
         renderPhases();
-        window.addLog("Input recording saved: " + result.name);
+        return;
       }
+
+      // Switch back to planner and show name modal
+      switchScreen("planner");
+      document.getElementById("rec-name-modal").style.display = "flex";
+      const input = document.getElementById("rec-name-input");
+      input.value = "";
+      setTimeout(() => input.focus(), 50);
+      return;
+    }
+
+    // Start recording: switch to dashboard so game is visible
+    recordingBlockPhase = phase;
+    recordingBlockIdx = idx;
+    switchScreen("dashboard");
+    await new Promise(r => setTimeout(r, 300)); // let game become visible
+
+    const r = await pywebview.api.start_input_recording();
+    if (r.ok) {
+      inputRecording = true;
+      document.getElementById("rec-popout").style.display = "flex";
+      window.addLog("[Record] Recording input — act inside Roblox, then click Stop.");
     } else {
-      const name = opPhases[phase][idx].recordingName || `rec_${Date.now()}`;
-      const r = await pywebview.api.start_input_recording(name);
-      if (r.ok) {
-        inputRecording = true;
-        window.addLog("Recording input... press Rec again to stop.");
-        const btn = document.getElementById(`btn-record-${phase}-${idx}`);
-        if (btn) { btn.textContent = "Stop"; btn.style.color = "var(--rose)"; }
-      }
+      window.addLog("[Record] Couldn't start: " + (r.reason || "error"));
+      switchScreen("planner");
     }
   }
+
+  // Stop button in the recording popout
+  document.getElementById("rec-stop-btn").addEventListener("click", () => {
+    if (inputRecording && recordingBlockPhase !== null) {
+      startInputRecording(recordingBlockPhase, recordingBlockIdx);
+    }
+  });
+
+  // Save recording name modal
+  document.getElementById("rec-name-save").addEventListener("click", async () => {
+    const input = document.getElementById("rec-name-input");
+    const name = input.value.trim();
+    if (!name || !window.pywebview || !pywebview.api) return;
+    document.getElementById("rec-name-modal").style.display = "none";
+    const result = await pywebview.api.save_pending_recording(name);
+    if (result.ok) {
+      // Wire the name back to the block
+      if (recordingBlockPhase !== null && recordingBlockIdx !== null) {
+        opPhases[recordingBlockPhase][recordingBlockIdx].recordingName = result.name;
+        opDirty = true;
+      }
+      window.addLog("[Record] Saved: " + result.name);
+    } else {
+      window.addLog("[Record] Save failed: " + (result.reason || "error"));
+    }
+    recordingBlockPhase = null;
+    recordingBlockIdx = null;
+    renderPhases();
+  });
+
+  // Enter key in the name input
+  document.getElementById("rec-name-input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") document.getElementById("rec-name-save").click();
+  });
+
+  // Discard / close
+  document.getElementById("rec-name-discard").addEventListener("click", async () => {
+    document.getElementById("rec-name-modal").style.display = "none";
+    if (window.pywebview && pywebview.api) await pywebview.api.discard_pending_recording();
+    window.addLog("[Record] Recording discarded.");
+    recordingBlockPhase = null;
+    recordingBlockIdx = null;
+    renderPhases();
+  });
+  document.getElementById("rec-name-cancel").addEventListener("click", () => {
+    document.getElementById("rec-name-discard").click();
+  });
 })();

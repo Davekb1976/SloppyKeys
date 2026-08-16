@@ -434,6 +434,30 @@
     </div>
   </div>
 
+<!-- Recording popout (bottom-right toast during recording) -->
+<div id="rec-popout" style="display:none;">
+  <span class="rec-dot"></span>
+  <span id="rec-popout-text">Recording input inside the game window</span>
+  <button type="button" class="rec-stop-btn" id="rec-stop-btn">Stop Recording</button>
+</div>
+
+<!-- Save recording name modal -->
+<div class="modal-overlay" id="rec-name-modal" style="display:none;">
+  <div class="modal-box" style="width:380px; display:flex; flex-direction:column;">
+    <div class="modal-header">
+      <span class="modal-title">Save Recording</span>
+      <button class="modal-close" id="rec-name-cancel">&times;</button>
+    </div>
+    <div class="modal-body" style="padding:16px; display:flex; flex-direction:column; gap:12px;">
+      <input type="text" class="setting-input" id="rec-name-input" placeholder="Recording name..." style="width:100%;">
+      <div style="display:flex; gap:8px; justify-content:flex-end;">
+        <button class="btn btn--sm" id="rec-name-discard">Discard</button>
+        <button class="btn btn--sm btn--primary" id="rec-name-save">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="im-modal" style="display:none;">
   <div class="modal-box" style="width:900px; height:600px; display:flex; flex-direction:column;">
     <div class="modal-header">

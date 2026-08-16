@@ -595,26 +595,46 @@ class Api:
         self._walk_recorder = None
         return {"ok": True, "name": name}
 
-    def start_input_recording(self, name: str) -> dict:
-        """Begin recording full mouse+keyboard input."""
+    def start_input_recording(self) -> dict:
+        """Begin recording full mouse+keyboard input via hooks."""
         if not self._app_root:
-            return {"ok": False}
+            return {"ok": False, "reason": "no app root"}
         from sloppykeys.macro.recording import InputRecorder
         if not hasattr(self, '_input_recorder'):
             self._input_recorder = None
         if self._input_recorder and self._input_recorder.is_recording:
-            return {"ok": False, "error": "already recording"}
-        self._input_recorder = InputRecorder(name, self._app_root, self._slot_on_screen)
-        self._input_recorder.start()
+            return {"ok": False, "reason": "already recording"}
+        self._input_recorder = InputRecorder(self._app_root)
+        ok = self._input_recorder.start()
+        if not ok:
+            self._input_recorder = None
+            return {"ok": False, "reason": "Roblox not found"}
         return {"ok": True}
 
     def stop_input_recording(self) -> dict:
-        """Stop recording and save the input recording."""
+        """Stop recording. Returns event count (not yet saved)."""
         if not hasattr(self, '_input_recorder') or not self._input_recorder:
-            return {"ok": False}
-        name = self._input_recorder.stop()
+            return {"ok": False, "count": 0}
+        self._pending_recording_events = self._input_recorder.stop()
         self._input_recorder = None
-        return {"ok": True, "name": name}
+        return {"ok": True, "count": len(self._pending_recording_events)}
+
+    def save_pending_recording(self, name: str) -> dict:
+        """Save the stopped recording under the given name."""
+        if not self._app_root:
+            return {"ok": False}
+        events = getattr(self, '_pending_recording_events', None)
+        if not events:
+            return {"ok": False, "reason": "no pending recording"}
+        from sloppykeys.macro.recording import save_recording
+        saved = save_recording(self._app_root, name, events)
+        self._pending_recording_events = None
+        return {"ok": True, "name": saved}
+
+    def discard_pending_recording(self) -> dict:
+        """Discard the stopped recording without saving."""
+        self._pending_recording_events = None
+        return {"ok": True}
 
     def list_walk_paths(self) -> list:
         """Names of all recorded walk paths."""
@@ -627,8 +647,8 @@ class Api:
         """Names of all input recordings."""
         if not self._app_root:
             return []
-        from sloppykeys.macro.recording import list_input_recordings
-        return list_input_recordings(self._app_root)
+        from sloppykeys.macro.recording import list_recordings
+        return list_recordings(self._app_root)
 
     # ---- Macro control ----
 
