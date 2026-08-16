@@ -706,11 +706,33 @@ class Api:
                     if self._window:
                         self._window.evaluate_js("window.toggleCompact && window.toggleCompact();")
                 self._key_down["f7"] = f7_down
+
+                # Reload (F3) — refresh settings/delays/configs from disk
+                reload_kb = keybinds.get("reload")
+                reload_down = kb_pressed(reload_kb)
+                if reload_down and not self._key_down.get("reload", False):
+                    self._reload()
+                self._key_down["reload"] = reload_down
             except Exception:
                 pass
             time.sleep(HOTKEY_INTERVAL)
 
     # ---- Internal ----
+
+    def _reload(self) -> None:
+        """Reload settings and refresh the controller's delays/keybinds from disk."""
+        if not self._app_root:
+            return
+        from sloppykeys.config.delays import DelaysStore
+
+        delays = DelaysStore(self._app_root).all()
+        if self._ctrl:
+            self._ctrl._nav.apply_delays(delays)
+            self._ctrl._placer.apply_delays(delays)
+        self._log_to_ui("Reloaded settings from disk.")
+        # Tell the frontend to re-read settings
+        if self._window:
+            self._window.evaluate_js("window.onBackendReady && window.onBackendReady();")
 
     def _host_hwnd(self) -> int | None:
         if self._hwnd and is_window(self._hwnd):
