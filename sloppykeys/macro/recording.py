@@ -343,23 +343,137 @@ class InputRecorder:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Replay (uses SendInput for mouse, keyboard package for keys)
+# Replay (uses SendInput for mouse — games listen to the input stack, not
+# SetCursorPos which is what the mouse package uses internally)
 # ═══════════════════════════════════════════════════════════════════════════
+
+# SendInput structures (replay only)
+import ctypes.wintypes as wt
+
+_user32 = ctypes.WinDLL("user32", use_last_error=True)
+_ULONG_PTR = ctypes.c_size_t
+_INPUT_MOUSE = 0
+_INPUT_KEYBOARD = 1
+_MOUSEEVENTF_MOVE = 0x0001
+_MOUSEEVENTF_ABSOLUTE = 0x8000
+_MOUSEEVENTF_VIRTUALDESK = 0x4000
+_MOUSEEVENTF_LEFTDOWN = 0x0002
+_MOUSEEVENTF_LEFTUP = 0x0004
+_MOUSEEVENTF_RIGHTDOWN = 0x0008
+_MOUSEEVENTF_RIGHTUP = 0x0010
+_MOUSEEVENTF_MIDDLEDOWN = 0x0020
+_MOUSEEVENTF_MIDDLEUP = 0x0040
+_MOUSEEVENTF_WHEEL = 0x0800
+_KEYEVENTF_SCANCODE = 0x0008
+_KEYEVENTF_KEYUP = 0x0002
+_SM_XVIRTUALSCREEN = 76
+_SM_YVIRTUALSCREEN = 77
+_SM_CXVIRTUALSCREEN = 78
+_SM_CYVIRTUALSCREEN = 79
+
+
+class _MouseInput(ctypes.Structure):
+    _fields_ = [("dx", ctypes.c_long), ("dy", ctypes.c_long), ("mouseData", ctypes.c_ulong),
+                ("dwFlags", ctypes.c_ulong), ("time", ctypes.c_ulong), ("dwExtraInfo", _ULONG_PTR)]
+
+
+class _KeyBdInput(ctypes.Structure):
+    _fields_ = [("wVk", ctypes.c_ushort), ("wScan", ctypes.c_ushort),
+                ("dwFlags", ctypes.c_ulong), ("time", ctypes.c_ulong), ("dwExtraInfo", _ULONG_PTR)]
+
+
+class _HardwareInput(ctypes.Structure):
+    _fields_ = [("uMsg", ctypes.c_ulong), ("wParamL", ctypes.c_short), ("wParamH", ctypes.c_ushort)]
+
+
+class _InputUnion(ctypes.Union):
+    _fields_ = [("mi", _MouseInput), ("ki", _KeyBdInput), ("hi", _HardwareInput)]
+
+
+class _Input(ctypes.Structure):
+    _anonymous_ = ("_u",)
+    _fields_ = [("type", ctypes.c_ulong), ("_u", _InputUnion)]
+
+
+def _send(inp: _Input) -> None:
+    _user32.SendInput(1, ctypes.byref(inp), ctypes.sizeof(_Input))
+
+
+def _screen_to_absolute(x: int, y: int) -> tuple[int, int]:
+    """Convert screen coords to SendInput's 0–65535 absolute range on the virtual desktop."""
+    vx = _user32.GetSystemMetrics(_SM_XVIRTUALSCREEN)
+    vy = _user32.GetSystemMetrics(_SM_YVIRTUALSCREEN)
+    vw = _user32.GetSystemMetrics(_SM_CXVIRTUALSCREEN)
+    vh = _user32.GetSystemMetrics(_SM_CYVIRTUALSCREEN)
+    abs_x = ((x - vx) * 65536 + 32768) // vw if vw else 0
+    abs_y = ((y - vy) * 65536 + 32768) // vh if vh else 0
+    return (max(0, min(65535, abs_x)), max(0, min(65535, abs_y)))
+
+
+def _si_move(x: int, y: int) -> None:
+    """Move cursor via SendInput (games see this as real hardware input)."""
+    ax, ay = _screen_to_absolute(x, y)
+    inp = _Input(type=_INPUT_MOUSE)
+    inp.mi = _MouseInput(dx=ax, dy=ay, mouseData=0,
+                         dwFlags=_MOUSEEVENTF_MOVE | _MOUSEEVENTF_ABSOLUTE | _MOUSEEVENTF_VIRTUALDESK,
+                         time=0, dwExtraInfo=0)
+    _send(inp)
+
+
+_BTN_DOWN = {"left": _MOUSEEVENTF_LEFTDOWN, "right": _MOUSEEVENTF_RIGHTDOWN, "middle": _MOUSEEVENTF_MIDDLEDOWN}
+_BTN_UP = {"left": _MOUSEEVENTF_LEFTUP, "right": _MOUSEEVENTF_RIGHTUP, "middle": _MOUSEEVENTF_MIDDLEUP}
+
+
+def _si_button(button: str, down: bool) -> None:
+    flags = (_BTN_DOWN if down else _BTN_UP).get(button, 0)
+    if not flags:
+        return
+    inp = _Input(type=_INPUT_MOUSE)
+    inp.mi = _MouseInput(dx=0, dy=0, mouseData=0, dwFlags=flags, time=0, dwExtraInfo=0)
+    _send(inp)
+
+
+def _si_scroll(delta: int) -> None:
+    inp = _Input(type=_INPUT_MOUSE)
+    inp.mi = _MouseInput(dx=0, dy=0, mouseData=delta, dwFlags=_MOUSEEVENTF_WHEEL, time=0, dwExtraInfo=0)
+    _send(inp)
+
+
+def _si_key(vk: int, up: bool) -> None:
+    scan = _user32.MapVirtualKeyW(vk, 0)
+    flags = _KEYEVENTF_SCANCODE | (_KEYEVENTF_KEYUP if up else 0)
+    inp = _Input(type=_INPUT_KEYBOARD)
+    inp.ki = _KeyBdInput(wVk=0, wScan=scan, dwFlags=flags, time=0, dwExtraInfo=0)
+    _send(inp)
+
+
+def _vk_from_name(key_name: str) -> int | None:
+    """Resolve a key name (from recording) to a VK code."""
+    import keyboard as kb_lib
+    try:
+        sc = kb_lib.key_to_scan_codes(key_name)
+        if sc:
+            # scan_code_to_vk
+            vk = _user32.MapVirtualKeyW(sc[0], 3)  # MAPVK_VSC_TO_VK_EX
+            return vk if vk else None
+    except (ValueError, IndexError):
+        pass
+    return None
+
 
 def replay_recording(
     events: list[dict],
     hwnd: int | None = None,
     stop_event: threading.Event | None = None,
 ) -> None:
-    """Replay a recorded event list with original timing.
+    """Replay a recorded event list with original timing via SendInput.
 
-    Converts reference-space coords back to screen coords. Uses 1ms timer
-    resolution. Always releases all held buttons/keys on exit.
+    SendInput pushes events through the real input stack — games see them
+    as actual hardware input (unlike SetCursorPos which some games ignore).
+    Uses MOUSEEVENTF_VIRTUALDESK for multi-monitor correctness.
     """
     if not events:
         return
-    import keyboard as kb_lib
-    import mouse as mouse_lib
 
     if hwnd is None:
         hwnd = find_roblox_window()
@@ -381,14 +495,6 @@ def replay_recording(
     held_buttons: set[str] = set()
     held_keys: set[int] = set()
 
-    # Map key names to VK codes for keyboard
-    def _vk_for(key_name: str) -> int | None:
-        """Resolve a key name to its VK code."""
-        try:
-            return kb_lib.key_to_scan_codes(key_name)[0]
-        except (ValueError, IndexError):
-            return None
-
     try:
         last_t = 0.0
         for ev in events:
@@ -407,53 +513,38 @@ def replay_recording(
             if etype == "move":
                 screen_x = int(left + ev.get("x", 0) * sx)
                 screen_y = int(top + ev.get("y", 0) * sy)
-                mouse_lib.move(screen_x, screen_y, absolute=True, duration=0)
+                _si_move(screen_x, screen_y)
             elif etype == "down":
                 button = ev.get("button", "left")
                 if button in held_buttons:
-                    mouse_lib.release(button)
-                # Settle: give Roblox one frame to process the cursor position.
-                # Without this, Roblox clicks at the PREVIOUS position because
-                # it reads cursor pos once per rendered frame, and the move that
-                # just happened hasn't been consumed yet.
-                time.sleep(0.018)  # ~1 frame at 60Hz
-                mouse_lib.press(button)
+                    _si_button(button, False)
+                _si_button(button, True)
                 held_buttons.add(button)
             elif etype == "up":
                 button = ev.get("button", "left")
-                mouse_lib.release(button)
+                _si_button(button, False)
                 held_buttons.discard(button)
             elif etype == "scroll":
                 delta = ev.get("delta", 0)
                 if delta:
-                    mouse_lib.wheel(delta / 120)
+                    _si_scroll(delta)
             elif etype == "keydown":
                 key = ev.get("key", "")
-                if key:
-                    try:
-                        kb_lib.press(key)
-                        held_keys.add(key)
-                    except ValueError:
-                        pass
+                vk = _vk_from_name(key) if key else None
+                if vk:
+                    _si_key(vk, up=False)
+                    held_keys.add(vk)
             elif etype == "keyup":
                 key = ev.get("key", "")
-                if key:
-                    try:
-                        kb_lib.release(key)
-                        held_keys.discard(key)
-                    except ValueError:
-                        pass
+                vk = _vk_from_name(key) if key else None
+                if vk:
+                    _si_key(vk, up=True)
+                    held_keys.discard(vk)
     finally:
         for button in held_buttons:
-            try:
-                mouse_lib.release(button)
-            except Exception:
-                pass
-        for key in held_keys:
-            try:
-                kb_lib.release(key)
-            except Exception:
-                pass
+            _si_button(button, False)
+        for vk in held_keys:
+            _si_key(vk, up=True)
         if _winmm:
             _winmm.timeEndPeriod(1)
 
