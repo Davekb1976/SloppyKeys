@@ -540,7 +540,7 @@ class Api:
         # Apply live to the search engine
         if self._ctrl and hasattr(self._ctrl, '_engine'):
             from sloppykeys.core.image_search import apply_confidence_overrides
-            apply_confidence_overrides(self._ctrl._engine, thresholds)
+            apply_confidence_overrides(thresholds)
         return {"ok": True}
 
     def save_image_crop(self, category: str, name: str, x: int, y: int, w: int, h: int) -> dict:
@@ -571,6 +571,64 @@ class Api:
         path = os.path.join(folder, f"{name}.png")
         cv2.imwrite(path, crop)
         return {"ok": True, "path": path}
+
+    # ---- Walk Path Recording ----
+
+    def start_walk_recording(self, name: str) -> dict:
+        """Begin recording WASD keypresses."""
+        if not self._app_root:
+            return {"ok": False}
+        from sloppykeys.macro.recording import WalkRecorder
+        if not hasattr(self, '_walk_recorder'):
+            self._walk_recorder = None
+        if self._walk_recorder and self._walk_recorder.is_recording:
+            return {"ok": False, "error": "already recording"}
+        self._walk_recorder = WalkRecorder(name, self._app_root)
+        self._walk_recorder.start()
+        return {"ok": True}
+
+    def stop_walk_recording(self) -> dict:
+        """Stop recording and save the walk path."""
+        if not hasattr(self, '_walk_recorder') or not self._walk_recorder:
+            return {"ok": False}
+        name = self._walk_recorder.stop()
+        self._walk_recorder = None
+        return {"ok": True, "name": name}
+
+    def start_input_recording(self, name: str) -> dict:
+        """Begin recording full mouse+keyboard input."""
+        if not self._app_root:
+            return {"ok": False}
+        from sloppykeys.macro.recording import InputRecorder
+        if not hasattr(self, '_input_recorder'):
+            self._input_recorder = None
+        if self._input_recorder and self._input_recorder.is_recording:
+            return {"ok": False, "error": "already recording"}
+        self._input_recorder = InputRecorder(name, self._app_root, self._slot_on_screen)
+        self._input_recorder.start()
+        return {"ok": True}
+
+    def stop_input_recording(self) -> dict:
+        """Stop recording and save the input recording."""
+        if not hasattr(self, '_input_recorder') or not self._input_recorder:
+            return {"ok": False}
+        name = self._input_recorder.stop()
+        self._input_recorder = None
+        return {"ok": True, "name": name}
+
+    def list_walk_paths(self) -> list:
+        """Names of all recorded walk paths."""
+        if not self._app_root:
+            return []
+        from sloppykeys.macro.recording import list_walk_paths
+        return list_walk_paths(self._app_root)
+
+    def list_input_recordings(self) -> list:
+        """Names of all input recordings."""
+        if not self._app_root:
+            return []
+        from sloppykeys.macro.recording import list_input_recordings
+        return list_input_recordings(self._app_root)
 
     # ---- Macro control ----
 
