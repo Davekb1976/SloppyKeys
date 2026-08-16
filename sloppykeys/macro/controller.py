@@ -12,6 +12,7 @@ Usage (from the bridge):
 
 from __future__ import annotations
 
+import os
 import time
 import threading
 from typing import Callable
@@ -35,6 +36,7 @@ from sloppykeys.macro.placement import UnitPlacer, OUTCOME_WON, OUTCOME_LOST
 TICK_SLEEP = 0.05
 STEP_TIMEOUT = 180.0
 MATCH_POLL = 1.0
+REOPEN_COOLDOWN = 60.0  # seconds between reopen attempts
 
 RectProvider = Callable[[], tuple[int, int, int, int] | None]
 
@@ -77,6 +79,7 @@ class MacroController:
         self._paused = False
         self._current_task: dict | None = None
         self._cycle = 0
+        self._last_reopen_time = 0.0
 
     @staticmethod
     def _default_rect() -> tuple[int, int, int, int] | None:
@@ -148,6 +151,56 @@ class MacroController:
             time.sleep(0.15)
         return self._stop_requested
 
+    def _try_reopen_roblox(self) -> bool:
+        """If auto-reopen is enabled and Roblox isn't running, relaunch via deep link.
+
+        Throttled to one attempt per REOPEN_COOLDOWN seconds. Returns True if
+        Roblox is (or became) available, False if we couldn't recover.
+        """
+        hwnd = rbx.find_roblox_window()
+        if hwnd is not None:
+            return True
+
+        unified = UnifiedSettings(self._app_root)
+        if not unified.get("auto_reopen_roblox", True):
+            return False
+
+        now = time.time()
+        if now - self._last_reopen_time < REOPEN_COOLDOWN:
+            return False
+
+        self._last_reopen_time = now
+        link = unified.get("private_server_link", "")
+        if not link or link == "empty":
+            self._log("Roblox closed but no private server link — can't reopen.")
+            return False
+
+        self._log("Roblox closed mid-run. Relaunching via deep link...")
+        import subprocess
+        try:
+            # Roblox deep links use the roblox:// protocol or the HTTPS share URL
+            # which Windows handles via the default browser / Roblox launcher.
+            import os as _os
+            _os.startfile(link)
+        except OSError as exc:
+            self._log(f"Failed to launch Roblox: {exc}")
+            return False
+
+        # Wait for the window to appear (up to 60s)
+        deadline = time.time() + 60.0
+        while time.time() < deadline:
+            if self._stop_requested:
+                return False
+            hwnd = rbx.find_roblox_window()
+            if hwnd is not None:
+                self._log("Roblox reopened successfully.")
+                time.sleep(5.0)  # give it a moment to load
+                return True
+            time.sleep(2.0)
+
+        self._log("Roblox didn't appear within 60s.")
+        return False
+
     def _run(self) -> tuple[bool, str]:
         loop_pass = 0
         while not self._stop_requested:
@@ -175,6 +228,13 @@ class MacroController:
                 for rep in range(repeat):
                     if self._checkpoint():
                         return (True, f"stopped after {self._cycle} cycles")
+
+                    # Auto-reopen Roblox if it crashed
+                    if not self._try_reopen_roblox():
+                        if self._stop_requested:
+                            return (True, f"stopped after {self._cycle} cycles")
+                        self._log("  Roblox unavailable — skipping task.")
+                        break
 
                     # Navigate lobby
                     ok = self._navigate_lobby(mode, map_name, stage)
@@ -314,16 +374,64 @@ class MacroController:
         This is the simpler approach: just call it with the full timeout and
         let it handle keep-alive clicks and the win/loss detection loop.
         """
+        # Run battle blocks linearly before waiting for outcome
+        self._run_phase_linear(battle)
+
         self._log("  Waiting for match result...")
         outcome, msg = self._placer.wait_for_outcome()
         if outcome == OUTCOME_WON:
             self._stats.record_win()
             self._log(f"  Win! ({msg})")
+            self._send_webhook_result("win")
         elif outcome == OUTCOME_LOST:
             self._stats.record_loss()
             self._log(f"  Loss. ({msg})")
+            self._send_webhook_result("loss")
         else:
             self._log(f"  Match ended: {msg}")
+
+    def _send_webhook_result(self, result: str) -> None:
+        """Send a Discord webhook notification for a match result with screenshot."""
+        unified = UnifiedSettings(self._app_root)
+        webhook_url = unified.get("discord_webhook", "")
+        if not webhook_url:
+            return
+
+        from sloppykeys.core.webhook import DiscordWebhook, COLOR_WIN, COLOR_LOSS
+
+        hook = DiscordWebhook(
+            url_provider=lambda: webhook_url,
+            log=self._log,
+        )
+        if not hook.enabled:
+            return
+
+        task = self._current_task or {}
+        mode = task.get("mode", "—")
+        map_name = task.get("map", "—")
+        stage = task.get("stage", "—")
+        wins = self._stats.wins
+        losses = self._stats.losses
+        total = wins + losses
+        rate = f"{round(wins * 100 / total)}%" if total > 0 else "—"
+
+        title = "Stage Won" if result == "win" else "Stage Lost"
+        color = COLOR_WIN if result == "win" else COLOR_LOSS
+        fields = [
+            ("Stage", f"{mode} / {map_name} / {stage}"),
+            ("Cycle", str(self._cycle + 1)),
+            ("Session", f"{wins}W – {losses}L ({rate})"),
+        ]
+
+        # Capture a screenshot of the result screen
+        screenshot = self._capture_screenshot()
+
+        hook.send(
+            title=title,
+            fields=fields,
+            color=color,
+            image_png=screenshot,
+        )
 
     def _execute_block(self, block: dict) -> None:
         """Run one block based on its type."""
@@ -383,9 +491,115 @@ class MacroController:
                 self._ahk.run(key_script(key, hold_ms=hold_ms), wait=True, timeout=5.0)
 
         elif btype == "walk":
-            # ponytail: replay a recorded walk path
-            self._log(f"    [block] walk")
+            # Replay a recorded walk path
+            path_name = block.get("pathName", "")
+            if path_name:
+                from sloppykeys.macro.recording import replay_walk_script
+                script = replay_walk_script(self._app_root, path_name)
+                if script:
+                    self._ahk.run(script, wait=True, timeout=30.0)
+                else:
+                    self._log(f"    [block] walk path '{path_name}' not found or empty")
+            else:
+                self._log(f"    [block] walk (no path name set)")
+
+        elif btype == "record":
+            # Replay a recorded input sequence
+            rec_name = block.get("recordingName", "")
+            if rec_name:
+                from sloppykeys.macro.recording import replay_input_script
+                script = replay_input_script(self._app_root, rec_name)
+                if script:
+                    self._ahk.run(script, wait=True, timeout=60.0)
+                else:
+                    self._log(f"    [block] recording '{rec_name}' not found or empty")
+            else:
+                self._log(f"    [block] record (no recording name set)")
 
         elif btype == "detect":
-            # ponytail: image detection with then/else branching
-            self._log(f"    [block] detect (not yet implemented)")
+            # Image detection with then/else branching
+            image_name = block.get("image", "")
+            threshold = float(block.get("threshold", 0.8))
+            loop = block.get("loop", False)
+            loop_attempts = int(block.get("loopAttempts", 5))
+            then_blocks = block.get("then", [])
+            else_blocks = block.get("else", [])
+
+            if not image_name:
+                self._log("    [block] detect: no image specified")
+                return
+
+            from sloppykeys.core.image_search import ImageProfile
+
+            # Resolve the image path: check images/ subfolders
+            image_path = image_name
+            if not os.path.isabs(image_path):
+                # Try common locations
+                for subdir in ("images/match", "images/lobby", "images/detect", "images"):
+                    candidate = os.path.join(self._app_root, subdir, image_name)
+                    if not candidate.endswith(".png"):
+                        candidate += ".png"
+                    if os.path.isfile(candidate):
+                        image_path = candidate
+                        break
+
+            profile = ImageProfile(
+                name=image_name,
+                image_path=image_path,
+                confidence=threshold,
+            )
+
+            found = False
+            attempts = loop_attempts if loop else 1
+            for attempt in range(attempts):
+                if self._checkpoint():
+                    return
+                rect = self._rect()
+                if rect is None:
+                    time.sleep(0.5)
+                    continue
+                match = self._engine.find_first([profile], rect)
+                if match is not None:
+                    found = True
+                    break
+                if loop and attempt < attempts - 1:
+                    time.sleep(0.5)
+
+            if found:
+                for tb in then_blocks:
+                    if self._checkpoint():
+                        return
+                    self._execute_block(tb)
+                    time.sleep(TICK_SLEEP)
+            else:
+                for eb in else_blocks:
+                    if self._checkpoint():
+                        return
+                    self._execute_block(eb)
+                    time.sleep(TICK_SLEEP)
+
+    def _capture_screenshot(self) -> bytes | None:
+        """Capture the current Roblox screen as PNG bytes for webhook attachment."""
+        try:
+            import mss
+            import cv2
+            import numpy as np
+        except ImportError:
+            return None
+
+        rect = self._rect()
+        if rect is None:
+            return None
+
+        x, y, w, h = rect
+        monitor = {"left": x, "top": y, "width": w, "height": h}
+        try:
+            with mss.mss() as sct:
+                img = np.array(sct.grab(monitor))
+            bgr = img[:, :, :3]
+            ok, buf = cv2.imencode(".png", bgr)
+            if ok:
+                return buf.tobytes()
+        except Exception:
+            pass
+        return None
