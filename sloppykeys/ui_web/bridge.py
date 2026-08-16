@@ -401,16 +401,20 @@ class Api:
         )
 
     def list_maps(self, category: str) -> list:
-        """Map image names in a category (without .png extension)."""
+        """Map image names in a category (scans subfolders recursively)."""
         if not self._app_root:
             return []
         folder = os.path.join(self._app_root, "images", "reference", category)
         if not os.path.isdir(folder):
             return []
-        return sorted(
-            f[:-4] for f in os.listdir(folder)
-            if f.lower().endswith(".png")
-        )
+        maps = []
+        for dirpath, _dirs, files in os.walk(folder):
+            for f in sorted(files):
+                if f.lower().endswith(".png"):
+                    # Use relative path from the category folder as the map name
+                    rel = os.path.relpath(os.path.join(dirpath, f), folder)
+                    maps.append(rel[:-4].replace("\\", "/"))
+        return maps
 
     def get_map_image(self, category: str, name: str) -> dict:
         """Base64 data URI of a map image for the position picker."""
@@ -418,7 +422,8 @@ class Api:
             return {"ok": False}
         import base64
 
-        path = os.path.join(self._app_root, "images", "reference", category, name + ".png")
+        # Name can be "Villian Invasion/Act 1" (with path separators)
+        path = os.path.join(self._app_root, "images", "reference", category, name.replace("/", os.sep) + ".png")
         if not os.path.isfile(path):
             return {"ok": False, "reason": "not found"}
         try:

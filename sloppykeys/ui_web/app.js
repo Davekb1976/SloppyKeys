@@ -464,6 +464,13 @@
     renderPhases();
   });
 
+  document.getElementById("btn-op-clear").addEventListener("click", () => {
+    // Reset all phases to default (only walk_path in pre_start)
+    opPhases = { pre_start: [{ type: "walk_path", params: {}, mode: "auto", pathName: "" }], battle: [], loop_a: [], loop_b: [] };
+    opDirty = true;
+    renderPhases();
+  });
+
   document.getElementById("btn-op-delete").addEventListener("click", async () => {
     const name = opName.value.trim();
     if (!name || !window.pywebview || !pywebview.api) return;
