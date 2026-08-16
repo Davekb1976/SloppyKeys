@@ -389,10 +389,10 @@ class Api:
     # ---- Position Picker (map images) ----
 
     def list_map_categories(self) -> list:
-        """Category folders under images/reference/."""
+        """Category folders under assets/reference/."""
         if not self._app_root:
             return []
-        ref = os.path.join(self._app_root, "images", "reference")
+        ref = os.path.join(self._app_root, "assets", "reference")
         if not os.path.isdir(ref):
             return []
         return sorted(
@@ -404,7 +404,7 @@ class Api:
         """Map image names in a category (scans subfolders recursively)."""
         if not self._app_root:
             return []
-        folder = os.path.join(self._app_root, "images", "reference", category)
+        folder = os.path.join(self._app_root, "assets", "reference", category)
         if not os.path.isdir(folder):
             return []
         maps = []
@@ -423,7 +423,7 @@ class Api:
         import base64
 
         # Name can be "Villian Invasion/Act 1" (with path separators)
-        path = os.path.join(self._app_root, "images", "reference", category, name.replace("/", os.sep) + ".png")
+        path = os.path.join(self._app_root, "assets", "reference", category, name.replace("/", os.sep) + ".png")
         if not os.path.isfile(path):
             return {"ok": False, "reason": "not found"}
         try:
@@ -493,7 +493,7 @@ class Api:
         default_threshold = 0.70
 
         categories = []
-        images_root = os.path.join(self._app_root, "images")
+        images_root = os.path.join(self._app_root, "assets")
 
         for key, label in IMAGE_CATEGORIES.items():
             folder = os.path.join(images_root, key)
@@ -565,8 +565,8 @@ class Api:
         if crop.size == 0:
             return {"ok": False, "reason": "crop is empty"}
 
-        # Overwrite the original file: images/<category>/<name>.png
-        folder = os.path.join(self._app_root, "images", category)
+        # Overwrite the original file: assets/<category>/<name>.png
+        folder = os.path.join(self._app_root, "assets", category)
         os.makedirs(folder, exist_ok=True)
         path = os.path.join(folder, f"{name}.png")
         cv2.imwrite(path, crop)

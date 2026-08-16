@@ -30,7 +30,7 @@ NAME = "SloppyKeys"
 DEFAULT_DEST = os.path.join(os.path.dirname(os.path.dirname(HERE)), "SLOPPYKEYS")
 
 # Copied beside the exe. Folders the user's work lives in, plus the route data.
-DATA_DIRS = ("images", "configs")
+DATA_DIRS = ("assets", "configs")
 DATA_FILES = ("routes.json",)
 # `routes.json` again under a second name. The installer writes `routes.json` only if it is
 # missing (it is the user's own events once they have any) but always replaces this copy, so

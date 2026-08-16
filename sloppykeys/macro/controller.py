@@ -543,11 +543,11 @@ class MacroController:
 
             from sloppykeys.core.image_search import ImageProfile
 
-            # Resolve the image path: check images/ subfolders
+            # Resolve the image path: check assets/ subfolders
             image_path = image_name
             if not os.path.isabs(image_path):
                 # Try common locations
-                for subdir in ("images/match", "images/lobby", "images/detect", "images"):
+                for subdir in ("assets/match", "assets/lobby", "assets/detect", "assets"):
                     candidate = os.path.join(self._app_root, subdir, image_name)
                     if not candidate.endswith(".png"):
                         candidate += ".png"

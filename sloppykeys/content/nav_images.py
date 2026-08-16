@@ -4,11 +4,11 @@ Paths are derived from the gamemode/stage schema so the folder layout can't
 drift from `gamemodes.py`. All paths are relative to the app root; feed them
 through `ImageSearchEngine.to_absolute_path`.
 
-Layout (under images/):
-    images/lobby/play.png                       the Play button
-    images/gamemodes/<gamemode>.png             one per gamemode card
-    images/stages/<gamemode>/<stage>.png        one per stage/map
-    images/match/start_game.png                 in-match, proves the stage loaded
+Layout (under assets/):
+    assets/lobby/play.png                       the Play button
+    assets/gamemodes/<gamemode>.png             one per gamemode card
+    assets/stages/<gamemode>/<stage>.png        one per stage/map
+    assets/match/start_game.png                 in-match, proves the stage loaded
 
 Filenames are slugs: lowercase, non-alphanumerics collapsed to "_".
   "King's Tomb"        -> kings_tomb.png
@@ -22,7 +22,7 @@ import re
 
 from .gamemodes import GAMEMODES
 
-IMAGES_DIR = "images"
+IMAGES_DIR = "assets"
 LOBBY_DIR = "lobby"
 GAMEMODES_DIR = "gamemodes"
 STAGES_DIR = "stages"
