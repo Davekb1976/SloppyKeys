@@ -1722,26 +1722,23 @@
   async function startWalkRecording(phase, idx) {
     if (!window.pywebview || !pywebview.api) return;
     if (walkRecording) {
-      // Stop recording
-      const result = await pywebview.api.stop_walk_recording();
+      // Stop recording — don't save yet, show name modal
+      await pywebview.api.stop_walk_recording();
       walkRecording = false;
       document.getElementById("rec-popout").style.display = "none";
-      if (result.ok) {
-        opPhases[phase][idx].pathName = result.name;
-        opDirty = true;
-        _cachedWalkPaths = null;
-        window.addLog("Walk path saved: " + result.name);
-      }
-      // Switch back to planner
+      // Switch back to planner and show name modal
       switchScreen("planner");
-      renderPhases();
+      document.getElementById("walk-name-modal").style.display = "flex";
+      const input = document.getElementById("walk-name-input");
+      input.value = "";
+      setTimeout(() => input.focus(), 50);
     } else {
       // Start recording: switch to dashboard
       walkRecPhase = phase;
       walkRecIdx = idx;
       switchScreen("dashboard");
       await new Promise(r => setTimeout(r, 300));
-      const name = opPhases[phase][idx].pathName || `walk_${Date.now()}`;
+      const name = `walk_${Date.now()}`; // temp name, will be renamed on save
       const r = await pywebview.api.start_walk_recording(name);
       if (r.ok) {
         walkRecording = true;
@@ -1753,6 +1750,40 @@
       }
     }
   }
+
+  // Walk path name modal handlers
+  document.getElementById("walk-name-save").addEventListener("click", async () => {
+    const input = document.getElementById("walk-name-input");
+    const name = input.value.trim();
+    if (!name || !window.pywebview || !pywebview.api) return;
+    document.getElementById("walk-name-modal").style.display = "none";
+    // Rename the saved walk path to the user's chosen name
+    const r = await pywebview.api.rename_walk_path(name);
+    if (r.ok) {
+      if (walkRecPhase !== null && walkRecIdx !== null) {
+        opPhases[walkRecPhase][walkRecIdx].pathName = r.name;
+        opDirty = true;
+      }
+      _cachedWalkPaths = null;
+      window.addLog("Walk path saved: " + r.name);
+    }
+    walkRecPhase = null;
+    walkRecIdx = null;
+    renderPhases();
+  });
+
+  document.getElementById("walk-name-input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") document.getElementById("walk-name-save").click();
+  });
+
+  document.getElementById("walk-name-discard").addEventListener("click", async () => {
+    document.getElementById("walk-name-modal").style.display = "none";
+    if (window.pywebview && pywebview.api) await pywebview.api.discard_walk_path();
+    window.addLog("[Walk] Recording discarded.");
+    walkRecPhase = null;
+    walkRecIdx = null;
+    renderPhases();
+  });
 
   // ---- Recording helpers ----
   let _cachedRecordings = null;

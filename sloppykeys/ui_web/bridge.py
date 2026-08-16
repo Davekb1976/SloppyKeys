@@ -811,12 +811,52 @@ class Api:
         return {"ok": True}
 
     def stop_walk_recording(self) -> dict:
-        """Stop recording and save the walk path."""
+        """Stop recording the walk path (keeps it in memory, not saved yet)."""
         if not hasattr(self, '_walk_recorder') or not self._walk_recorder:
             return {"ok": False}
-        name = self._walk_recorder.stop()
+        self._pending_walk_name = self._walk_recorder.stop()
         self._walk_recorder = None
-        return {"ok": True, "name": name}
+        return {"ok": True}
+
+    def rename_walk_path(self, name: str) -> dict:
+        """Rename the pending walk path to the user's chosen name and save."""
+        if not self._app_root:
+            return {"ok": False}
+        pending = getattr(self, '_pending_walk_name', None)
+        if not pending:
+            return {"ok": False, "reason": "no pending walk path"}
+        import os, shutil
+        from sloppykeys.macro.recording import _safe_name
+        old_path = os.path.join(self._app_root, "paths", f"{pending}.json")
+        new_slug = _safe_name(name)
+        new_path = os.path.join(self._app_root, "paths", f"{new_slug}.json")
+        if os.path.isfile(old_path) and old_path != new_path:
+            # Rename by reading + rewriting with new name
+            import json
+            try:
+                with open(old_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                data["name"] = name
+                with open(new_path, "w", encoding="utf-8") as f:
+                    json.dump(data, f)
+                os.remove(old_path)
+            except OSError:
+                pass
+        self._pending_walk_name = None
+        return {"ok": True, "name": new_slug}
+
+    def discard_walk_path(self) -> dict:
+        """Discard the pending walk path recording."""
+        import os
+        pending = getattr(self, '_pending_walk_name', None)
+        if pending and self._app_root:
+            path = os.path.join(self._app_root, "paths", f"{pending}.json")
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+        self._pending_walk_name = None
+        return {"ok": True}
 
     def start_input_recording(self) -> dict:
         """Begin recording full mouse+keyboard input via hooks."""
