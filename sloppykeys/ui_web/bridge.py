@@ -882,6 +882,7 @@ class Api:
         if self._ctrl is None or not self._ctrl.is_running:
             return {"ok": False}
         self._ctrl.pause()
+        self._push_status()
         return {"ok": True}
 
     def resume_macro(self) -> dict:
@@ -889,6 +890,7 @@ class Api:
         if self._ctrl is None:
             return {"ok": False}
         self._ctrl.resume()
+        self._push_status()
         return {"ok": True}
 
     def get_macro_status(self) -> dict:
