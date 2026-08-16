@@ -477,42 +477,40 @@
         });
         row.addEventListener("dragend", () => {
           row.classList.remove("dragging");
-          zone.querySelectorAll(".drop-placeholder").forEach((p) => { p.classList.remove("open"); setTimeout(() => p.remove(), 160); });
-          if (zone.closest(".phase-section")) zone.closest(".phase-section").classList.remove("drag-active");
+          document.querySelectorAll(".drop-placeholder").forEach((p) => p.remove());
+          document.querySelectorAll(".phase-section.drag-active").forEach((s) => s.classList.remove("drag-active"));
+          document.querySelectorAll(".phase-dropzone.drag-over").forEach((z) => z.classList.remove("drag-over"));
         });
         row.addEventListener("dragover", (e) => {
           e.preventDefault();
           e.stopPropagation();
           const moveData = e.dataTransfer.types.includes("application/x-block-move") || e.dataTransfer.types.includes("text/plain");
           if (!moveData) return;
-          // Show animated placeholder
           const rect = row.getBoundingClientRect();
           const midY = rect.top + rect.height / 2;
           const after = e.clientY > midY;
-          // Remove existing placeholders in this zone
-          zone.querySelectorAll(".drop-placeholder").forEach((p) => p.classList.remove("open"));
-          setTimeout(() => zone.querySelectorAll(".drop-placeholder:not(.open)").forEach((p) => p.remove()), 160);
-          // Create or reuse placeholder
-          let placeholder = zone.querySelector(".drop-placeholder.open");
+          // Reuse a single placeholder per zone
+          let placeholder = zone.querySelector(".drop-placeholder");
           if (!placeholder) {
             placeholder = document.createElement("div");
             placeholder.className = "drop-placeholder";
-            zone.appendChild(placeholder); // temporarily
+            zone.appendChild(placeholder);
+            requestAnimationFrame(() => placeholder.classList.add("open"));
           }
-          if (after) row.after(placeholder);
-          else row.before(placeholder);
-          // Trigger the open animation on next frame
-          requestAnimationFrame(() => placeholder.classList.add("open"));
+          if (after) { if (row.nextElementSibling !== placeholder) row.after(placeholder); }
+          else { if (row.previousElementSibling !== placeholder) row.before(placeholder); }
+          if (!placeholder.classList.contains("open")) {
+            requestAnimationFrame(() => placeholder.classList.add("open"));
+          }
         });
         row.addEventListener("dragleave", (e) => {
-          if (!row.contains(e.relatedTarget)) {
-            zone.querySelectorAll(".drop-placeholder").forEach((p) => { p.classList.remove("open"); setTimeout(() => p.remove(), 160); });
-          }
+          // Only remove if leaving the zone entirely (not entering another row)
         });
         row.addEventListener("drop", (e) => {
           e.preventDefault();
           e.stopPropagation();
-          zone.querySelectorAll(".drop-placeholder").forEach((p) => p.remove());
+          const ph = zone.querySelector(".drop-placeholder");
+          if (ph) ph.remove();
           const raw = e.dataTransfer.getData("application/x-block-move");
           if (!raw) return;
           const src = JSON.parse(raw);
@@ -601,7 +599,8 @@
       e.preventDefault();
       zone.classList.remove("drag-over");
       if (section) section.classList.remove("drag-active");
-      zone.querySelectorAll(".drop-placeholder").forEach((p) => p.remove());
+      const ph = zone.querySelector(".drop-placeholder");
+      if (ph) ph.remove();
 
       // Cross-phase block move (reorder from another phase or within when dropped on empty area)
       const moveRaw = e.dataTransfer.getData("application/x-block-move");
