@@ -1455,7 +1455,12 @@
   });
   document.getElementById("im-capture").addEventListener("click", async () => {
     if (!window.pywebview || !pywebview.api) return;
+    // The modal hid the game (it paints over the DOM); show it for a frame so
+    // mss has a real window to grab, then hide it again behind the modal.
+    if (pywebview.api.set_game_visible) pywebview.api.set_game_visible(true);
+    await new Promise(r => setTimeout(r, 400));
     const r = await pywebview.api.get_roblox_snapshot();
+    if (pywebview.api.set_game_visible) pywebview.api.set_game_visible(false);
     if (r.ok) window.addLog("[Image Manager] Captured Roblox screen.");
     else window.addLog("[Image Manager] Capture failed: " + (r.reason || "error"));
   });
