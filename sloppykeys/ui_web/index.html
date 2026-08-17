@@ -555,6 +555,23 @@
   </div>
 </div>
 
+<!-- Name a newly cropped detect image -->
+<div class="modal-overlay" id="detect-name-modal" style="display:none;">
+  <div class="modal-box" style="width:380px; display:flex; flex-direction:column;">
+    <div class="modal-header">
+      <span class="modal-title">Save Detect Image</span>
+      <button class="modal-close" id="detect-name-cancel">&times;</button>
+    </div>
+    <div class="modal-body" style="padding:16px; display:flex; flex-direction:column; gap:12px;">
+      <input type="text" class="setting-input" id="detect-name-input" placeholder="Image name..." style="width:100%;">
+      <div style="display:flex; gap:8px; justify-content:flex-end;">
+        <button class="btn btn--sm" id="detect-name-discard">Discard</button>
+        <button class="btn btn--sm btn--primary" id="detect-name-save">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Save walk path name modal -->
 <div class="modal-overlay" id="walk-name-modal" style="display:none;">
   <div class="modal-box" style="width:380px; display:flex; flex-direction:column;">

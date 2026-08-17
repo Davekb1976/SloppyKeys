@@ -256,6 +256,69 @@ class Api:
             return RouteStore(self._app_root).acts(map_name)
         return targets_for(gamemode, map_name)
 
+    # ---- Detect block templates (assets/detect) ----
+
+    def list_detect_images(self) -> list:
+        """Templates the detect block can search for, with thumbnails for the preview.
+
+        Their own folder rather than the navigation categories: these are the user's
+        own crops for their own macros, and mixing them in would make a missing
+        navigation template indistinguishable from a personal one.
+        """
+        if not self._app_root:
+            return []
+        import base64
+
+        folder = os.path.join(self._app_root, "assets", "detect")
+        if not os.path.isdir(folder):
+            return []
+        out = []
+        for fname in sorted(os.listdir(folder)):
+            if not fname.lower().endswith(".png"):
+                continue
+            try:
+                with open(os.path.join(folder, fname), "rb") as f:
+                    b64 = base64.b64encode(f.read()).decode("ascii")
+            except OSError:
+                continue
+            out.append({
+                "name": fname[:-4],
+                "path": f"assets/detect/{fname}",
+                "data_uri": f"data:image/png;base64,{b64}",
+            })
+        return out
+
+    def save_detect_image(self, name: str, x: int, y: int, w: int, h: int) -> dict:
+        """Crop the cached snapshot into `assets/detect/<name>.png`.
+
+        The name is sanitised through the same helper every other display-name-to-path
+        conversion uses, and refused outright if nothing usable survives.
+        """
+        if not self._app_root:
+            return {"ok": False, "reason": "no app root"}
+        from sloppykeys.config.unit_configs import safe_component
+
+        clean = safe_component(str(name or "").strip())[:60].strip()
+        # `safe_component` maps illegal characters to "-", so ".." and "///" survive as
+        # "-" and "---" — safely inside the folder, but a file nobody meant to make.
+        # Require something nameable rather than repairing it into junk.
+        if not any(ch.isalnum() for ch in clean):
+            return {"ok": False, "reason": "invalid name"}
+        return self.save_image_crop(f"assets/detect/{clean}.png", x, y, w, h)
+
+    def delete_detect_image(self, name: str) -> dict:
+        """Delete one detect template."""
+        if not self._app_root:
+            return {"ok": False}
+        target = self._template_path(f"assets/detect/{name}.png")
+        if target is None:
+            return {"ok": False, "reason": "bad name"}
+        try:
+            os.remove(target)
+            return {"ok": True}
+        except OSError as exc:
+            return {"ok": False, "reason": str(exc)}
+
     # ---- Challenge ----
 
     def get_challenge_info(self) -> dict:

@@ -844,17 +844,20 @@ class MacroController:
 
             from sloppykeys.core.image_search import ImageProfile
 
-            # Resolve the image path: check assets/ subfolders
+            # Resolve the image path. `assets/detect` comes first: that is where the
+            # block's own Capture button writes, so a name that exists both there and
+            # under a navigation folder must resolve to the user's own crop.
             image_path = image_name
             if not os.path.isabs(image_path):
-                # Try common locations
-                for subdir in ("assets/match", "assets/lobby", "assets/detect", "assets"):
+                for subdir in ("assets/detect", "assets/match", "assets/lobby", "assets"):
                     candidate = os.path.join(self._app_root, subdir, image_name)
                     if not candidate.endswith(".png"):
                         candidate += ".png"
                     if os.path.isfile(candidate):
                         image_path = candidate
                         break
+                else:
+                    self._log(f"    [block] detect: image '{image_name}' not found — treating as not found")
 
             profile = ImageProfile(
                 name=image_name,

@@ -839,8 +839,11 @@
           return `<div class="block-row block-detect" data-phase="${phase}" data-idx="${i}" data-type="detect">
             <div class="detect-header">
               <span class="block-type">detect</span>
-              <input placeholder="image" value="${b.image || ""}" data-field="image" style="width:80px;">
-              <input placeholder="threshold" value="${b.threshold || 0.8}" data-field="threshold" type="number" step="0.05" style="width:55px;">
+              <img class="detect-preview" id="detect-prev-${phase}-${i}" alt="" title="What this block searches for">
+              ${blkField("Image", `<select class="blk-select" data-field="image" id="sel-detect-${phase}-${i}" style="width:110px;"><option value="">Pick image...</option></select>`)}
+              <button class="btn btn--sm" id="btn-detect-cap-${phase}-${i}" title="Capture a new image from the game">Capture</button>
+              <button class="btn btn--sm btn--danger" id="btn-detect-del-${phase}-${i}" title="Delete the selected image">✕</button>
+              ${blkField("Match", `<input value="${b.threshold || 0.8}" data-field="threshold" type="number" step="0.05" min="0.5" max="0.99" style="width:55px;">`)}
               <label class="check"><input type="checkbox" ${b.loop ? "checked" : ""} data-field="loop"><span class="check-box"></span>Loop</label>
               <span class="block-actions">
                 <span class="block-once${b.once ? " on" : ""}" data-phase="${phase}" data-idx="${i}" title="Run Once">1×</span>
@@ -1101,6 +1104,24 @@
         btn.addEventListener("click", () => {
           const parts = btn.id.replace("btn-walkdel-", "").split("-");
           deleteWalkPath(parts[0], parseInt(parts[1]));
+        });
+      });
+      // Detect blocks: fill the image dropdown, show the preview, wire capture/delete
+      zone.querySelectorAll("[id^='sel-detect-']").forEach((sel) => {
+        const parts = sel.id.replace("sel-detect-", "").split("-");
+        const ph = parts[0], idx = parseInt(parts[1]);
+        populateDetectSelect(sel, opPhases[ph]?.[idx]?.image || "");
+      });
+      zone.querySelectorAll("[id^='btn-detect-cap-']").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const parts = btn.id.replace("btn-detect-cap-", "").split("-");
+          captureDetectImage(parts[0], parseInt(parts[1]));
+        });
+      });
+      zone.querySelectorAll("[id^='btn-detect-del-']").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const parts = btn.id.replace("btn-detect-del-", "").split("-");
+          deleteDetectImage(parts[0], parseInt(parts[1]));
         });
       });
       // Wire input recording buttons
@@ -1605,10 +1626,15 @@
       return;
     }
     // Show crop modal
-    showCropView(result.data_uri, name);
+    showCropView(result.data_uri, { label: templatePath });
   }
 
-  function showCropView(dataUri, name) {
+  // `opts`: { label, backLabel, onBack, onSave(rect) }. With no onSave it overwrites
+  // `cropTarget` through save_image_crop, which is the Image Manager's behaviour.
+  function showCropView(dataUri, opts) {
+    opts = opts || {};
+    const name = opts.label || "";
+    const backLabel = opts.backLabel || "← Library";
     const img = new Image();
     img.onload = () => {
       cropImage = img;
@@ -1618,7 +1644,7 @@
       const body = imModal.querySelector(".modal-body");
       body.innerHTML = `
         <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
-          <button class="btn btn--sm" id="crop-back">← Library</button>
+          <button class="btn btn--sm" id="crop-back">${backLabel}</button>
           <span style="font-size:11px; color:var(--text-muted);">Draw a box around the element to crop</span>
           <span class="pos-readout" id="crop-readout" style="margin-left:auto;">No selection</span>
         </div>
@@ -1727,6 +1753,7 @@
       canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
       document.getElementById("crop-back").addEventListener("click", () => {
+        if (opts.onBack) { opts.onBack(); return; }
         // Restore the library view inside the modal body
         const body = imModal.querySelector(".modal-body");
         body.innerHTML = `<div id="im-tabs" class="pos-tabs"></div><div id="im-grid" class="im-grid"></div>`;
@@ -1738,9 +1765,16 @@
         renderImGrid();
         if (window.pywebview && pywebview.api) pywebview.api.set_game_visible(false);
       });
-      document.getElementById("crop-retake").addEventListener("click", () => startImageCapture(cropTarget));
+      document.getElementById("crop-retake").addEventListener("click", () => {
+        if (opts.onRetake) { opts.onRetake(); return; }
+        startImageCapture(cropTarget);
+      });
       document.getElementById("crop-save").addEventListener("click", async () => {
-        if (!cropRect || !cropTarget || !window.pywebview || !pywebview.api) return;
+        if (!cropRect || !window.pywebview || !pywebview.api) return;
+        // A caller that owns its own destination (the detect block names the file
+        // after cropping) handles the save itself.
+        if (opts.onSave) { opts.onSave({ ...cropRect }); return; }
+        if (!cropTarget) return;
         const r = await pywebview.api.save_image_crop(cropTarget, cropRect.x, cropRect.y, cropRect.w, cropRect.h);
         if (r.ok) {
           window.addLog(`[Image Manager] Saved crop for ${cropTarget}`);
@@ -2130,6 +2164,105 @@
       window.addLog("[Record] Delete failed: " + (r.reason || "not found"));
     }
   }
+
+  // ---- Detect block images ----
+  let _cachedDetectImages = null;
+  let detectCapPhase = null, detectCapIdx = null, detectCapRect = null;
+
+  async function detectImages() {
+    if (!window.pywebview || !pywebview.api) return [];
+    if (!_cachedDetectImages) {
+      _cachedDetectImages = (await pywebview.api.list_detect_images()) || [];
+    }
+    return _cachedDetectImages;
+  }
+
+  async function populateDetectSelect(sel, current) {
+    const imgs = await detectImages();
+    sel.innerHTML = '<option value="">Pick image...</option>' + imgs.map(im =>
+      `<option value="${im.name}"${im.name === current ? " selected" : ""}>${im.name}</option>`
+    ).join("");
+    // Keep a name that no longer has a file, so a missing image is visible rather
+    // than silently reset to "none" — the block would then match nothing at run time.
+    if (current && !imgs.some(im => im.name === current)) {
+      sel.insertAdjacentHTML("beforeend", `<option value="${current}" selected>${current} (missing)</option>`);
+    }
+    showDetectPreview(sel);
+    sel.addEventListener("change", () => showDetectPreview(sel));
+  }
+
+  async function showDetectPreview(sel) {
+    const prev = document.getElementById(sel.id.replace("sel-detect-", "detect-prev-"));
+    if (!prev) return;
+    const imgs = await detectImages();
+    const hit = imgs.find(im => im.name === sel.value);
+    prev.src = hit ? hit.data_uri : "";
+    prev.style.display = hit ? "" : "none";
+  }
+
+  async function captureDetectImage(phase, idx) {
+    if (!window.pywebview || !pywebview.api) return;
+    detectCapPhase = phase; detectCapIdx = idx;
+    // The backend reveals the game for the grab, so no screen switch is needed.
+    const snap = await pywebview.api.get_roblox_snapshot();
+    if (!snap.ok) { window.addLog("[Detect] Capture failed: " + (snap.reason || "error")); return; }
+    showCropView(snap.data_uri, {
+      label: "New detect image",
+      backLabel: "Cancel",
+      onBack: () => { imModal.style.display = "none"; restoreGameIfDashboard(); },
+      onRetake: () => captureDetectImage(phase, idx),
+      onSave: (rect) => {
+        detectCapRect = rect;
+        imModal.style.display = "none";
+        document.getElementById("detect-name-input").value = "";
+        document.getElementById("detect-name-modal").style.display = "flex";
+        document.getElementById("detect-name-input").focus();
+      },
+    });
+  }
+
+  async function deleteDetectImage(phase, idx) {
+    const name = opPhases[phase][idx].image || "";
+    if (!name) { window.addLog("[Detect] No image selected to delete."); return; }
+    if (!window.pywebview || !pywebview.api) return;
+    const r = await pywebview.api.delete_detect_image(name);
+    if (r.ok) {
+      opPhases[phase][idx].image = "";
+      opDirty = true;
+      _cachedDetectImages = null;
+      window.addLog("[Detect] Deleted: " + name);
+      renderPhases();
+    } else {
+      window.addLog("[Detect] Delete failed: " + (r.reason || "not found"));
+    }
+  }
+
+  function closeDetectNameModal() {
+    document.getElementById("detect-name-modal").style.display = "none";
+    detectCapRect = null;
+    restoreGameIfDashboard();
+  }
+  document.getElementById("detect-name-cancel").addEventListener("click", closeDetectNameModal);
+  document.getElementById("detect-name-discard").addEventListener("click", closeDetectNameModal);
+  document.getElementById("detect-name-input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") document.getElementById("detect-name-save").click();
+  });
+  document.getElementById("detect-name-save").addEventListener("click", async () => {
+    const name = document.getElementById("detect-name-input").value.trim();
+    if (!name || !detectCapRect || !window.pywebview || !pywebview.api) return;
+    const r = await pywebview.api.save_detect_image(
+      name, detectCapRect.x, detectCapRect.y, detectCapRect.w, detectCapRect.h);
+    if (!r.ok) { window.addLog("[Detect] Save failed: " + (r.reason || "error")); return; }
+    _cachedDetectImages = null;
+    // Point the block that started the capture at what it just made.
+    if (detectCapPhase !== null && opPhases[detectCapPhase]?.[detectCapIdx]) {
+      opPhases[detectCapPhase][detectCapIdx].image = name;
+      opDirty = true;
+    }
+    window.addLog("[Detect] Saved image: " + name);
+    closeDetectNameModal();
+    renderPhases();
+  });
 
   async function deleteWalkPath(phase, idx) {
     const name = opPhases[phase][idx].pathName || "";
