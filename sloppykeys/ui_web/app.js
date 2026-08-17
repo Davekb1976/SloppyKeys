@@ -497,29 +497,41 @@
         ctx.translate(panX, panY);
         ctx.scale(zoom, zoom);
         ctx.drawImage(img, 0, 0, img.naturalWidth * scale, img.naturalHeight * scale);
+        // Draw a readable label chip (dark pill + bright text) above a box.
+        const fontPx = 11 / zoom;
+        ctx.font = "600 " + fontPx + "px system-ui";
+        ctx.textBaseline = "alphabetic";
+        function drawLabel(text, x, y, color) {
+          const padX = 4 / zoom, padY = 2 / zoom;
+          const tw = ctx.measureText(text).width;
+          const th = fontPx;
+          let ly = y - 2 / zoom;                 // sit just above the box
+          if (ly - th - padY * 2 < 0) ly = y + th + padY * 2 + 2 / zoom; // flip below if clipped at top
+          ctx.fillStyle = "rgba(15, 18, 26, 0.85)";
+          ctx.fillRect(x, ly - th - padY * 2, tw + padX * 2, th + padY * 2);
+          ctx.fillStyle = color;
+          ctx.fillText(text, x + padX, ly - padY);
+        }
         // Onion-skin: every other saved region, dimmed, with its label.
-        ctx.font = (11 / zoom) + "px system-ui";
-        ctx.textBaseline = "bottom";
         ocrRegionSpecs.forEach(s => {
           if (s.key === ocrRegionKey) return; // the one being edited is drawn below
           const box = ocrRegionOverrides[s.key] || s.default;
           if (!box) return;
           const bx = box[0] * scale, by = box[1] * scale, bw = box[2] * scale, bh = box[3] * scale;
-          ctx.strokeStyle = "rgba(148, 163, 184, 0.55)";
+          ctx.strokeStyle = "rgba(226, 232, 240, 0.7)";
           ctx.lineWidth = 1 / zoom;
           ctx.strokeRect(bx, by, bw, bh);
-          ctx.fillStyle = "rgba(148, 163, 184, 0.85)";
-          ctx.fillText(s.label, bx, Math.max(11 / zoom, by - 1 / zoom));
+          drawLabel(s.label, bx, by, "#e2e8f0");
         });
         if (ocrRegionRect) {
           const label = (ocrRegionSpecs.find(s => s.key === ocrRegionKey) || {}).label || ocrRegionKey;
-          ctx.strokeStyle = "#8b5cf6";
+          const rx = ocrRegionRect.x * scale, ry = ocrRegionRect.y * scale;
+          ctx.strokeStyle = "#a78bfa";
           ctx.lineWidth = 2 / zoom;
-          ctx.strokeRect(ocrRegionRect.x * scale, ocrRegionRect.y * scale, ocrRegionRect.w * scale, ocrRegionRect.h * scale);
+          ctx.strokeRect(rx, ry, ocrRegionRect.w * scale, ocrRegionRect.h * scale);
           ctx.fillStyle = "rgba(139, 92, 246, 0.15)";
-          ctx.fillRect(ocrRegionRect.x * scale, ocrRegionRect.y * scale, ocrRegionRect.w * scale, ocrRegionRect.h * scale);
-          ctx.fillStyle = "#8b5cf6";
-          ctx.fillText(label, ocrRegionRect.x * scale, Math.max(11 / zoom, ocrRegionRect.y * scale - 1 / zoom));
+          ctx.fillRect(rx, ry, ocrRegionRect.w * scale, ocrRegionRect.h * scale);
+          drawLabel(label, rx, ry, "#c4b5fd");
         }
         ctx.restore();
       }
