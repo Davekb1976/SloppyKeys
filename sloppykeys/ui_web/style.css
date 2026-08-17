@@ -495,26 +495,41 @@ input:focus, select:focus {
 }
 .blk-select:focus { border-color: var(--accent); outline: none; }
 
-/* Custom checkbox: bordered box with a filled square dot when checked */
-.blk-check {
+/* # The only boolean control in the app
+   A square bordered box that fills with a square dot when checked. Used for every
+   on/off value — settings rows, block options, modal options. There is no sliding
+   switch and no native checkbox anywhere; see ui-design.md. Optional trailing text
+   goes inside the same <label>, so the text is part of the hit target.
+     <label class="check"><input type="checkbox"><span class="check-box"></span>Auto</label>
+   Add `.check--lg` for a settings row, where the box stands alone with no text. */
+.check {
   display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
   font-size: 10px; color: var(--text-dim); align-self: center;
   -webkit-user-select: none; user-select: none;
 }
-.blk-check input { position: absolute; opacity: 0; width: 0; height: 0; }
-.blk-check-box {
+.check input { position: absolute; opacity: 0; width: 0; height: 0; }
+.check-box {
   width: 16px; height: 16px; flex-shrink: 0; box-sizing: border-box;
-  border: 1.5px solid var(--border); background: var(--surface-sunken);
+  border: 1.5px solid var(--border-strong); background: var(--surface-sunken);
   display: inline-flex; align-items: center; justify-content: center;
-  transition: border-color 0.12s, background 0.12s;
+  transition: border-color 0.12s, background 0.12s, box-shadow 0.12s;
 }
-.blk-check-box::after {
+.check-box::after {
   content: ""; width: 8px; height: 8px; background: var(--accent);
   transform: scale(0); transition: transform 0.12s ease;
 }
-.blk-check input:checked + .blk-check-box { border-color: var(--accent); }
-.blk-check input:checked + .blk-check-box::after { transform: scale(1); }
-.blk-check input:focus-visible + .blk-check-box { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent); }
+.check:hover .check-box { border-color: var(--accent); }
+.check input:checked + .check-box { border-color: var(--accent); }
+.check input:checked + .check-box::after { transform: scale(1); }
+.check input:focus-visible + .check-box { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent); }
+.check input:disabled + .check-box { opacity: 0.4; cursor: default; }
+/* Settings-row size: the box carries the row on its own, so it reads larger. */
+.check--lg .check-box { width: 20px; height: 20px; }
+.check--lg .check-box::after { width: 10px; height: 10px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .check-box, .check-box::after { transition: none; }
+}
 
 /* Block actions container (right side: once, clone, remove) */
 .block-actions { display: flex; align-items: center; gap: 4px; margin-left: auto; flex-shrink: 0; }
@@ -754,30 +769,7 @@ input:focus, select:focus {
 .setting-desc { font-size: 11px; color: var(--text-faint); margin-top: 2px; display: block; line-height: 1.4; }
 .setting-input { width: 100%; max-width: 300px; flex-shrink: 0; }
 
-/* Toggle — square track, square thumb, chunky bevel */
-.toggle { position: relative; display: inline-block; width: 40px; height: 22px; flex-shrink: 0; cursor: pointer; }
-.toggle input { opacity: 0; width: 0; height: 0; }
-.toggle-track {
-  position: absolute; inset: 0; border-radius: 0;
-  background: var(--surface-sunken); border: 1px solid var(--border-strong);
-  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
-}
-.toggle-track::after {
-  content: ''; position: absolute; top: -1px; left: -1px; width: 20px; height: 22px;
-  border-radius: 0; background: var(--border-hover);
-  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.30);
-  transition: left 0.12s, background 0.12s;
-}
-.toggle:hover .toggle-track {
-  border-color: var(--accent);
-  box-shadow: 0 0 8px rgba(139, 92, 246, 0.25);
-}
-.toggle input:checked + .toggle-track {
-  background: var(--accent); border-color: var(--accent-strong);
-}
-.toggle input:checked + .toggle-track::after {
-  left: 19px; background: var(--accent-contrast);
-}
+/* No sliding-switch style here on purpose: every boolean uses `.check` above. */
 
 /* ---- Accessibility ---- */
 @media (prefers-reduced-motion: reduce) {

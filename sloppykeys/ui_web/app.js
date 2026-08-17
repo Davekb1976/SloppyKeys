@@ -752,7 +752,7 @@
           fields = `<svg class="pinned-walk-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4m-10-10h4m12 0h4"/></svg>
             <button class="btn btn--sm${b.mode === "auto" ? " btn--primary" : ""}" onclick="setWalkPathMode('${phase}',${i},'auto')">Auto</button>
             <button class="btn btn--sm${b.mode === "custom" ? " btn--primary" : ""}" onclick="setWalkPathMode('${phase}',${i},'custom')">Custom</button>
-            <label style="font-size:10px;color:var(--text-muted);display:flex;align-items:center;gap:3px;"><input type="checkbox" ${b.sprint ? "checked" : ""} data-field="sprint" style="width:auto;height:auto;"> Sprint</label>`;
+            <label class="check"><input type="checkbox" ${b.sprint ? "checked" : ""} data-field="sprint"><span class="check-box"></span>Sprint</label>`;
           if (b.mode === "custom") {
             fields += `<select class="setting-select" data-field="pathName" style="width:90px;height:22px;font-size:10px;" id="sel-walkpath-${phase}-${i}"><option value="">Pick path...</option></select>
               <button class="btn btn--sm" id="btn-walkrec-${phase}-${i}">Rec</button>
@@ -773,7 +773,7 @@
         } else if (b.type === "upgrade_unit") {
           fields = unitIndexSelect(b)
             + blkField("Times", `<input value="${b.params?.times || 1}" data-field="params.times" type="number" style="width:40px;">`)
-            + `<label class="blk-check"><input type="checkbox" ${b.autograde ? "checked" : ""} data-field="autograde"><span class="blk-check-box"></span>Auto</label>`;
+            + `<label class="check"><input type="checkbox" ${b.autograde ? "checked" : ""} data-field="autograde"><span class="check-box"></span>Auto</label>`;
         } else if (b.type === "sell_unit") {
           fields = unitIndexSelect(b);
         } else if (b.type === "target_priority") {
@@ -786,7 +786,7 @@
         else if (b.type === "leave_at_minute") fields = blkField("Minutes", `<input value="${b.params?.minutes || 10}" data-field="params.minutes" type="number">`);
         else if (b.type === "click") fields = blkField("X", `<input value="${b.params?.x || 0}" data-field="params.x" type="number">`) + blkField("Y", `<input value="${b.params?.y || 0}" data-field="params.y" type="number">`) + blkField("Position", `<button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button>`);
         else if (b.type === "send_key") fields = blkField("Key", `<input value="${b.key || ""}" data-field="key" style="width:50px;">`) + blkField("Hold (ms)", `<input value="${b.params?.hold_ms || 0}" data-field="params.hold_ms" type="number" style="width:60px;">`);
-        else if (b.type === "walk") fields = `<button class="btn btn--sm" id="btn-walk-rec-${phase}-${i}">Rec</button><button class="btn btn--sm" id="btn-walktest-${phase}-${i}">Test</button><button class="btn btn--sm btn--danger" id="btn-walkdel-${phase}-${i}" title="Delete walk path">✕</button><select class="setting-select" data-field="pathName" style="width:100px;height:22px;font-size:10px;" id="sel-walk-${phase}-${i}"><option value="">Pick path...</option></select><label style="font-size:10px;color:var(--text-muted);display:flex;align-items:center;gap:3px;"><input type="checkbox" ${b.sprint ? "checked" : ""} data-field="sprint" style="width:auto;height:auto;"> Sprint</label>`;
+        else if (b.type === "walk") fields = `<button class="btn btn--sm" id="btn-walk-rec-${phase}-${i}">Rec</button><button class="btn btn--sm" id="btn-walktest-${phase}-${i}">Test</button><button class="btn btn--sm btn--danger" id="btn-walkdel-${phase}-${i}" title="Delete walk path">✕</button><select class="setting-select" data-field="pathName" style="width:100px;height:22px;font-size:10px;" id="sel-walk-${phase}-${i}"><option value="">Pick path...</option></select><label class="check"><input type="checkbox" ${b.sprint ? "checked" : ""} data-field="sprint"><span class="check-box"></span>Sprint</label>`;
         else if (b.type === "record") fields = `<select class="setting-select" data-field="recordingName" style="width:110px;height:22px;font-size:10px;" id="sel-rec-${phase}-${i}"><option value="">Select...</option></select><button class="btn btn--sm" id="btn-record-${phase}-${i}">Rec</button><button class="btn btn--sm" id="btn-test-rec-${phase}-${i}">Test</button><button class="btn btn--sm btn--danger" id="btn-del-rec-${phase}-${i}" title="Delete recording">✕</button>`;
         else if (b.type === "detect") {
           const thenBlocks = (b.then || []);
@@ -796,9 +796,7 @@
               <span class="block-type">detect</span>
               <input placeholder="image" value="${b.image || ""}" data-field="image" style="width:80px;">
               <input placeholder="threshold" value="${b.threshold || 0.8}" data-field="threshold" type="number" step="0.05" style="width:55px;">
-              <label style="font-size:10px;color:var(--text-muted);display:flex;align-items:center;gap:3px;">
-                <input type="checkbox" ${b.loop ? "checked" : ""} data-field="loop" style="width:auto;height:auto;"> Loop
-              </label>
+              <label class="check"><input type="checkbox" ${b.loop ? "checked" : ""} data-field="loop"><span class="check-box"></span>Loop</label>
               <span class="block-actions">
                 <span class="block-once${b.once ? " on" : ""}" data-phase="${phase}" data-idx="${i}" title="Run Once">1×</span>
                 <span class="block-clone" data-phase="${phase}" data-idx="${i}" title="Clone">⊕</span>
