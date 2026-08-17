@@ -1123,9 +1123,9 @@ class Api:
         # Also push latest stats
         if self._ctrl:
             snap = self._ctrl._stats.snapshot()
-            won_js = '"Win"' if snap.last_run == "Win" else '"Loss"'
+            won_js = "true" if snap.last_run == "Win" else "false"
             self._window.evaluate_js(
-                f'window.onMatchResult && window.onMatchResult({snap.last_run == "Win"}, '
+                f'window.onMatchResult && window.onMatchResult({won_js}, '
                 f'{snap.wins}, {snap.losses});'
             )
 
