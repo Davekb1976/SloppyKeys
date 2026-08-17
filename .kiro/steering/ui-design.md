@@ -103,7 +103,35 @@ Every distinct section is a `.panel` — a bordered card with:
 
 **Highlight**: the selected item in a list gets `border-left: 3px solid var(--accent)` and a soft `background: var(--accent-soft)`.
 
-**Setting rows**: two-column layout within a panel body. Left: label + description. Right: control (input/toggle/select). Full-width rows have the control below. Labels are 12px semibold (`--text`), descriptions are 10px (`--text-faint`), micro-labels above controls are 9px uppercase (`--text-muted`).
+**Setting rows**: two-column layout within a panel body. Left: label + description. Right: control (input/checkbox/select). Full-width rows have the control below. Labels are 12px semibold (`--text`), descriptions are 10px (`--text-faint`), micro-labels above controls are 9px uppercase (`--text-muted`).
+
+## Booleans are one control: `.check`
+
+Every on/off value in the app — settings row, block option, modal option — is the same
+square box that fills with a **square dot** when checked. There is exactly one
+implementation, `.check` / `.check-box` in `style.css`.
+
+```html
+<label class="check"><input type="checkbox" data-field="sprint"><span class="check-box"></span>Sprint</label>
+<label class="check check--lg"><input type="checkbox" data-key="hard_mode"><span class="check-box"></span></label>
+```
+
+- The native `<input>` is the state and stays in the DOM (visually hidden, not
+  `display:none`), so `el.checked`, `change` events, labels and keyboard focus all keep
+  working. The `<span class="check-box">` is the only thing drawn, styled off
+  `input:checked + .check-box`.
+- Trailing text goes **inside the same `<label>`**, which makes the text part of the hit
+  target. No separate `<span>` beside the label.
+- `.check--lg` is the settings-row size (20px), where the box stands alone with no text.
+  Block rows use the default 16px.
+- Nothing else is acceptable: **no sliding switch / track-and-thumb toggle**, no bare
+  `<input type="checkbox">` relying on the browser's own tick, no emoji or glyph
+  checkmark. A sliding `.toggle` existed and was removed; don't reintroduce it.
+- A **multi-state or grouped** choice is not a checkbox — use `.slot-toggle`-style chunky
+  buttons (Challenge slots #1/#2/#3) or a `.blk-select` dropdown.
+
+Never restyle a checkbox inline. If a new context needs a different size, add a modifier
+next to `.check--lg` rather than a `style=` attribute on the label.
 
 ## Typography
 
