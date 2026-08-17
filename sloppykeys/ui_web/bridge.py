@@ -1023,6 +1023,13 @@ class Api:
         from sloppykeys.macro.recording import list_walk_paths
         return list_walk_paths(self._app_root)
 
+    def delete_walk_path(self, name: str) -> dict:
+        """Delete a saved walk path by name."""
+        if not self._app_root:
+            return {"ok": False}
+        from sloppykeys.macro.recording import delete_walk_path
+        return {"ok": delete_walk_path(self._app_root, name)}
+
     def list_input_recordings(self) -> list:
         """Names of all input recordings."""
         if not self._app_root:

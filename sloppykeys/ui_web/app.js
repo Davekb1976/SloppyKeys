@@ -722,7 +722,8 @@
           if (b.mode === "custom") {
             fields += `<select class="setting-select" data-field="pathName" style="width:90px;height:22px;font-size:10px;" id="sel-walkpath-${phase}-${i}"><option value="">Pick path...</option></select>
               <button class="btn btn--sm" id="btn-walkrec-${phase}-${i}">Rec</button>
-              <button class="btn btn--sm" id="btn-walktest-${phase}-${i}">Test</button>`;
+              <button class="btn btn--sm" id="btn-walktest-${phase}-${i}">Test</button>
+              <button class="btn btn--sm btn--danger" id="btn-walkdel-${phase}-${i}" title="Delete walk path">✕</button>`;
           }
           fields += `<span class="block-once-badge">RUNS ONCE</span>`;
         } else if (b.type === "place_unit") {
@@ -751,7 +752,7 @@
         else if (b.type === "leave_at_minute") fields = blkField("Minutes", `<input value="${b.params?.minutes || 10}" data-field="params.minutes" type="number">`);
         else if (b.type === "click") fields = blkField("X", `<input value="${b.params?.x || 0}" data-field="params.x" type="number">`) + blkField("Y", `<input value="${b.params?.y || 0}" data-field="params.y" type="number">`) + blkField("Position", `<button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button>`);
         else if (b.type === "send_key") fields = blkField("Key", `<input value="${b.key || ""}" data-field="key" style="width:50px;">`) + blkField("Hold (ms)", `<input value="${b.params?.hold_ms || 0}" data-field="params.hold_ms" type="number" style="width:60px;">`);
-        else if (b.type === "walk") fields = `<button class="btn btn--sm" id="btn-walk-rec-${phase}-${i}">Rec</button><button class="btn btn--sm" id="btn-walktest-${phase}-${i}">Test</button><select class="setting-select" data-field="pathName" style="width:100px;height:22px;font-size:10px;" id="sel-walk-${phase}-${i}"><option value="">Pick path...</option></select><label style="font-size:10px;color:var(--text-muted);display:flex;align-items:center;gap:3px;"><input type="checkbox" ${b.sprint ? "checked" : ""} data-field="sprint" style="width:auto;height:auto;"> Sprint</label>`;
+        else if (b.type === "walk") fields = `<button class="btn btn--sm" id="btn-walk-rec-${phase}-${i}">Rec</button><button class="btn btn--sm" id="btn-walktest-${phase}-${i}">Test</button><button class="btn btn--sm btn--danger" id="btn-walkdel-${phase}-${i}" title="Delete walk path">✕</button><select class="setting-select" data-field="pathName" style="width:100px;height:22px;font-size:10px;" id="sel-walk-${phase}-${i}"><option value="">Pick path...</option></select><label style="font-size:10px;color:var(--text-muted);display:flex;align-items:center;gap:3px;"><input type="checkbox" ${b.sprint ? "checked" : ""} data-field="sprint" style="width:auto;height:auto;"> Sprint</label>`;
         else if (b.type === "record") fields = `<select class="setting-select" data-field="recordingName" style="width:110px;height:22px;font-size:10px;" id="sel-rec-${phase}-${i}"><option value="">Select...</option></select><button class="btn btn--sm" id="btn-record-${phase}-${i}">Rec</button><button class="btn btn--sm" id="btn-test-rec-${phase}-${i}">Test</button><button class="btn btn--sm btn--danger" id="btn-del-rec-${phase}-${i}" title="Delete recording">✕</button>`;
         else if (b.type === "detect") {
           const thenBlocks = (b.then || []);
@@ -1014,6 +1015,13 @@
           const ph = parts[0];
           const idx = parseInt(parts[1]);
           testWalkPath(ph, idx);
+        });
+      });
+      // Wire walk delete buttons
+      zone.querySelectorAll("[id^='btn-walkdel-']").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const parts = btn.id.replace("btn-walkdel-", "").split("-");
+          deleteWalkPath(parts[0], parseInt(parts[1]));
         });
       });
       // Wire input recording buttons
@@ -2036,6 +2044,22 @@
       renderPhases();
     } else {
       window.addLog("[Record] Delete failed: " + (r.reason || "not found"));
+    }
+  }
+
+  async function deleteWalkPath(phase, idx) {
+    const name = opPhases[phase][idx].pathName || "";
+    if (!name) { window.addLog("[Walk] No path selected to delete."); return; }
+    if (!window.pywebview || !pywebview.api) return;
+    const r = await pywebview.api.delete_walk_path(name);
+    if (r.ok) {
+      opPhases[phase][idx].pathName = "";
+      opDirty = true;
+      _cachedWalkPaths = null;
+      window.addLog("[Walk] Deleted: " + name);
+      renderPhases();
+    } else {
+      window.addLog("[Walk] Delete failed: not found");
     }
   }
 

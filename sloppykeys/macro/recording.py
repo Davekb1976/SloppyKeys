@@ -675,3 +675,13 @@ def list_walk_paths(app_root: str) -> list[str]:
     if not os.path.isdir(folder):
         return []
     return sorted(f[:-5] for f in os.listdir(folder) if f.endswith(".json"))
+
+
+def delete_walk_path(app_root: str, name: str) -> bool:
+    """Delete a walk path recording by name."""
+    path = os.path.join(app_root, "paths", f"{_safe_name(name)}.json")
+    try:
+        os.remove(path)
+        return True
+    except OSError:
+        return False
