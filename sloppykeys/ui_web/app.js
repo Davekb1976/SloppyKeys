@@ -607,10 +607,8 @@
   document.getElementById("ocr-region-recapture").addEventListener("click", async () => {
     if (!window.pywebview || !pywebview.api || !ocrRegionKey) return;
     document.getElementById("ocr-region-modal").style.display = "none";
-    switchScreen("dashboard");
-    await new Promise(r => setTimeout(r, 400));
+    // No screen switch needed: the backend reveals the game for the grab itself.
     const snap = await pywebview.api.get_roblox_snapshot();
-    switchScreen("settings");
     if (!snap.ok) { window.addLog("[OCR] Recapture failed."); return; }
     ocrCachedSnapshot = snap.data_uri;
     openRegionPicker(ocrRegionKey, ocrCachedSnapshot);
@@ -655,10 +653,7 @@
           return;
         }
         btn.textContent = "...";
-        switchScreen("dashboard");
-        await new Promise(r => setTimeout(r, 400));
         const snap = await pywebview.api.get_roblox_snapshot();
-        switchScreen("settings");
         btn.textContent = "Set";
         if (!snap.ok) { window.addLog("[OCR] Capture failed — is Roblox running?"); return; }
         ocrCachedSnapshot = snap.data_uri;
@@ -676,12 +671,9 @@
 
   document.getElementById("btn-vision-test-all").addEventListener("click", async () => {
     if (!window.pywebview || !pywebview.api) return;
-    // Show game so OCR can grab it. test_ocr_all captures once synchronously and
-    // returns before running OCR, so we only switch back once the frame is taken.
-    switchScreen("dashboard");
-    await new Promise(r => setTimeout(r, 500));
+    // Stays on this screen: test_ocr_all reveals the game, grabs one frame, and
+    // re-hides it before the OCR pass runs off-thread.
     await pywebview.api.test_ocr_all();
-    switchScreen("settings");
   });
 
   // Populate gamemodes in the task builder mode dropdown
@@ -1455,12 +1447,8 @@
   });
   document.getElementById("im-capture").addEventListener("click", async () => {
     if (!window.pywebview || !pywebview.api) return;
-    // The modal hid the game (it paints over the DOM); show it for a frame so
-    // mss has a real window to grab, then hide it again behind the modal.
-    if (pywebview.api.set_game_visible) pywebview.api.set_game_visible(true);
-    await new Promise(r => setTimeout(r, 400));
+    // get_roblox_snapshot reveals the game itself when the current screen hides it.
     const r = await pywebview.api.get_roblox_snapshot();
-    if (pywebview.api.set_game_visible) pywebview.api.set_game_visible(false);
     if (r.ok) window.addLog("[Image Manager] Captured Roblox screen.");
     else window.addLog("[Image Manager] Capture failed: " + (r.reason || "error"));
   });
@@ -1561,13 +1549,11 @@
 
   async function startImageCapture(category, name) {
     cropTarget = { category, name };
-    // Hide modal, restore game, capture, then show crop view
-    imModal.style.display = "none";
-    if (window.pywebview && pywebview.api) pywebview.api.set_game_visible(true);
-    await new Promise(r => setTimeout(r, 400)); // let game render a frame
     if (!window.pywebview || !pywebview.api) return;
+    // The backend reveals the game for the grab and re-hides it, so the modal
+    // only has to get out of the way of the crop view that follows.
+    imModal.style.display = "none";
     const result = await pywebview.api.get_roblox_snapshot();
-    if (window.pywebview && pywebview.api) pywebview.api.set_game_visible(false);
     if (!result.ok) {
       window.addLog("[Image Manager] Capture failed: " + (result.reason || "error"));
       imModal.style.display = "flex";

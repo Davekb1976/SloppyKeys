@@ -21,6 +21,7 @@ Two other layouts were measured and rejected on this stack:
 
 from __future__ import annotations
 
+import contextlib
 import os
 import sys
 import threading
@@ -83,6 +84,8 @@ FOLLOW_INTERVAL = 0.016  # ~60Hz
 SEARCH_INTERVAL = 1.0
 DRAG_INTERVAL = 0.008  # ~125Hz, so a drag never misses a displayed frame.
 HOTKEY_INTERVAL = 0.04  # ~25Hz, same cadence as the PySide6 window's 40ms timer.
+# How long a just-revealed game window needs before mss sees a painted frame.
+GAME_REVEAL_SETTLE = 0.4
 
 
 class Api:
@@ -187,6 +190,25 @@ class Api:
         else:
             set_topmost(self._game_hwnd, False)
             user32.ShowWindow(self._game_hwnd, SW_HIDE)
+
+    @contextlib.contextmanager
+    def _game_revealed(self):
+        """Guarantee the game window is on screen for the duration of a capture.
+
+        Every screen but the Dashboard hides it with SW_HIDE, so mss would grab
+        whatever sits behind it. Reveals only when it was hidden, waits for one
+        painted frame, and restores the previous state on the way out — so a
+        caller already on the Dashboard pays nothing.
+        """
+        was_visible = self._game_visible
+        if not was_visible:
+            self.set_game_visible(True)
+            time.sleep(GAME_REVEAL_SETTLE)
+        try:
+            yield
+        finally:
+            if not was_visible:
+                self.set_game_visible(False)
 
     def report_slot(self, x: float, y: float, w: float, h: float) -> None:
         """The page tells us where the game slot actually rendered."""
@@ -411,7 +433,7 @@ class Api:
                 return None
             vx, vy = origin
             vw, vh = size
-            with mss.mss() as sct:
+            with self._game_revealed(), mss.mss() as sct:
                 mon = {"left": vx, "top": vy, "width": vw, "height": vh}
                 img = np.array(sct.grab(mon))[:, :, :3].copy()
             return img, vw, vh
@@ -738,7 +760,10 @@ class Api:
             return {"ok": False, "reason": "couldn't read Roblox geometry"}
 
         monitor = {"left": origin[0], "top": origin[1], "width": size[0], "height": size[1]}
-        with mss.mss() as sct:
+        # Reveals the game first when we're on a screen that hides it, so a capture
+        # from the Image Manager, the position picker or the OCR tab isn't a grab of
+        # whatever was behind it.
+        with self._game_revealed(), mss.mss() as sct:
             img = np.array(sct.grab(monitor))
 
         bgr = img[:, :, :3].copy()
