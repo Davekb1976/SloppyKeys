@@ -873,7 +873,6 @@ class Api:
             "stages": "Stage Selection",
             "challenge": "Challenge",
             "events": "Events",
-            "actions": "Actions",
         }
 
         # Read current thresholds from settings
