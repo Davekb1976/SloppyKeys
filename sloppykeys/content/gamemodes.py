@@ -30,6 +30,7 @@ STORY_MAPS = [
     "Rose Kingdom",
     "Fairy King Forest",
     "King's Tomb",
+    "East Town",
 ]
 RAID_ACTS = ["Act 1", "Act 2", "Act 3"]
 # Expedition has no third dimension: its difficulty is a toggle for how hard the
