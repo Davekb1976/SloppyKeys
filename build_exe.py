@@ -6,7 +6,7 @@
 directory on every launch (seconds of delay, and antivirus dislikes it). Onedir starts fast
 and the exe sits beside its own data.
 
-**Nothing is bundled that the user edits.** `images/`, `configs/`, `routes.json` and
+**Nothing is bundled that the user edits.** `assets/`, `routes.json` and
 `settings.json` are *copied next to the exe*, not packed inside it, because the app writes
 to all of them — a captured template has to survive a restart. `window.resolve_app_root()`
 returns the exe's folder when frozen, which is what makes that work.
@@ -30,7 +30,9 @@ NAME = "SloppyKeys"
 DEFAULT_DEST = os.path.join(os.path.dirname(os.path.dirname(HERE)), "SLOPPYKEYS")
 
 # Copied beside the exe. Folders the user's work lives in, plus the route data.
-DATA_DIRS = ("assets", "configs")
+# `operations/`, `paths/` and `recordings/` are not here on purpose: they are created
+# by the app on first save and a shipped build has none.
+DATA_DIRS = ("assets",)
 DATA_FILES = ("routes.json",)
 # `routes.json` again under a second name. The installer writes `routes.json` only if it is
 # missing (it is the user's own events once they have any) but always replaces this copy, so

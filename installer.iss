@@ -12,8 +12,9 @@
 ; Output: installer_output\SloppyKeys-Setup-<version>.exe
 ;
 ; # Where the user's data lives
-; In the install folder, beside the exe: `images\`, `configs\`, `routes.json`,
-; `settings.json`, `log.txt`. That is not a choice the installer makes —
+; In the install folder, beside the exe: `assets\`, `operations\`, `paths\`,
+; `recordings\`, `routes.json`, `settings.json`, `log.txt`. That is not a choice the
+; installer makes —
 ; `window.resolve_app_root()` returns the exe's own directory when frozen, so the install
 ; folder *is* the data folder, and a zip copy of the same build behaves identically.
 ;
@@ -89,8 +90,7 @@ Source: "{#Payload}\_internal\*"; DestDir: "{app}\_internal"; Flags: ignoreversi
 
 ; User data — see the note at the top for both flags. `skipifsourcedoesntexist` because a
 ; build with no routes yet is legitimate.
-Source: "{#Payload}\images\*"; DestDir: "{app}\images"; Flags: onlyifdoesntexist uninsneveruninstall recursesubdirs createallsubdirs skipifsourcedoesntexist
-Source: "{#Payload}\configs\*"; DestDir: "{app}\configs"; Flags: onlyifdoesntexist uninsneveruninstall recursesubdirs createallsubdirs skipifsourcedoesntexist
+Source: "{#Payload}\assets\*"; DestDir: "{app}\assets"; Flags: onlyifdoesntexist uninsneveruninstall recursesubdirs createallsubdirs skipifsourcedoesntexist
 Source: "{#Payload}\routes.json"; DestDir: "{app}"; Flags: onlyifdoesntexist uninsneveruninstall skipifsourcedoesntexist
 ; Not user data: the build's own copy of routes.json, replaced on every upgrade so the app
 ; can offer routes a new version ships (nav_routes.RouteStore.merge_shipped). `routes.json`
@@ -180,14 +180,16 @@ begin
   // Never start a continuation line with `#13` — the preprocessor reads a leading `#` as
   // a directive and aborts the compile. Keep the linebreaks trailing.
   if MsgBox('Also delete your SloppyKeys data?' + #13#10#13#10 +
-            'That is your captured templates (images), unit plans (configs), Events ' +
-            'routes, and settings including the private server link and Discord ' +
-            'webhook.' + #13#10#13#10 +
+            'That is your captured templates (assets), saved macros (operations), ' +
+            'walk paths, input recordings, Events routes, and settings including the ' +
+            'private server link and Discord webhook.' + #13#10#13#10 +
             'Choose No to keep them for a future reinstall.',
             mbConfirmation, MB_YESNO) <> IDYES then
     Exit;
-  DelTree(ExpandConstant('{app}\images'), True, True, True);
-  DelTree(ExpandConstant('{app}\configs'), True, True, True);
+  DelTree(ExpandConstant('{app}\assets'), True, True, True);
+  DelTree(ExpandConstant('{app}\operations'), True, True, True);
+  DelTree(ExpandConstant('{app}\paths'), True, True, True);
+  DelTree(ExpandConstant('{app}\recordings'), True, True, True);
   DeleteFile(ExpandConstant('{app}\routes.json'));
   DeleteFile(ExpandConstant('{app}\settings.json'));
   DelTree(ExpandConstant('{app}'), True, True, True);

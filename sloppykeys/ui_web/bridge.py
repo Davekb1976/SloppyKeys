@@ -59,7 +59,6 @@ from sloppykeys.core.win32.roblox_window import (
 )
 from sloppykeys.config.keybinds import DEFAULTS as KEYBIND_DEFAULTS, KeybindStore
 from sloppykeys.config.unified import UnifiedSettings
-from sloppykeys.content.units import UnitPlan
 from sloppykeys.macro.controller import MacroController
 
 WINDOW_TITLE = "SloppyKeys"
@@ -256,22 +255,6 @@ class Api:
 
             return RouteStore(self._app_root).acts(map_name)
         return targets_for(gamemode, map_name)
-
-    def get_config_path(self, gamemode: str, map_name: str, target: str) -> str:
-        """The unit plan config path for the current selection."""
-        if not self._app_root or not gamemode or not map_name:
-            return ""
-        from sloppykeys.content.gamemodes import has_targets
-
-        parts = [self._app_root, "configs", gamemode, map_name]
-        if has_targets(gamemode) and target:
-            parts = [self._app_root, "configs", gamemode, map_name, target + ".json"]
-        else:
-            parts = [self._app_root, "configs", gamemode, map_name + ".json"]
-        import os
-
-        path = os.path.join(*parts)
-        return path if os.path.isfile(path) else ""
 
     # ---- Settings (unified, auto-save) ----
 
