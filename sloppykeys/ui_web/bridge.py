@@ -256,6 +256,100 @@ class Api:
             return RouteStore(self._app_root).acts(map_name)
         return targets_for(gamemode, map_name)
 
+    # ---- Challenge ----
+
+    def get_challenge_info(self) -> dict:
+        """Clock-derived challenge facts. No capture, so it is safe to poll and
+        works from any screen — the rotation boundary is wall clock, not OCR."""
+        from sloppykeys.content.challenge import next_daily_reset_at, next_interval_at
+
+        now = time.localtime()
+        nxt = next_interval_at()
+        daily = next_daily_reset_at()
+        secs = max(0, int(nxt.timestamp() - time.mktime(now)))
+        return {
+            "ok": True,
+            "next_reroll": nxt.strftime("%H:%M"),
+            "reroll_in": f"{secs // 60}m {secs % 60:02d}s",
+            "next_daily": daily.strftime("%H:%M"),
+        }
+
+    def scan_challenge(self) -> dict:
+        """OCR the three challenge rows once. The panel has to be open — the reads
+        are only trusted when at least one limit parsed as `n/10`, which nothing
+        else on screen produces in those boxes.
+
+        Reveals the game for the capture like every other grab, and runs off the
+        caller's thread since RapidOCR on nine boxes is slow.
+        """
+        if not self._app_root:
+            return {"ok": False, "reason": "no app root"}
+
+        def _run():
+            from sloppykeys.core.image_search import ImageSearchEngine
+            from sloppykeys.macro.challenge import ChallengeScanner
+
+            try:
+                engine = ImageSearchEngine(self._app_root, log=lambda _m: None)
+                scanner = ChallengeScanner(engine, self._roblox_client_rect)
+                with self._game_revealed():
+                    reads, panel_open = scanner.scan_if_open()
+            except Exception as exc:
+                self._log_to_ui(f"[Challenge] Scan failed: {exc}")
+                self._push_challenge({"ok": False, "reason": str(exc)})
+                return
+
+            if not panel_open:
+                self._log_to_ui("[Challenge] No panel found — open the Challenge UI first.")
+                self._push_challenge({"ok": False, "reason": "panel not open"})
+                return
+
+            slots = [
+                {
+                    "slot": r.slot,
+                    "state": r.state,
+                    "map": r.map_name,
+                    "limit": r.limit_text,
+                }
+                for r in reads
+            ]
+            for r in reads:
+                self._log_to_ui(f"[Challenge] {r.summary()}")
+            self._push_challenge({"ok": True, "slots": slots})
+
+        threading.Thread(target=_run, daemon=True).start()
+        return {"ok": True}
+
+    def _push_challenge(self, payload: dict) -> None:
+        """Hand a scan result to the page. json.dumps, not an f-string — Python's
+        True/False and None are not JS literals."""
+        import json as _json
+
+        if not self._window:
+            return
+        try:
+            self._window.evaluate_js(
+                f"window.onChallengeScan && window.onChallengeScan({_json.dumps(payload)});"
+            )
+        except Exception as exc:
+            self._log_to_ui(f"[Challenge] Could not update the panel: {exc}")
+
+    def _roblox_client_rect(self) -> tuple[int, int, int, int] | None:
+        """(x, y, w, h) of the game's client area in screen coords, the shape the
+        scanner and the search engine both expect."""
+        hwnd = self._game_hwnd
+        if not hwnd or not is_window(hwnd):
+            hwnd = find_roblox_window()
+        if not hwnd:
+            return None
+        from sloppykeys.core.win32.roblox_window import client_size, client_to_screen
+
+        origin = client_to_screen(hwnd, 0, 0)
+        size = client_size(hwnd)
+        if not origin or not size:
+            return None
+        return (origin[0], origin[1], size[0], size[1])
+
     # ---- Settings (unified, auto-save) ----
 
     def get_settings(self) -> dict:

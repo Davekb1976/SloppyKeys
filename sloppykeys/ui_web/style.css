@@ -228,7 +228,27 @@ input:focus, select:focus {
 .dash-section-title {
   font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
   color: var(--text-faint); margin-bottom: var(--space-3);
+  /* A title can carry one action on the right (Challenge > Scan). */
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
 }
+.dash-section-title .btn { letter-spacing: normal; text-transform: none; }
+
+/* Challenge card: one line per slot, state carried by the colour of the limit. */
+.chal-slots { display: flex; flex-direction: column; gap: 2px; margin-top: var(--space-2); }
+.chal-slot {
+  display: flex; align-items: baseline; gap: var(--space-2);
+  font-size: 11px; padding: 2px 0;
+}
+.chal-slot-n { font-weight: 700; color: var(--text-muted); flex-shrink: 0; }
+.chal-slot-map {
+  flex: 1; min-width: 0; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.chal-slot-limit { font-family: Consolas, ui-monospace, monospace; color: var(--text-dim); flex-shrink: 0; }
+.chal-slot.ready .chal-slot-limit { color: var(--teal); }
+.chal-slot.exhausted .chal-slot-map,
+.chal-slot.exhausted .chal-slot-limit { color: var(--text-faint); }
+.chal-slot.unknown .chal-slot-limit { color: var(--amber); }
 
 /* Status */
 .status-grid { display: flex; flex-direction: column; }

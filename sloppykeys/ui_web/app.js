@@ -127,6 +127,50 @@
     document.getElementById("stat-last").textContent = won ? "Win" : "Loss";
   };
 
+  // ---- Challenge card ----
+  const chalSlots = document.getElementById("chal-slots");
+  const chalScanBtn = document.getElementById("btn-chal-scan");
+
+  // Clock-only, so it can tick without touching the game.
+  async function refreshChallengeInfo() {
+    if (!window.pywebview || !pywebview.api || !pywebview.api.get_challenge_info) return;
+    try {
+      const i = await pywebview.api.get_challenge_info();
+      if (i && i.ok) {
+        document.getElementById("chal-reroll").textContent = `${i.next_reroll} (${i.reroll_in})`;
+      }
+    } catch (e) {}
+  }
+  setInterval(refreshChallengeInfo, 30000);
+
+  // Called from Python when a scan finishes (or fails).
+  window.onChallengeScan = function (r) {
+    chalScanBtn.disabled = false;
+    chalScanBtn.textContent = "Scan";
+    if (!r || !r.ok) {
+      const why = r && r.reason === "panel not open"
+        ? "Open the Challenge panel, then Scan" : "Scan failed";
+      chalSlots.innerHTML = `<div class="empty-state">${why}</div>`;
+      return;
+    }
+    chalSlots.innerHTML = (r.slots || []).map(s => {
+      const cls = s.state === "runnable" ? "ready" : (s.state === "exhausted" ? "exhausted" : "unknown");
+      return `<div class="chal-slot ${cls}">
+        <span class="chal-slot-n">#${s.slot}</span>
+        <span class="chal-slot-map">${s.map || "unknown"}</span>
+        <span class="chal-slot-limit">${s.limit}</span>
+      </div>`;
+    }).join("") || '<div class="empty-state">Not scanned</div>';
+  };
+
+  chalScanBtn.addEventListener("click", () => {
+    if (!window.pywebview || !pywebview.api) return;
+    chalScanBtn.disabled = true;
+    chalScanBtn.textContent = "...";
+    chalSlots.innerHTML = '<div class="empty-state">Scanning...</div>';
+    pywebview.api.scan_challenge();
+  });
+
   // ---- Game slot geometry ----
   // The backend cuts a hole in the window over this rect, so the rect has to
   // come from where the slot actually rendered rather than a duplicated
@@ -701,6 +745,7 @@
     loadTasks();
     loadQueuePresets();
     loadVisionRegions();
+    refreshChallengeInfo();
   };
 
   // ---- Macro Manager ----
