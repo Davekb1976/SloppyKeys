@@ -87,10 +87,14 @@ GAMEMODES: dict[str, Gamemode] = {
         name="Expedition",
         map_label="Map",
         target_label="Difficulty",
+        # Not `STORY_MAPS`: Expedition offers its own subset, and its stage cards are
+        # separate crops under `assets/stages/expedition/` because they look different
+        # on screen from Story's.
         maps=[
             "School Grounds",
             "Flower Forest",
             "Rose Kingdom",
+            "East Town",
         ],
         targets=EXPEDITION_TARGETS,
     ),
