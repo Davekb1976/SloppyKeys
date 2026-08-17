@@ -674,6 +674,31 @@
   let opPhases = { pre_start: [{ type: "walk_path", params: {}, mode: "auto", pathName: "" }], battle: [], loop_a: [], loop_b: [] };
   let opDirty = false;
 
+  // List all place_unit blocks across phases as {n, name} for unit-index dropdowns.
+  function listPlacedUnits() {
+    const out = [];
+    let n = 0;
+    PHASES.forEach((phase) => {
+      (opPhases[phase] || []).forEach((b) => {
+        if (b.type === "place_unit") { n++; out.push({ n, name: b.params?.name || "" }); }
+      });
+    });
+    return out;
+  }
+
+  // Build a unit-index dropdown (which placed unit this block acts on).
+  function unitIndexSelect(b) {
+    const units = listPlacedUnits();
+    const cur = String(b.params?.index ?? "");
+    const opts = units.map(u => `<option value="${u.n}"${String(u.n) === cur ? " selected" : ""}>#${u.n}${u.name ? " " + u.name : ""}</option>`).join("");
+    return `<span class="blk-field"><span class="blk-field-label">Unit</span><select class="blk-select" data-field="params.index">${'<option value="">—</option>' + opts}</select></span>`;
+  }
+
+  // A labeled field wrapper (caption above the control).
+  function blkField(label, inner) {
+    return `<span class="blk-field"><span class="blk-field-label">${label}</span>${inner}</span>`;
+  }
+
   function renderPhases() {
     PHASES.forEach((phase) => {
       const zone = document.getElementById("zone-" + phase);
@@ -702,18 +727,30 @@
           fields += `<span class="block-once-badge">RUNS ONCE</span>`;
         } else if (b.type === "place_unit") {
           const hk = b.hotkey || "";
-          fields = `<button class="btn btn--sm hotkey-capture" id="hk-${phase}-${i}" title="Unit slot hotkey">${hk ? hk.toUpperCase() : "Key"}</button><input placeholder="x" value="${b.params?.x || 0}" data-field="params.x" type="number"><input placeholder="y" value="${b.params?.y || 0}" data-field="params.y" type="number"><button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button><input placeholder="name" value="${b.params?.name || ""}" data-field="params.name" style="width:70px;">`;
+          // Compute this block's #N ordinal among place_unit blocks
+          let ord = 0; for (const ph of PHASES) { for (const bb of (opPhases[ph]||[])) { if (bb.type === "place_unit") { ord++; if (bb === b) break; } } if (opPhases[ph].includes(b)) break; }
+          fields = `<span class="unit-ord">#${ord}</span>`
+            + blkField("Key", `<button class="btn btn--sm hotkey-capture" id="hk-${phase}-${i}" title="Unit slot hotkey">${hk ? hk.toUpperCase() : "Key"}</button>`)
+            + blkField("X", `<input value="${b.params?.x || 0}" data-field="params.x" type="number">`)
+            + blkField("Y", `<input value="${b.params?.y || 0}" data-field="params.y" type="number">`)
+            + blkField("Position", `<button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button>`)
+            + blkField("Name", `<input value="${b.params?.name || ""}" data-field="params.name" style="width:80px;">`);
         } else if (b.type === "upgrade_unit") {
-          fields = `<input placeholder="x" value="${b.params?.x || 0}" data-field="params.x" type="number" style="width:40px;"><input placeholder="y" value="${b.params?.y || 0}" data-field="params.y" type="number" style="width:40px;"><button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button><input placeholder="×" value="${b.params?.times || 1}" data-field="params.times" type="number" style="width:35px;" title="Upgrade presses"><label style="font-size:10px;color:var(--text-muted);display:flex;align-items:center;gap:3px;" title="Press V for autograde after upgrading"><input type="checkbox" ${b.autograde ? "checked" : ""} data-field="autograde" style="width:auto;height:auto;"> Auto</label>`;
+          fields = unitIndexSelect(b)
+            + blkField("Times", `<input value="${b.params?.times || 1}" data-field="params.times" type="number" style="width:40px;">`)
+            + `<label class="blk-check"><input type="checkbox" ${b.autograde ? "checked" : ""} data-field="autograde"><span class="blk-check-box"></span>Auto</label>`;
         } else if (b.type === "sell_unit") {
-          fields = `<input placeholder="x" value="${b.params?.x || 0}" data-field="params.x" type="number" style="width:40px;"><input placeholder="y" value="${b.params?.y || 0}" data-field="params.y" type="number" style="width:40px;"><button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button>`;
+          fields = unitIndexSelect(b);
         } else if (b.type === "target_priority") {
-          fields = `<input placeholder="x" value="${b.params?.x || 0}" data-field="params.x" type="number" style="width:40px;"><input placeholder="y" value="${b.params?.y || 0}" data-field="params.y" type="number" style="width:40px;"><button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button>`;
-        } else if (b.type === "wait_ms") fields = `<input placeholder="ms" value="${b.params?.ms || 500}" data-field="params.ms" type="number">`;
-        else if (b.type === "wait_wave") fields = `<input placeholder="wave" value="${b.params?.wave || 1}" data-field="params.wave" type="number">`;
-        else if (b.type === "leave_at_minute") fields = `<input placeholder="min" value="${b.params?.minutes || 10}" data-field="params.minutes" type="number">`;
-        else if (b.type === "click") fields = `<input placeholder="x" value="${b.params?.x || 0}" data-field="params.x" type="number"><input placeholder="y" value="${b.params?.y || 0}" data-field="params.y" type="number"><button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button>`;
-        else if (b.type === "send_key") fields = `<input placeholder="key" value="${b.key || ""}" data-field="key" style="width:40px;"><input placeholder="hold ms" value="${b.params?.hold_ms || 0}" data-field="params.hold_ms" type="number">`;
+          const prio = String(b.params?.priority || "Boss");
+          const opts = ["First","Last","Strongest","Boss","Weakest","Shielded","Fastest","None"].map(p => `<option value="${p}"${p === prio ? " selected" : ""}>${p}</option>`).join("");
+          fields = unitIndexSelect(b)
+            + blkField("Target", `<select class="blk-select" data-field="params.priority">${opts}</select>`);
+        } else if (b.type === "wait_ms") fields = blkField("Milliseconds", `<input value="${b.params?.ms || 500}" data-field="params.ms" type="number">`);
+        else if (b.type === "wait_wave") fields = blkField("Wave", `<input value="${b.params?.wave || 1}" data-field="params.wave" type="number">`);
+        else if (b.type === "leave_at_minute") fields = blkField("Minutes", `<input value="${b.params?.minutes || 10}" data-field="params.minutes" type="number">`);
+        else if (b.type === "click") fields = blkField("X", `<input value="${b.params?.x || 0}" data-field="params.x" type="number">`) + blkField("Y", `<input value="${b.params?.y || 0}" data-field="params.y" type="number">`) + blkField("Position", `<button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button>`);
+        else if (b.type === "send_key") fields = blkField("Key", `<input value="${b.key || ""}" data-field="key" style="width:50px;">`) + blkField("Hold (ms)", `<input value="${b.params?.hold_ms || 0}" data-field="params.hold_ms" type="number" style="width:60px;">`);
         else if (b.type === "walk") fields = `<button class="btn btn--sm" id="btn-walk-rec-${phase}-${i}">Rec</button><button class="btn btn--sm" id="btn-walktest-${phase}-${i}">Test</button><select class="setting-select" data-field="pathName" style="width:100px;height:22px;font-size:10px;" id="sel-walk-${phase}-${i}"><option value="">Pick path...</option></select><label style="font-size:10px;color:var(--text-muted);display:flex;align-items:center;gap:3px;"><input type="checkbox" ${b.sprint ? "checked" : ""} data-field="sprint" style="width:auto;height:auto;"> Sprint</label>`;
         else if (b.type === "record") fields = `<select class="setting-select" data-field="recordingName" style="width:110px;height:22px;font-size:10px;" id="sel-rec-${phase}-${i}"><option value="">Select...</option></select><button class="btn btn--sm" id="btn-record-${phase}-${i}">Rec</button><button class="btn btn--sm" id="btn-test-rec-${phase}-${i}">Test</button><button class="btn btn--sm btn--danger" id="btn-del-rec-${phase}-${i}" title="Delete recording">✕</button>`;
         else if (b.type === "detect") {

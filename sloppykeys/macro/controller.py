@@ -257,6 +257,7 @@ class MacroController:
                         phases = op.get("phases", {})
                     else:
                         phases = {}
+                    self._phases = phases
 
                     # Pre Start
                     self._run_phase_linear(phases.get("pre_start", []))
@@ -497,12 +498,36 @@ class MacroController:
             return True
 
     def _unit_click_position(self, block: dict) -> tuple[int, int] | None:
-        """Resolve a unit block's click position from its params, converted to screen coords."""
+        """Resolve a unit block's click position, converted to screen coords.
+
+        Unit-action blocks (upgrade/sell/priority) carry an `index` naming which
+        placed unit they act on; resolve it to the Nth place_unit block's coords.
+        Falls back to the block's own x/y (legacy blocks that still store coords).
+        """
         params = block.get("params", {})
-        x = int(params.get("x", 0))
-        y = int(params.get("y", 0))
+        index = params.get("index")
+        if index not in (None, ""):
+            src = self._place_unit_by_index(int(index))
+            if src is None:
+                return None
+            sp = src.get("params", {})
+            x, y = int(sp.get("x", 0)), int(sp.get("y", 0))
+        else:
+            x, y = int(params.get("x", 0)), int(params.get("y", 0))
         if x and y:
             return self._client_to_screen(x, y)
+        return None
+
+    def _place_unit_by_index(self, n: int) -> dict | None:
+        """Return the Nth (1-based) place_unit block across all phases."""
+        phases = getattr(self, "_phases", None) or {}
+        count = 0
+        for phase in ("pre_start", "battle", "loop_a", "loop_b"):
+            for b in phases.get(phase, []):
+                if b.get("type") == "place_unit":
+                    count += 1
+                    if count == n:
+                        return b
         return None
 
     def _client_to_screen(self, cx: int, cy: int) -> tuple[int, int] | None:
@@ -567,17 +592,26 @@ class MacroController:
         return True
 
     def _tick_target_priority(self, block: dict) -> bool:
-        """Click the unit, press priority key. One-shot."""
+        """Click the unit, press the priority key. One-shot.
+
+        ponytail: the game cycles targeting with one keypress and exposes no
+        readable current state, so we press once per invocation. Reaching a
+        specific priority reliably would need OCR of the unit's target label —
+        the dropdown value is stored for that upgrade path.
+        """
         pos = self._unit_click_position(block)
         if pos is None:
             self._log("    [block] target priority: no unit position — skipping")
             return True
 
+        priority = block.get("params", {}).get("priority", "")
         from sloppykeys.macro.input_scripts import nudge_click_script, key_script, SPREAD_TIGHT
         self._ahk.run(nudge_click_script(pos[0], pos[1], spread=SPREAD_TIGHT), wait=True, timeout=5.0)
         time.sleep(0.4)
         self._ahk.run(key_script(self._game_keybind("priority")), wait=True, timeout=3.0)
         time.sleep(0.2)
+        if priority:
+            self._log(f"    [block] target priority → {priority}")
         return True
 
     def _tick_wait_wave(self, block: dict) -> bool:
@@ -716,17 +750,16 @@ class MacroController:
                 self._ahk.run(nudge_click_script(sx, sy, spread=SPREAD_TIGHT), wait=True, timeout=5.0)
 
         elif btype == "upgrade_unit":
-            idx = int(params.get("index", 1))
-            # ponytail: upgrade logic will be fleshed out with the full block executor
-            self._log(f"    [block] upgrade unit #{idx}")
+            # Drain the repeat state so a linear-phase upgrade runs to completion.
+            while not self._tick_upgrade_unit(block):
+                if self._checkpoint():
+                    break
 
         elif btype == "sell_unit":
-            idx = int(params.get("index", 1))
-            self._log(f"    [block] sell unit #{idx}")
+            self._tick_sell_unit(block)
 
         elif btype == "target_priority":
-            idx = int(params.get("index", 1))
-            self._log(f"    [block] target priority #{idx}")
+            self._tick_target_priority(block)
 
         elif btype == "wait_ms":
             ms = max(0, int(params.get("ms", 500)))
@@ -939,6 +972,7 @@ class MacroController:
             # Load and run the macro operation
             op = load_operation(self._app_root, macro_name)
             phases = op.get("phases", {})
+            self._phases = phases
 
             # Pre Start
             self._run_phase_linear(phases.get("pre_start", []))
