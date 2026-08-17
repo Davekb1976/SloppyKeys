@@ -22,11 +22,11 @@ log.prev.txt
 *.suo
 *.sw?
 
-# Scratch client dumps, not templates: `images/debug/` and the challenge panel's
-# `images/challenge/debug/`. They are screenshots of the user's own game, they are
+# Scratch client dumps, not templates: `assets/debug/` and the challenge panel's
+# `assets/challenge/debug/`. They are screenshots of the user's own game, they are
 # overwritten on every scan, and `build_exe.py` already refuses to ship them.
-/images/debug/
-images/**/debug/
+/assets/debug/
+assets/**/debug/
 
 # Multi-root editor workspace: it points at sibling folders that only exist on one
 # machine (`../Anime-Expeditions-Creams-Macro-main`, `../../SLOPPYKEYS`), so committing it
