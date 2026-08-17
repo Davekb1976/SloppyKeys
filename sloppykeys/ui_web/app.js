@@ -1525,22 +1525,24 @@
         items.push({ ...img, catKey: cat.key, catLabel: cat.label });
       });
     });
+    // The card is identified by its path, not its name: Story, Expedition and
+    // Challenge all have a School Grounds, and the bare name can't tell them apart.
     gridEl.innerHTML = items.map((img) => `
       <div class="im-card${img.missing ? " im-card-missing" : ""}">
         <div class="im-card-header">
-          <span class="im-card-cat">${img.catKey}</span>
+          <span class="im-card-cat">${img.group ? img.catKey + " / " + img.group : img.catKey}</span>
           <span class="im-card-name">${img.name}</span>
           ${img.missing ? '<span class="im-missing-badge">MISSING</span>' : ''}
-          <button class="im-card-add" data-cat="${img.catKey}" data-name="${img.name}" title="Capture &amp; add">+</button>
+          <button class="im-card-add" data-path="${img.path}" title="Capture &amp; add">+</button>
         </div>
         ${img.missing
           ? '<div class="im-card-missing-body">Capture from Roblox to add this template</div>'
           : `<img class="im-card-thumb" src="${img.data_uri}" alt="${img.name}">`}
         <div class="im-card-slider">
           <span>Match</span>
-          <input type="range" min="0.50" max="1.00" step="0.01" value="${img.threshold}" data-name="${img.name}">
+          <input type="range" min="0.50" max="1.00" step="0.01" value="${img.threshold}" data-path="${img.path}">
           <span class="im-val">${img.threshold.toFixed(2)}</span>
-          ${!img.missing ? `<button class="btn btn--sm" data-test-image="${img.catKey}/${img.file}" title="Test search">Test</button>` : ''}
+          ${!img.missing ? `<button class="btn btn--sm" data-test-image="${img.path}" title="Test search">Test</button>` : ''}
         </div>
       </div>
     `).join("");
@@ -1551,12 +1553,12 @@
       });
       slider.addEventListener("change", (e) => {
         if (!window.pywebview || !pywebview.api) return;
-        pywebview.api.set_image_threshold(e.target.dataset.name, parseFloat(e.target.value));
+        pywebview.api.set_image_threshold(e.target.dataset.path, parseFloat(e.target.value));
       });
     });
     // Wire + buttons (capture & crop)
     gridEl.querySelectorAll(".im-card-add").forEach((btn) => {
-      btn.addEventListener("click", () => startImageCapture(btn.dataset.cat, btn.dataset.name));
+      btn.addEventListener("click", () => startImageCapture(btn.dataset.path));
     });
     // Wire test buttons
     gridEl.querySelectorAll("[data-test-image]").forEach((btn) => {
@@ -1565,7 +1567,7 @@
   }
 
   // ---- Image capture + crop flow ----
-  let cropTarget = null; // {category, name}
+  let cropTarget = null; // the template's relative path, e.g. assets/stages/story/x.png
 
   async function testImageSearch(imagePath) {
     if (!window.pywebview || !pywebview.api) return;
@@ -1590,8 +1592,8 @@
   let cropDragging = false;
   let cropStart = null;
 
-  async function startImageCapture(category, name) {
-    cropTarget = { category, name };
+  async function startImageCapture(templatePath) {
+    cropTarget = templatePath;
     if (!window.pywebview || !pywebview.api) return;
     // The backend reveals the game for the grab and re-hides it, so the modal
     // only has to get out of the way of the crop view that follows.
@@ -1736,12 +1738,12 @@
         renderImGrid();
         if (window.pywebview && pywebview.api) pywebview.api.set_game_visible(false);
       });
-      document.getElementById("crop-retake").addEventListener("click", () => startImageCapture(cropTarget.category, cropTarget.name));
+      document.getElementById("crop-retake").addEventListener("click", () => startImageCapture(cropTarget));
       document.getElementById("crop-save").addEventListener("click", async () => {
         if (!cropRect || !cropTarget || !window.pywebview || !pywebview.api) return;
-        const r = await pywebview.api.save_image_crop(cropTarget.category, cropTarget.name, cropRect.x, cropRect.y, cropRect.w, cropRect.h);
+        const r = await pywebview.api.save_image_crop(cropTarget, cropRect.x, cropRect.y, cropRect.w, cropRect.h);
         if (r.ok) {
-          window.addLog(`[Image Manager] Saved crop for "${cropTarget.name}".`);
+          window.addLog(`[Image Manager] Saved crop for ${cropTarget}`);
           // Return to library
           imModal.querySelector(".modal-body").innerHTML = `<div id="im-tabs" class="pos-tabs"></div><div id="im-grid" class="im-grid"></div>`;
           // Re-fetch data to include the new image

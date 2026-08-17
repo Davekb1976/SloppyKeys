@@ -907,14 +907,24 @@ class Api:
                         path = os.path.join(dirpath, fname)
                         rel = os.path.relpath(path, self._app_root).replace("\\", "/")
                         found_paths.add(rel)
+                        # Subfolder between the category and the file, e.g. "story" for
+                        # assets/stages/story/school_grounds.png. Story, Expedition and
+                        # Challenge all offer School Grounds, so the bare name alone
+                        # shows three identical-looking cards.
+                        group = os.path.relpath(dirpath, folder).replace("\\", "/")
+                        group = "" if group == "." else group
                         try:
                             with open(path, "rb") as f:
                                 b64 = base64.b64encode(f.read()).decode("ascii")
                             names.append({
                                 "name": name,
+                                "group": group,
                                 "file": fname,
+                                # The template's identity everywhere: the threshold key the
+                                # search engine looks up, and the file a crop overwrites.
+                                "path": rel,
                                 "data_uri": f"data:image/png;base64,{b64}",
-                                "threshold": float(thresholds.get(name, default_threshold)),
+                                "threshold": float(thresholds.get(rel, default_threshold)),
                                 "missing": False,
                             })
                         except OSError:
@@ -931,11 +941,14 @@ class Api:
                 # This template is expected but missing
                 fname = os.path.basename(ep)
                 name = fname[:-4] if fname.endswith(".png") else fname
+                group = ep[len(prefix):-len(fname)].strip("/")
                 names.append({
                     "name": name,
+                    "group": group,
                     "file": fname,
+                    "path": ep,
                     "data_uri": "",
-                    "threshold": float(thresholds.get(name, default_threshold)),
+                    "threshold": float(thresholds.get(ep, default_threshold)),
                     "missing": True,
                 })
 
@@ -944,19 +957,43 @@ class Api:
 
         return {"ok": True, "categories": categories, "default_threshold": default_threshold}
 
-    def set_image_threshold(self, name: str, value: float) -> dict:
-        """Set a per-image match threshold. Auto-saves."""
+    def _template_path(self, rel: str) -> str | None:
+        """Validate a template path coming from the page and return it absolute.
+
+        Rejects rather than repairs: this both names a settings key and picks the file a
+        crop overwrites, so a traversal would let the page write outside `assets/`.
+        """
+        rel = str(rel or "").replace("\\", "/").strip()
+        if not rel.startswith("assets/") or not rel.endswith(".png"):
+            return None
+        root = os.path.realpath(os.path.join(self._app_root, "assets"))
+        target = os.path.realpath(os.path.join(self._app_root, rel))
+        if os.path.commonpath([root, target]) != root:
+            return None
+        return target
+
+    def set_image_threshold(self, path: str, value: float) -> dict:
+        """Set one template's match threshold. Auto-saves.
+
+        Keyed by the template's **relative path**, because that is what
+        `image_search.confidence_for` looks up. Keying by bare filename meant the
+        slider wrote a setting the engine never read, and that Story's and
+        Expedition's same-named stage shared one value.
+        """
         if not self._app_root:
             return {"ok": False}
+        if self._template_path(path) is None:
+            return {"ok": False, "reason": "bad template path"}
+        key = str(path).replace("\\", "/").strip()
         settings = UnifiedSettings(self._app_root)
         thresholds = settings.get("image_thresholds", {})
         if not isinstance(thresholds, dict):
             thresholds = {}
         default = 0.70
         if abs(float(value) - default) < 0.01:
-            thresholds.pop(name, None)
+            thresholds.pop(key, None)
         else:
-            thresholds[name] = max(0.50, min(1.0, float(value)))
+            thresholds[key] = max(0.50, min(1.0, float(value)))
         settings.set("image_thresholds", thresholds)
         # Apply live to the search engine
         if self._ctrl and hasattr(self._ctrl, '_engine'):
@@ -981,15 +1018,18 @@ class Api:
             return {"ok": False, "best": 0, "reason": "can't read Roblox geometry"}
 
         rect = (origin[0], origin[1], size[0], size[1])
-        full_path = os.path.join(self._app_root, "assets", image_path)
-        if not os.path.isfile(full_path):
+        # `image_path` is already `assets/...`, the same identity the grid and the
+        # threshold use. Joining "assets" again here doubled the prefix.
+        full_path = self._template_path(image_path)
+        if full_path is None or not os.path.isfile(full_path):
             return {"ok": False, "best": 0, "reason": f"file not found: {image_path}"}
 
-        # Read threshold from settings
+        # Read the threshold under the same path key the search engine looks up.
         settings = UnifiedSettings(self._app_root)
         thresholds = settings.get("image_thresholds", {})
+        key = str(image_path).replace("\\", "/").strip()
         name = os.path.splitext(os.path.basename(image_path))[0]
-        threshold = float(thresholds.get(name, 0.70))
+        threshold = float(thresholds.get(key, 0.70))
 
         # Use the controller's engine if available, else create a temporary one
         engine = self._ctrl._engine if self._ctrl else ImageSearchEngine(self._app_root)
@@ -1006,10 +1046,19 @@ class Api:
         best = low_match.score if low_match else 0
         return {"ok": False, "best": best, "threshold": threshold}
 
-    def save_image_crop(self, category: str, name: str, x: int, y: int, w: int, h: int) -> dict:
-        """Crop from the cached snapshot and save it, OVERWRITING the original image."""
+    def save_image_crop(self, path: str, x: int, y: int, w: int, h: int) -> dict:
+        """Crop from the cached snapshot and save it, OVERWRITING that template.
+
+        Takes the template's relative path, not category+name: a stage lives at
+        `assets/stages/<gamemode>/<stage>.png`, and joining category+name dropped the
+        gamemode folder, so a recaptured stage landed flat in `assets/stages/` where
+        `nav_images.stage_image` never looks for it.
+        """
         if not self._app_root:
             return {"ok": False, "reason": "no app root"}
+        target = self._template_path(path)
+        if target is None:
+            return {"ok": False, "reason": "bad template path"}
         if not hasattr(self, '_cached_snapshot') or self._cached_snapshot is None:
             return {"ok": False, "reason": "no cached snapshot — capture first"}
         try:
@@ -1028,12 +1077,9 @@ class Api:
         if crop.size == 0:
             return {"ok": False, "reason": "crop is empty"}
 
-        # Overwrite the original file: assets/<category>/<name>.png
-        folder = os.path.join(self._app_root, "assets", category)
-        os.makedirs(folder, exist_ok=True)
-        path = os.path.join(folder, f"{name}.png")
-        cv2.imwrite(path, crop)
-        return {"ok": True, "path": path}
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        cv2.imwrite(target, crop)
+        return {"ok": True, "path": target}
 
     # ---- Walk Path Recording ----
 
