@@ -43,6 +43,7 @@ from sloppykeys.core.win32.frameless import (
     fit_and_centre,
     move_to,
     set_topmost,
+    set_window_below,
 )
 from sloppykeys.core.win32.roblox_window import (
     activate_window,
@@ -172,24 +173,29 @@ class Api:
     # ---- Screens ----
 
     def set_game_visible(self, visible: bool) -> None:
-        """Only the Dashboard shows the game.
+        """Only the Dashboard shows the game; elsewhere it is covered, not hidden.
 
-        SW_HIDE removes it from view and the taskbar — but that's the only
-        reliable way to prevent it showing through on other screens (it's
-        topmost and positioned directly over our window's slot). The reference
-        project does the same.
+        The game rides the topmost band over our slot, so leaving the band is not
+        enough — HWND_NOTOPMOST lands it at the top of the normal band, still above
+        the page. It gets tucked directly beneath our window instead, which covers
+        it because our window is opaque and the slot sits inside it.
+
+        Deliberately *not* SW_HIDE: that works, but it unmaps the window and takes
+        its taskbar button with it, so the game vanishes from the taskbar every time
+        the user opens a modal.
         """
         self._game_visible = bool(visible)
         if not self._docked or not is_window(self._game_hwnd) or self._game_hwnd is None:
             return
-        SW_HIDE = 0
         SW_SHOWNOACTIVATE = 4
+        user32.ShowWindow(self._game_hwnd, SW_SHOWNOACTIVATE)
         if visible:
-            user32.ShowWindow(self._game_hwnd, SW_SHOWNOACTIVATE)
             set_topmost(self._game_hwnd, True)
         else:
             set_topmost(self._game_hwnd, False)
-            user32.ShowWindow(self._game_hwnd, SW_HIDE)
+            host = self._host_hwnd()
+            if host:
+                set_window_below(self._game_hwnd, host)
 
     @contextlib.contextmanager
     def _game_revealed(self):
@@ -1377,12 +1383,16 @@ class Api:
             return False
 
         SW_SHOWNOACTIVATE = 4
+        user32.ShowWindow(game_hwnd, SW_SHOWNOACTIVATE)
         if self._game_visible:
-            user32.ShowWindow(game_hwnd, SW_SHOWNOACTIVATE)
             set_topmost(game_hwnd, True)
         else:
+            # Covered, not hidden — see set_game_visible. Reasserted each tick
+            # because the game can raise itself back up the normal band.
             set_topmost(game_hwnd, False)
-            user32.ShowWindow(game_hwnd, 0)  # SW_HIDE
+            host = self._host_hwnd()
+            if host:
+                set_window_below(game_hwnd, host)
         return True
 
     def _release_game(self) -> None:

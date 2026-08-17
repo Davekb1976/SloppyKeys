@@ -129,6 +129,27 @@ def set_topmost(hwnd: int, on: bool) -> bool:
     )
 
 
+def set_window_below(hwnd: int, above_hwnd: int) -> bool:
+    """Put `hwnd` directly beneath `above_hwnd` in the z-order, leaving it shown.
+
+    `set_topmost(hwnd, False)` is not enough to get a window out of the way:
+    HWND_NOTOPMOST drops it to the *top* of the non-topmost band, which is still
+    above ours, so it keeps painting over the page. This is how the game gets
+    covered without SW_HIDE — which would also drop its taskbar button.
+    """
+    return bool(
+        user32.SetWindowPos(
+            hwnd,
+            above_hwnd,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+        )
+    )
+
+
 def work_area() -> tuple[int, int, int, int]:
     """The primary screen minus the taskbar, as (left, top, width, height)."""
     rect = wintypes.RECT()
