@@ -886,11 +886,13 @@
           e.stopPropagation();
           btn.textContent = "...";
           btn.classList.add("capturing");
+          if (window.pywebview && pywebview.api) pywebview.api.begin_hotkey_capture();
           const handler = (ev) => {
             ev.preventDefault();
             ev.stopPropagation();
             document.removeEventListener("keydown", handler, true);
             btn.classList.remove("capturing");
+            if (window.pywebview && pywebview.api) pywebview.api.end_hotkey_capture();
             const key = ev.key.length === 1 ? ev.key : ev.key;
             btn.textContent = key.toUpperCase();
             // Parse phase/idx from btn id: hk-<phase>-<idx>
@@ -1291,6 +1293,7 @@
           btn.addEventListener("click", () => {
             btn.textContent = "Press a key...";
             btn.classList.add("capturing");
+            if (window.pywebview && pywebview.api) pywebview.api.begin_hotkey_capture();
             const handler = (e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -1304,6 +1307,7 @@
               btn.textContent = display;
               if (window.pywebview && pywebview.api) {
                 pywebview.api.set_hotkey(btn.dataset.action, vk, ctrl, shift, alt);
+                pywebview.api.end_hotkey_capture();
               }
             };
             document.addEventListener("keydown", handler, true);
@@ -1353,6 +1357,7 @@
     btn.addEventListener("click", () => {
       btn.textContent = "...";
       btn.classList.add("capturing");
+      if (window.pywebview && pywebview.api) pywebview.api.begin_hotkey_capture();
       const handler = (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -1362,6 +1367,7 @@
         btn.textContent = key.toUpperCase();
         if (window.pywebview && pywebview.api) {
           pywebview.api.set_game_keybind(btn.dataset.gameKey, key);
+          pywebview.api.end_hotkey_capture();
         }
       };
       document.addEventListener("keydown", handler, true);

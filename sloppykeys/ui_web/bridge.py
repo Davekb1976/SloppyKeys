@@ -105,6 +105,10 @@ class Api:
         self._run_thread: threading.Thread | None = None
         # Hotkey edge detection
         self._key_down: dict[str, bool] = {"start": False, "stop": False}
+        # While the user is rebinding a key in the UI, suppress the hotkey loop so
+        # the key being assigned doesn't also fire its action. Timestamped so an
+        # abandoned capture (clicked, then clicked away) can't wedge hotkeys off.
+        self._capture_until: float = 0.0
 
     # ---- Window chrome ----
 
@@ -279,6 +283,17 @@ class Api:
             return {"ok": False, "error": "unknown action"}
         store = KeybindStore(self._app_root)
         store.set(action, Keybind(vk=int(vk), ctrl=bool(ctrl), shift=bool(shift), alt=bool(alt)))
+        return {"ok": True}
+
+    def begin_hotkey_capture(self) -> dict:
+        """Suppress the global hotkey loop while the UI captures a key to rebind.
+        Auto-expires after 10s so an abandoned capture can't wedge hotkeys off."""
+        self._capture_until = time.time() + 10.0
+        return {"ok": True}
+
+    def end_hotkey_capture(self) -> dict:
+        """Re-enable the global hotkey loop after a rebind completes or cancels."""
+        self._capture_until = 0.0
         return {"ok": True}
 
     def get_delays(self) -> dict:
@@ -1166,11 +1181,9 @@ class Api:
 
         while self._running:
             try:
-                # Skip hotkeys when our own window is focused (so rebinding
-                # a key in Settings doesn't trigger the function it's mapped to).
-                our_hwnd = self._host_hwnd()
-                fg = user32.GetForegroundWindow()
-                if our_hwnd and fg == our_hwnd:
+                # Skip only while the user is actively rebinding a key, so the
+                # key being assigned doesn't also trigger its mapped action.
+                if time.time() < self._capture_until:
                     time.sleep(HOTKEY_INTERVAL)
                     continue
 
