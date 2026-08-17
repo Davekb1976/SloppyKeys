@@ -55,8 +55,9 @@ Three constants hold the macro together, and breaking one fails *plausibly* rath
 loudly:
 
 - **Viewport pinned 1152×756** (`ui/theme.py::VIEWPORT_WIDTH/HEIGHT`). Every coordinate in
-  `content/`, every box in `settings.json`, every PNG in `images/`, all of `configs/` and
-  `routes.json` was captured at that size; changing it invalidates all of them. Keep
+  `content/`, every box in `settings.json`, every PNG in `assets/`, every block coord in
+  `operations/` and `routes.json` was captured at that size; changing it invalidates all of
+  them. Keep
   `WINDOW_WIDTH/HEIGHT` equal to the layout's measured `minimumSizeHint`. Re-capture through
   Settings > Vision.
 - **DPI off, display scaling 100%** — `QT_ENABLE_HIGHDPI_SCALING=0`, `QT_SCALE_FACTOR=1`, set
@@ -77,13 +78,13 @@ from Roblox's own screenshot — it multiplies by the display scale.
 ## Data, not code
 
 Content and timing are **tables**; add a row, not a branch. The Run selectors, the navigator
-and `configs/` paths all derive from them, so one edit ripples consistently.
+and the task queue's validation all derive from them, so one edit ripples consistently.
 
 - **Gamemode / map / target** → `content/gamemodes.py` (`GAMEMODES`, `maps_for`,
   `has_targets`, `selection_complete`).
 - **Act coordinates** → `content/acts.py`. **Start sequence** (hard mode, confirm, start,
   Expedition's cycling difficulty) → `content/start_stage.py`.
-- **Navigation images** → `content/nav_images.py`; PNGs in `images/` per its README.
+- **Navigation images** → `content/nav_images.py`; PNGs in `assets/` per its README.
 - **Challenge panel geometry** → `content/challenge.py`. **Walk presets** →
   `content/start_position.py`. **Events routes** → `content/nav_route.py` (`NavStep` kinds:
   click, find, expect, scroll, wait), authored by the user into `routes.json`.
@@ -166,7 +167,7 @@ no auto-calibrate).
   doesn't work. Lobby clicks also retreat (`park=`) so a lingering hover can't draw a tooltip
   over the button the next search needs.
 - **Never press a key at a screen you haven't verified.** `UnitPlacer` matches
-  `images/match/unit_ui.png` before acting on a placed unit; without it a missed click sends
+  `assets/match/unit_ui.png` before acting on a placed unit; without it a missed click sends
   `r`/`t`/`x` into the world and still looks like a working macro.
 - **Never block the UI thread.** AHK `wait=True`, sleeps, capture and OCR go on a worker
   (`QThreadPool`). Marshal results and *all* widget/dialog work back with a queued signal;
@@ -228,12 +229,12 @@ Change one, the others usually need it too:
 
 | Group | Surfaces |
 |---|---|
-| **Gamemode schema** | `content/gamemodes.py` ↔ Run/selector UI ↔ `configs/` paths ↔ `nav_images.py` ↔ Tasks validation |
+| **Gamemode schema** | `content/gamemodes.py` ↔ Run/selector UI ↔ `nav_images.py` ↔ Tasks validation ↔ the Task Builder's mode fields |
 | **Measured numbers** | a `content/` table ↔ its `*_key`/accessor/`*_specs` ↔ `config/regions.py` ↔ the Vision row |
-| **Config formats** | `config/` readers/writers ↔ JSON in `configs/`, `routes.json`, `images/`, `settings.json` |
+| **Config formats** | `config/` readers/writers ↔ JSON in `operations/`, `paths/`, `recordings/`, `routes.json`, `settings.json` |
 | **Settings** | store + a Settings control + `MainWindow` wire-up + where it's read |
 | **Delays** | one `DELAY_SPEC` entry ↔ `LobbyNavigator.apply_delays` ↔ `UnitPlacer.apply_delays` |
-| **Viewport size** | invalidates every coordinate, template, `configs/` file and route |
+| **Viewport size** | invalidates every coordinate, template, `operations/` block coord and route |
 | **Threading** | anything that clicks, sleeps, captures or OCRs runs off the UI thread |
 
 ## Security, data, performance
@@ -250,7 +251,8 @@ Change one, the others usually need it too:
 - **No secret in the tree or the log.** The private-server link and webhook URL live in the
   gitignored `settings.json`; never ship, print or example one. The webhook POSTs only to
   `core/webhook.py::ALLOWED_HOSTS`.
-- **On-disk formats are stable.** `configs/`, `routes.json`, `images/`, `settings.json` all
+- **On-disk formats are stable.** `operations/`, `paths/`, `recordings/`, `routes.json`,
+  `assets/`, `settings.json` all
   hold user data: readers default missing keys and preserve unknown ones, and
   `store.update_json` takes one lock across read and write because several stores share the
   file and the macro worker writes stats mid-run. A shape change that can't be defaulted
