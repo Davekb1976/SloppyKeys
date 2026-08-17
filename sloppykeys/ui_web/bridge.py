@@ -390,25 +390,73 @@ class Api:
         except Exception as exc:
             return {"ok": False, "reason": str(exc)}
 
+    def _capture_client_image(self):
+        """Grab the full Roblox client area as a BGR numpy image while it's visible.
+        Returns (img, vw, vh) or None. Capturing once up front means the OCR pass
+        doesn't depend on the game staying on screen."""
+        try:
+            import mss
+            import numpy as np
+            from sloppykeys.core.win32.roblox_window import (
+                client_to_screen, client_size, is_window, find_roblox_window,
+            )
+            hwnd = self._game_hwnd
+            if not hwnd or not is_window(hwnd):
+                hwnd = find_roblox_window()
+            if not hwnd:
+                return None
+            origin = client_to_screen(hwnd, 0, 0)
+            size = client_size(hwnd)
+            if not origin or not size:
+                return None
+            vx, vy = origin
+            vw, vh = size
+            with mss.mss() as sct:
+                mon = {"left": vx, "top": vy, "width": vw, "height": vh}
+                img = np.array(sct.grab(mon))[:, :, :3].copy()
+            return img, vw, vh
+        except Exception:
+            return None
+
     def test_ocr_all(self) -> dict:
-        """Test all OCR regions. Logs results via evaluate_js. Returns immediately."""
+        """Capture the game once (synchronously, while visible), then OCR every
+        region from that snapshot off-thread. Returns after the capture, so the
+        caller can restore the Settings screen without racing the read."""
         if not self._app_root:
             return {"ok": False}
 
+        cap = self._capture_client_image()
+        if cap is None:
+            self._log_to_ui("[OCR] Capture failed — is Roblox running and visible?")
+            return {"ok": False}
+        img, vw, vh = cap
+
         def _run():
+            from sloppykeys.core.ocr import OcrReader
             from sloppykeys.content.challenge import region_specs
+            ocr = OcrReader()
+            ok_avail, msg = ocr.available()
+            if not ok_avail:
+                self._log_to_ui(f"[OCR] {msg}")
+                return
+            regions = UnifiedSettings(self._app_root).get("vision_regions", {})
+            ih, iw = img.shape[:2]
             for key, label, default in region_specs():
-                settings = UnifiedSettings(self._app_root)
-                regions = settings.get("vision_regions", {})
                 box = list(regions.get(key, default))
-                r = self.test_ocr_region(key, box)
-                text = r.get("text", "") if r.get("ok") else f"[{r.get('reason', 'error')}]"
-                score = r.get("score", "") if r.get("ok") else ""
+                x = min(max(0, int(box[0] * vw / 1152)), iw - 1)
+                y = min(max(0, int(box[1] * vh / 756)), ih - 1)
+                w = min(max(1, int(box[2] * vw / 1152)), iw - x)
+                h = min(max(1, int(box[3] * vh / 756)), ih - y)
+                crop = img[y:y + h, x:x + w].copy()
+                result = ocr.read_line(crop)
+                text = result.text or "(empty)"
+                score = round(result.score, 3)
                 safe_text = text.replace("\\", "\\\\").replace('"', '\\"')
                 if self._window:
                     self._window.evaluate_js(
                         f'window.addLog && window.addLog("[OCR] {key}: \\"{safe_text}\\" (score: {score})");'
                     )
+            self._log_to_ui("[OCR] Scan complete.")
 
         import threading
         threading.Thread(target=_run, daemon=True).start()

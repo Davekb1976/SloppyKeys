@@ -452,13 +452,26 @@
   let ocrRegionKey = null;
   let ocrRegionRect = null;
   let ocrCachedSnapshot = null; // cached Roblox screenshot for Set buttons
+  let ocrRegionSpecs = [];       // [{key,label,default}] for onion-skin overlays
+  let ocrRegionOverrides = {};   // saved region boxes by key
 
-  function openRegionPicker(key, dataUri) {
+  async function openRegionPicker(key, dataUri) {
     ocrRegionKey = key;
     ocrRegionRect = null;
+    // Refresh the other regions so they show as labeled onion-skin outlines.
+    if (window.pywebview && pywebview.api) {
+      try {
+        ocrRegionSpecs = (await pywebview.api.get_vision_region_specs()) || [];
+        ocrRegionOverrides = (await pywebview.api.get_vision_regions()) || {};
+      } catch (e) {}
+    }
+    // Seed with the region's current box so it shows highlighted; redraw to change.
+    const savedActive = ocrRegionOverrides[key] || (ocrRegionSpecs.find(s => s.key === key) || {}).default;
+    if (savedActive) ocrRegionRect = { x: savedActive[0], y: savedActive[1], w: savedActive[2], h: savedActive[3] };
     document.getElementById("ocr-region-key").textContent = key;
-    document.getElementById("ocr-region-readout").textContent = "Draw a box";
-    document.getElementById("ocr-region-apply").disabled = true;
+    document.getElementById("ocr-region-readout").textContent = ocrRegionRect
+      ? `${ocrRegionRect.x}, ${ocrRegionRect.y}, ${ocrRegionRect.w}×${ocrRegionRect.h}` : "Draw a box";
+    document.getElementById("ocr-region-apply").disabled = !ocrRegionRect;
     document.getElementById("ocr-region-modal").style.display = "flex";
 
     const canvas = document.getElementById("ocr-region-canvas");
@@ -484,12 +497,29 @@
         ctx.translate(panX, panY);
         ctx.scale(zoom, zoom);
         ctx.drawImage(img, 0, 0, img.naturalWidth * scale, img.naturalHeight * scale);
+        // Onion-skin: every other saved region, dimmed, with its label.
+        ctx.font = (11 / zoom) + "px system-ui";
+        ctx.textBaseline = "bottom";
+        ocrRegionSpecs.forEach(s => {
+          if (s.key === ocrRegionKey) return; // the one being edited is drawn below
+          const box = ocrRegionOverrides[s.key] || s.default;
+          if (!box) return;
+          const bx = box[0] * scale, by = box[1] * scale, bw = box[2] * scale, bh = box[3] * scale;
+          ctx.strokeStyle = "rgba(148, 163, 184, 0.55)";
+          ctx.lineWidth = 1 / zoom;
+          ctx.strokeRect(bx, by, bw, bh);
+          ctx.fillStyle = "rgba(148, 163, 184, 0.85)";
+          ctx.fillText(s.label, bx, Math.max(11 / zoom, by - 1 / zoom));
+        });
         if (ocrRegionRect) {
+          const label = (ocrRegionSpecs.find(s => s.key === ocrRegionKey) || {}).label || ocrRegionKey;
           ctx.strokeStyle = "#8b5cf6";
           ctx.lineWidth = 2 / zoom;
           ctx.strokeRect(ocrRegionRect.x * scale, ocrRegionRect.y * scale, ocrRegionRect.w * scale, ocrRegionRect.h * scale);
           ctx.fillStyle = "rgba(139, 92, 246, 0.15)";
           ctx.fillRect(ocrRegionRect.x * scale, ocrRegionRect.y * scale, ocrRegionRect.w * scale, ocrRegionRect.h * scale);
+          ctx.fillStyle = "#8b5cf6";
+          ctx.fillText(label, ocrRegionRect.x * scale, Math.max(11 / zoom, ocrRegionRect.y * scale - 1 / zoom));
         }
         ctx.restore();
       }
@@ -634,12 +664,12 @@
 
   document.getElementById("btn-vision-test-all").addEventListener("click", async () => {
     if (!window.pywebview || !pywebview.api) return;
-    // Show game so OCR can capture from it
+    // Show game so OCR can grab it. test_ocr_all captures once synchronously and
+    // returns before running OCR, so we only switch back once the frame is taken.
     switchScreen("dashboard");
     await new Promise(r => setTimeout(r, 500));
-    pywebview.api.test_ocr_all();
-    // Switch back after a short delay (test runs on background thread)
-    setTimeout(() => switchScreen("settings"), 1000);
+    await pywebview.api.test_ocr_all();
+    switchScreen("settings");
   });
 
   // Populate gamemodes in the task builder mode dropdown
