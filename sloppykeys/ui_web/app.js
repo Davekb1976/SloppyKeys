@@ -1758,17 +1758,28 @@
     if (!gridEl) return;
     const filterEl = document.getElementById("im-filter");
     const q = (filterEl ? filterEl.value : "").trim().toLowerCase();
-    let items = [];
+    // Grouped into sections by category + subfolder, in first-seen order. Flat, the grid
+    // ran Story's four stage cards straight into Expedition's two and the only thing
+    // saying which was which was the badge — so every card had to be read to find one.
+    const sections = new Map();
     imData.categories.forEach((cat) => {
       if (imCategory !== "all" && cat.key !== imCategory) return;
       cat.names.forEach((img) => {
         if (q && !img.name.toLowerCase().includes(q)) return;
-        items.push({ ...img, catKey: cat.key, catLabel: cat.label, kind: cat.kind || "template" });
+        const key = cat.key + "/" + (img.group || "");
+        if (!sections.has(key)) {
+          sections.set(key, { label: cat.label, sub: img.group || "", items: [] });
+        }
+        sections.get(key).items.push({ ...img, catKey: cat.key, catLabel: cat.label, kind: cat.kind || "template" });
       });
     });
+    if (!sections.size) {
+      gridEl.innerHTML = `<div class="im-empty">${q ? "No images match that filter." : "No images yet."}</div>`;
+      return;
+    }
     // The card is identified by its path, not its name: Story, Expedition and
     // Challenge all have a School Grounds, and the bare name can't tell them apart.
-    gridEl.innerHTML = items.map((img) => `
+    const cardHtml = (img) => `
       <div class="im-card${img.missing ? " im-card-missing" : ""}">
         <div class="im-card-header">
           <span class="im-card-cat">${img.group ? img.catKey + " / " + img.group : img.catKey}</span>
@@ -1778,7 +1789,9 @@
             data-tip="${img.kind === "map" ? "Capture the whole screen as this map" : "Capture &amp; crop this template"}">+</button>
         </div>
         ${img.missing
-          ? '<div class="im-card-missing-body">Capture from Roblox to add this template</div>'
+          ? `<div class="im-card-missing-body">${img.kind === "map"
+              ? "Not captured — the picker falls back to a live grab"
+              : "Capture from Roblox to add this template"}</div>`
           : `<img class="im-card-thumb" src="${img.data_uri}" alt="${img.name}">`}
         ${img.kind === "map" ? "" : `<div class="im-card-slider">
           <span>Match</span>
@@ -1787,7 +1800,16 @@
           ${!img.missing ? `<button class="btn btn--sm tip-left" data-test-image="${img.path}" data-tip="Search for this template on screen now">Test</button>` : ''}
         </div>`}
       </div>
-    `).join("");
+    `;
+    gridEl.innerHTML = [...sections.values()].map((sec) => {
+      const missing = sec.items.filter((i) => i.missing).length;
+      return `<div class="im-section-head">
+          <span class="im-section-title">${sec.label}${sec.sub ? ` <span class="im-section-sub">${sec.sub}</span>` : ""}</span>
+          <span class="im-section-count">${sec.items.length}</span>
+          ${missing ? `<span class="im-section-missing">${missing} missing</span>` : ""}
+        </div>
+        <div class="im-section-grid">${sec.items.map(cardHtml).join("")}</div>`;
+    }).join("");
     // Wire sliders
     gridEl.querySelectorAll('input[type="range"]').forEach((slider) => {
       slider.addEventListener("input", (e) => {

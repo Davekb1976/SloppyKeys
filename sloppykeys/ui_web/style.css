@@ -800,12 +800,27 @@ input:focus, select:focus {
 .pos-readout { font-size: 11px; font-weight: 700; color: var(--accent); padding: 4px 8px; border: 1px solid var(--accent); }
 
 /* ---- Image Manager ---- */
+/* A column of sections, each holding its own 3-up card grid. The heading sticks while its
+   section scrolls, so which folder a card belongs to is readable without checking a badge. */
 .im-grid {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+  display: flex; flex-direction: column;
   overflow-y: auto; overflow-x: hidden;
-  flex: 1; min-height: 0; align-content: start;
+  flex: 1; min-height: 0;
   padding-right: 4px; /* scrollbar space */
 }
+.im-section-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.im-section-head {
+  position: sticky; top: 0; z-index: 2;
+  display: flex; align-items: center; gap: 8px;
+  margin: 14px 0 6px; padding: 4px 0;
+  background: var(--surface-base); border-bottom: 1px solid var(--border);
+}
+.im-section-head:first-child { margin-top: 0; }
+.im-section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text); }
+.im-section-sub { color: var(--accent); text-transform: none; letter-spacing: 0; }
+.im-section-count { font-size: 10px; font-weight: 700; color: var(--text-faint); }
+.im-section-missing { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--rose); margin-left: auto; }
+.im-empty { padding: 24px; text-align: center; font-size: 11px; color: var(--text-faint); }
 .im-card { border: 1px solid var(--border); background: var(--surface-panel); padding: 10px; display: flex; flex-direction: column; gap: 6px; }
 .im-card-header { display: flex; align-items: center; gap: 6px; }
 .im-card-cat { font-size: 9px; font-weight: 700; text-transform: uppercase; padding: 2px 6px; background: var(--accent-soft); color: var(--accent); }
