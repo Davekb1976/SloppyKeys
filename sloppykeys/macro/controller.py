@@ -483,6 +483,10 @@ class MacroController:
         park_interval = max(1.0, float(getattr(self._placer, "won_poll_click", 5.0)))
         parked = False
         last_park_click = 0.0
+        # Loop blocks that have had their one run. Keyed by identity, like `_upgrade_state`:
+        # the blocks come from the operation loaded for this rep, so the ids hold for the
+        # match and a reload starts a fresh set.
+        spent_once: set[int] = set()
         # A ceiling, because neither banner appearing is a real state: a missed crop, a
         # result screen dismissed by another player, or an Expedition node that parks the
         # client somewhere no result can come from. Without it this loop spun forever,
@@ -524,7 +528,13 @@ class MacroController:
             # the board. Only the outcome poll below still runs, because extracting puts the
             # victory screen up and that is what ends the match.
             if not handled:
-                if battle_idx >= len(battle) and not loop_a and not loop_b:
+                # "No loops left" counts a loop whose every block has spent its single run:
+                # otherwise the tick spins doing nothing and never parks, so the keep-alive
+                # click that stops Roblox idle-kicking the session never happens.
+                loops_pending = self._loop_pending(loop_a, spent_once) or self._loop_pending(
+                    loop_b, spent_once
+                )
+                if battle_idx >= len(battle) and not loops_pending:
                     now = time.time()
                     if not parked:
                         self._placer.park()
@@ -545,19 +555,14 @@ class MacroController:
                     if done:
                         battle_idx += 1
 
-                # Advance Loop A by one block (wraps around)
+                # Advance Loop A by one block (wraps around, skipping blocks that have had
+                # their one run)
                 if loop_a:
-                    block = loop_a[loop_a_idx]
-                    done = self._execute_battle_block(block)
-                    if done:
-                        loop_a_idx = (loop_a_idx + 1) % len(loop_a)
+                    loop_a_idx = self._advance_loop(loop_a, loop_a_idx, spent_once)
 
                 # Advance Loop B by one block (wraps around)
                 if loop_b:
-                    block = loop_b[loop_b_idx]
-                    done = self._execute_battle_block(block)
-                    if done:
-                        loop_b_idx = (loop_b_idx + 1) % len(loop_b)
+                    loop_b_idx = self._advance_loop(loop_b, loop_b_idx, spent_once)
 
             # Poll for outcome (win/loss)
             outcome = self._check_outcome()
@@ -576,6 +581,40 @@ class MacroController:
                 return
 
             time.sleep(TICK_SLEEP)
+
+    @staticmethod
+    def _runs_once(block: dict) -> bool:
+        """Does this block promise to run only once per match?
+
+        Two promises the Macro Manager makes on screen and the run loop never kept: the `1x`
+        toggle on any block, and the unconditional RUNS ONCE badge on `walk_path`. Both were
+        stored and drawn while the loop phases wrapped and re-ran them anyway — which on
+        Expedition means re-placing a unit that can only ever be placed once, and anywhere
+        means re-walking a recorded route from a position nobody recorded it from.
+
+        Battle already runs each block once, so this only changes Loop A and Loop B.
+        """
+        return bool(block.get("once")) or block.get("type") == "walk_path"
+
+    @classmethod
+    def _loop_pending(cls, blocks: list, spent: set[int]) -> bool:
+        """Has this loop phase got anything left to run?"""
+        return any(not (cls._runs_once(b) and id(b) in spent) for b in blocks)
+
+    def _advance_loop(self, blocks: list, idx: int, spent: set[int]) -> int:
+        """Run one block of a loop phase and return the next index.
+
+        A block that has spent its single run is stepped over without executing, so the loop
+        keeps cycling whatever is left instead of stalling on it.
+        """
+        block = blocks[idx]
+        if self._runs_once(block) and id(block) in spent:
+            return (idx + 1) % len(blocks)
+        if not self._execute_battle_block(block):
+            return idx  # not finished — same block again next tick
+        if self._runs_once(block):
+            spent.add(id(block))
+        return (idx + 1) % len(blocks)
 
     def _check_outcome(self) -> tuple[str, str] | None:
         """Non-blocking check for win/loss. Returns (outcome, msg) or None.
