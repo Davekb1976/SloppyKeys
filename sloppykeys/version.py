@@ -18,7 +18,7 @@ pre-1.0).
 
 from __future__ import annotations
 
-VERSION = "0.1.2"
+VERSION = "1.0.0"
 
 
 def bump(version: str) -> str:
