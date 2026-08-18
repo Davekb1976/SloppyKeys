@@ -477,6 +477,19 @@
               <label class="check check--lg"><input type="checkbox" id="s-debug-screenshots" data-key="debug_screenshots"><span class="check-box"></span></label>
             </div>
           </div>
+
+          <!-- Click points live here rather than under OCR Regions: they are coordinates
+               measured against the game, not text the macro reads. -->
+          <div class="page-header"><span class="page-title">Click Points</span></div>
+          <div class="setting-group">
+            <div class="setting-row" style="flex-direction:column; align-items:flex-start; gap:6px;">
+              <div class="setting-info">
+                <span class="setting-name">Acts and difficulty</span>
+                <span class="setting-desc">The clicks the macro fires blind — nothing verifies them, so 20px out picks the act above the one you asked for. Put the screen named in the section up in Roblox, then set each point by clicking it on the capture.</span>
+              </div>
+              <div id="vision-points-list" class="vision-regions"></div>
+            </div>
+          </div>
         </div>
 
         <!-- Vision (OCR regions) -->
@@ -493,16 +506,6 @@
             </div>
           </div>
 
-          <div class="page-header"><span class="page-title">Click Points</span></div>
-          <div class="setting-group">
-            <div class="setting-row" style="flex-direction:column; align-items:flex-start; gap:6px;">
-              <div class="setting-info">
-                <span class="setting-name">Acts and difficulty</span>
-                <span class="setting-desc">The clicks the macro fires blind — nothing verifies them, so 20px out picks the act above the one you asked for. Put the screen named in the section up in Roblox, then set each point by clicking it on the capture.</span>
-              </div>
-              <div id="vision-points-list" class="vision-regions"></div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
