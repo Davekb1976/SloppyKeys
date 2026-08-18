@@ -15,6 +15,7 @@ in the Macro Tester. Steps return (ok, message).
 
 from __future__ import annotations
 
+import os
 import time
 from typing import Callable
 
@@ -37,7 +38,7 @@ from sloppykeys.content.nav_images import (
     gamemode_image,
     match_play_image,
     play_image,
-    repeat_image,
+    repeat_images,
     select_stage_image,
     stage_image,
     start_game_image,
@@ -712,11 +713,27 @@ class LobbyNavigator:
         for this one (nobody has measured it), and failing the run over an uncaptured file
         would break every gamemode the moment this shipped.
         """
-        path = repeat_image()
-        if not self._engine.template_exists(path):
-            return (True, f"skipped Repeat — {path} is missing, waiting for Start Game instead")
+        candidates = [p for p in repeat_images() if self._engine.template_exists(p)]
+        if not candidates:
+            return (True, "skipped Repeat — no repeat template captured, waiting for Start Game")
         budget = self.search_timeout if timeout is None else float(timeout)
-        return self._find_click(path, "Repeat", timeout=budget)
+        # Every candidate on every pass, not one template's full budget then the next: the
+        # crops are alternatives for the same button, and Expedition's victory screen may
+        # only carry its own. Spending 6s on Story's before ever looking at Expedition's
+        # would read as a Repeat that isn't there.
+        deadline = time.monotonic() + max(0.0, budget)
+        while True:
+            for path in candidates:
+                match = self._find(path)
+                if match is not None:
+                    ok, message = self._click(match)
+                    if not ok:
+                        return (False, f"Repeat click failed: {message}")
+                    return (True, f"clicked Repeat ({os.path.basename(path)}, {match.score:.2f})")
+            if self._should_stop() or time.monotonic() >= deadline:
+                break
+            time.sleep(self.search_poll)
+        return (False, self._miss(candidates[0], "Repeat"))
 
     def sighted(self, path: str) -> bool:
         """One look: is this template on screen right now?

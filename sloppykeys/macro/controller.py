@@ -35,8 +35,6 @@ from sloppykeys.content.nav_images import (
     exp_continue_2_image,
     exp_continue_image,
     exp_extract_confirm_image,
-    exp_extract_continue_image,
-    exp_extract_final_image,
     exp_extract_image,
     exp_upgrade_card_image,
     start_game_image,
@@ -57,8 +55,8 @@ from sloppykeys.macro.expedition import (
     EXTRACT,
     FOLLOWUP_TIMEOUT,
     NOTHING,
-    RESTART_ROUND,
     START_GAME,
+    START_WAVE,
     ExpeditionMatch,
     extract_after_from_task,
 )
@@ -502,8 +500,8 @@ class MacroController:
                 return
 
             # Before the blocks and before parking: Expedition's own screens are what a
-            # placement click would otherwise land on, and a checkpoint waiting for a click
-            # is not a match to park through.
+            # placement click would otherwise land on.
+            handled = False
             if self._exp is not None:
                 event = self._expedition_tick()
                 if event == "win":
@@ -511,49 +509,47 @@ class MacroController:
                     self._log("  Extracted — Expedition run complete.")
                     self._send_webhook_result("win")
                     return
-                if event == "restage":
-                    self._log(
-                        "  The round is re-staging, so the placed units have left the board — "
-                        "replaying Battle once to put them back."
-                    )
-                    battle_idx = 0
-                    parked = False
-                    self._reset_battle_state()
+                handled = event == "handled"
 
-            if battle_idx >= len(battle) and not loop_a and not loop_b:
-                now = time.time()
-                if not parked:
-                    self._placer.park()
-                    parked = True
-                    last_park_click = now
-                    self._log(
-                        f"  Blocks finished — parked at the corner, clicking every "
-                        f"{park_interval:.0f}s until the match ends."
-                    )
-                elif now - last_park_click >= park_interval:
-                    self._placer.park_click()
-                    last_park_click = now
+            # `handled` means a panel is up and was clicked, so this tick does nothing else:
+            # a block's coordinate and the keep-alive click both land on that panel instead of
+            # the board. Only the outcome poll below still runs, because extracting puts the
+            # victory screen up and that is what ends the match.
+            if not handled:
+                if battle_idx >= len(battle) and not loop_a and not loop_b:
+                    now = time.time()
+                    if not parked:
+                        self._placer.park()
+                        parked = True
+                        last_park_click = now
+                        self._log(
+                            f"  Blocks finished — parked at the corner, clicking every "
+                            f"{park_interval:.0f}s until the match ends."
+                        )
+                    elif now - last_park_click >= park_interval:
+                        self._placer.park_click()
+                        last_park_click = now
 
-            # Advance Battle by one block (if not exhausted)
-            if battle_idx < len(battle):
-                block = battle[battle_idx]
-                done = self._execute_battle_block(block)
-                if done:
-                    battle_idx += 1
+                # Advance Battle by one block (if not exhausted)
+                if battle_idx < len(battle):
+                    block = battle[battle_idx]
+                    done = self._execute_battle_block(block)
+                    if done:
+                        battle_idx += 1
 
-            # Advance Loop A by one block (wraps around)
-            if loop_a:
-                block = loop_a[loop_a_idx]
-                done = self._execute_battle_block(block)
-                if done:
-                    loop_a_idx = (loop_a_idx + 1) % len(loop_a)
+                # Advance Loop A by one block (wraps around)
+                if loop_a:
+                    block = loop_a[loop_a_idx]
+                    done = self._execute_battle_block(block)
+                    if done:
+                        loop_a_idx = (loop_a_idx + 1) % len(loop_a)
 
-            # Advance Loop B by one block (wraps around)
-            if loop_b:
-                block = loop_b[loop_b_idx]
-                done = self._execute_battle_block(block)
-                if done:
-                    loop_b_idx = (loop_b_idx + 1) % len(loop_b)
+                # Advance Loop B by one block (wraps around)
+                if loop_b:
+                    block = loop_b[loop_b_idx]
+                    done = self._execute_battle_block(block)
+                    if done:
+                        loop_b_idx = (loop_b_idx + 1) % len(loop_b)
 
             # Poll for outcome (win/loss)
             outcome = self._check_outcome()
@@ -600,8 +596,12 @@ class MacroController:
         return ExpeditionMatch(after)
 
     def _expedition_tick(self) -> str | None:
-        """Handle whatever Expedition screen is up. "win" once extracted, "restage" when the
-        board was reset, None otherwise.
+        """Handle whatever Expedition screen is up.
+
+        "win" once extracted, "handled" when a screen was acted on, None when the screen is
+        clear. "handled" is what stops the run loop running a block in the same tick: a
+        checkpoint is not the moment to place a unit or click the corner, and a placement
+        coordinate lands on the Continue panel instead of the board.
 
         Throttled: four template searches is ~70ms and this shares a thread with the blocks,
         so looking every tick would spend a fifth of the run loop on screens that change once
@@ -642,14 +642,15 @@ class MacroController:
                 self._ahk.run(
                     nudge_click_script(pos[0], pos[1], spread=SPREAD_TIGHT), wait=True, timeout=5.0
                 )
-            return None
+            return "handled"
 
-        if action == RESTART_ROUND:
+        if action == START_WAVE:
             ok, msg = self._nav.click_start_game(timeout=0.0)
-            self._log(f"  Start Game (mid-match): {msg}")
-            if ok and self._exp.note_restage():
-                return "restage"
-            return None
+            if ok:
+                self._log(f"  Wave {self._exp.note_wave_started()} started: {msg}")
+            else:
+                self._log(f"  Start Game: {msg}")
+            return "handled"
 
         if action == ACCEPT_EXTRACT:
             if self._exp_extract():
@@ -663,53 +664,47 @@ class MacroController:
             # same screen, and continuing costs one wave and buys another offer.
             action = DECLINE_EXTRACT
 
-        if action == DECLINE_EXTRACT:
-            ok, msg = self._nav.click_until_gone(exp_extract_continue_image(), "Keep going")
-            self._log(f"  Keep going: {msg}")
+        # Declining an extraction and clearing an encounter are the same two clicks: the
+        # checkpoint's Continue is the same button the encounter shows, so there is one path
+        # for both rather than a template each.
+        if action in (DECLINE_EXTRACT, CONTINUE_WAVE):
+            label = "Keep going" if action == DECLINE_EXTRACT else "Continue"
+            ok, msg = self._nav.click_until_gone(exp_continue_image(), label)
+            self._log(f"  {label}: {msg}")
             if ok:
                 self._exp_followup()
-            return None
-
-        if action == CONTINUE_WAVE:
-            ok, msg = self._nav.click_until_gone(exp_continue_image(), "Continue")
-            self._log(f"  Continue: {msg}")
-            if ok:
-                self._exp_followup()
-            return None
+            return "handled"
 
         return None
 
     def _exp_followup(self) -> bool:
-        """Click the second Continue that follows every checkpoint click.
+        """Click the second Continue, on the panel the first Continue opens.
 
-        Either face can be the one on screen depending on the wave, so both are accepted
-        rather than only the expected one — insisting on `exp_continue_2` reads a wave that
-        showed the checkmarked variant as a step that never happened.
+        A deadline rather than one look: the panel arrives from the click just made and the
+        game can take a few seconds to draw it. Failing is not fatal — the next tick finds
+        whichever Continue is still up and tries again.
         """
+        path = exp_continue_2_image()
         deadline = time.monotonic() + FOLLOWUP_TIMEOUT
-        candidates = (
-            (exp_continue_2_image(), "Second Continue"),
-            (exp_extract_continue_image(), "Second Continue (checkmarked)"),
-        )
         while time.monotonic() < deadline:
             if self._checkpoint():
                 return False
-            for path, label in candidates:
-                if self._nav.sighted(path):
-                    ok, msg = self._nav.click_until_gone(
-                        path, label, fade_wait=self._nav.panel_fade_wait
-                    )
-                    self._log(f"  {label}: {msg}")
-                    return ok
+            if self._nav.sighted(path):
+                ok, msg = self._nav.click_until_gone(
+                    path, "Second Continue", fade_wait=self._nav.panel_fade_wait
+                )
+                self._log(f"  Second Continue: {msg}")
+                return ok
             time.sleep(self._nav.search_poll)
-        self._log("  No second Continue appeared — carrying on, the next look will retry.")
+        self._log("  No second Continue appeared — the next look will retry.")
         return False
 
     def _exp_extract(self) -> bool:
         """Take the extraction. True only once the chain is proven to have registered.
 
-        Up to three screens: Extract, the Extract on the panel it opens, and a last
-        "end this run?" confirm that does not always appear.
+        Two screens: Extract, then the second Extract on the "are you sure you'd like to end
+        this run?" panel it opens. The victory screen follows, and the run loop's own outcome
+        poll is what reads it.
         """
         ok, msg = self._nav.click_until_gone(exp_extract_image(), "Extract")
         self._log(f"  Extract: {msg}")
@@ -717,35 +712,19 @@ class MacroController:
             return False
         ok, msg = self._nav.click_until_gone(
             exp_extract_confirm_image(),
-            "Extract confirm",
+            "End run",
             timeout=self._nav.search_timeout,
             fade_wait=self._nav.panel_fade_wait,
         )
-        self._log(f"  Extract confirm: {msg}")
+        self._log(f"  End run: {msg}")
         if not ok:
             return False
-        if self._nav.sighted(exp_extract_final_image()):
-            ok, msg = self._nav.click_until_gone(
-                exp_extract_final_image(), "End run", fade_wait=self._nav.panel_fade_wait
-            )
-            self._log(f"  End run: {msg}")
         # Proof, not hope: a chain that did not register leaves Extract on screen, and
         # calling that a win records a run that never ended and strands the cycle.
         if self._nav.sighted(exp_extract_image()):
-            self._log("  Extract is still on screen after the confirm chain.")
+            self._log("  Extract is still on screen after the confirm.")
             return False
         return True
-
-    def _reset_battle_state(self) -> None:
-        """Forget per-block progress so a phase can run a second time.
-
-        `_tick_upgrade_unit` keeps its remaining count in `_upgrade_state` keyed by
-        `id(block)`, and a replay hands it the same block objects — so without this every
-        upgrade block is already spent and the replay places units it never upgrades.
-        `_wave_check_time` is `wait_wave`'s OCR throttle.
-        """
-        self._upgrade_state = {}
-        self._wave_check_time = 0.0
 
     def _execute_battle_block(self, block: dict) -> bool:
         """Execute one block in a tick-based context. Returns True when done

@@ -27,9 +27,9 @@ from sloppykeys.macro.expedition import (  # noqa: E402
     EXTRACT,
     EXTRACT_ATTEMPTS_BEFORE_PLAYING_ON,
     NOTHING,
-    RESTART_ROUND,
     SIGHTING_DEBOUNCE,
     START_GAME,
+    START_WAVE,
     ExpeditionMatch,
     extract_after_from_task,
 )
@@ -41,8 +41,8 @@ def test_priority() -> None:
     assert match.decide({CARD, CONTINUE, EXTRACT, START_GAME}, 100.0)[0] == DISMISS_CARD
     # Nothing was counted while the card was up.
     assert match.sightings == 0
-    # A mid-match Start Game outranks a checkpoint: the board has been reset.
-    assert match.decide({START_GAME, CONTINUE}, 101.0)[0] == RESTART_ROUND
+    # Start Game is how a defense wave begins, so it comes before a checkpoint click.
+    assert match.decide({START_GAME, CONTINUE}, 101.0)[0] == START_WAVE
     # Extract outranks the Continue sitting beside it.
     assert match.decide({EXTRACT, CONTINUE}, 102.0)[0] == ACCEPT_EXTRACT
     assert match.decide(set(), 103.0) == (NOTHING, "")
@@ -76,11 +76,11 @@ def test_playing_on() -> None:
     assert action == DECLINE_EXTRACT, note
 
 
-def test_restage_once() -> None:
+def test_waves_counted() -> None:
     match = ExpeditionMatch()
-    assert match.note_restage() is True
-    # A chatty popup must not rewind the phase over and over.
-    assert match.note_restage() is False
+    assert match.note_wave_started() == 1
+    # Every defense wave offers Start Game again; each is just the next wave.
+    assert match.note_wave_started() == 2
 
 
 def test_task_field() -> None:
@@ -139,22 +139,18 @@ def test_only_expedition_gets_a_state() -> None:
     assert ctrl._exp is not None and ctrl._exp.extract_after == 2
 
 
-def test_wave_dispatch() -> None:
+def test_continue_pair_dispatch() -> None:
     ctrl = _controller({"exp_continue.png", "exp_continue_2.png"})
-    assert ctrl._expedition_tick() is None
-    # The wave Continue, then the second Continue on the panel it opens.
+    # "handled" is what keeps the run loop from firing a block at the open panel.
+    assert ctrl._expedition_tick() == "handled"
     assert ctrl._nav.clicked == ["exp_continue.png", "exp_continue_2.png"]
 
 
 def test_extract_dispatch() -> None:
-    ctrl = _controller({
-        "exp_extract.png", "exp_extract_confirm.png", "exp_extract_final.png",
-    })
-    # The whole chain, and only then a win — the last look proves Extract is gone.
+    ctrl = _controller({"exp_extract.png", "exp_extract_confirm.png"})
+    # Both Extracts, and only then a win — the last look proves the first one is gone.
     assert ctrl._expedition_tick() == "win"
-    assert ctrl._nav.clicked == [
-        "exp_extract.png", "exp_extract_confirm.png", "exp_extract_final.png",
-    ]
+    assert ctrl._nav.clicked == ["exp_extract.png", "exp_extract_confirm.png"]
 
 
 def test_extract_that_never_registers() -> None:
@@ -169,46 +165,43 @@ def test_extract_that_never_registers() -> None:
 
     ctrl = _controller(set())
     ctrl._nav = _StickyNav({
-        "exp_extract.png", "exp_extract_confirm.png", "exp_extract_continue.png",
+        "exp_extract.png", "exp_extract_confirm.png", "exp_continue.png",
     })
     # Not a win, and not a stall either: it declines so the run keeps moving.
-    assert ctrl._expedition_tick() is None
+    assert ctrl._expedition_tick() == "handled"
     assert ctrl._exp.failed_extracts == 1
-    assert "exp_extract_continue.png" in ctrl._nav.clicked
+    assert "exp_continue.png" in ctrl._nav.clicked
 
 
-def test_restage_dispatch() -> None:
+def test_wave_dispatch() -> None:
     ctrl = _controller({"start_game.png"})
-    assert ctrl._expedition_tick() == "restage"
+    assert ctrl._expedition_tick() == "handled"
     assert ctrl._nav.clicked == ["start_game.png"]
-    # Second time: handled, but the phase is not rewound again.
+    # And again next wave: the same button is the normal way each one begins.
     ctrl._exp_next_check = 0.0
     ctrl._nav.on_screen.add("start_game.png")
+    assert ctrl._expedition_tick() == "handled"
+    assert ctrl._exp.waves_started == 2
+
+
+def test_clear_screen_is_not_handled() -> None:
+    # Nothing up: the run loop must be free to run its blocks this tick.
+    ctrl = _controller(set())
     assert ctrl._expedition_tick() is None
-
-
-def test_reset_battle_state() -> None:
-    ctrl = MacroController.__new__(MacroController)
-    ctrl._upgrade_state = {123: {"remaining": 0}}
-    ctrl._wave_check_time = 999.0
-    ctrl._reset_battle_state()
-    # A replay must find no spent upgrade blocks, or it places units it never upgrades.
-    assert ctrl._upgrade_state == {}
-    assert ctrl._wave_check_time == 0.0
 
 
 def main() -> None:
     test_priority()
     test_offer_counting()
     test_playing_on()
-    test_restage_once()
+    test_waves_counted()
     test_task_field()
     test_only_expedition_gets_a_state()
-    test_wave_dispatch()
+    test_continue_pair_dispatch()
     test_extract_dispatch()
     test_extract_that_never_registers()
-    test_restage_dispatch()
-    test_reset_battle_state()
+    test_wave_dispatch()
+    test_clear_screen_is_not_handled()
     print("OK: Expedition decisions and dispatch")
 
 

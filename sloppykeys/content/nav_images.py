@@ -89,34 +89,38 @@ RESTART_GAME_IMAGE = "restart_game.png"
 MATCH_PLAY_IMAGE = "match_play.png"
 
 # # Expedition's in-match screens
-# Expedition has no Victory popup between waves. Every wave transition is a Continue
-# followed by a smaller second Continue on the panel it opens, and at some checkpoints that
-# screen also offers Extract — which is the run's own ending, the equivalent of Story's win.
-# So these are the whole of Expedition's mid-match vocabulary:
+# Observed in game, which is what these follow rather than any guess about waves:
 #
-#   exp_continue        the large Continue that ends a wave
-#   exp_continue_2      the smaller Continue on the panel it opens
-#   exp_extract_continue  the *decline* choice offered beside Extract, a checkmarked
-#                       Continue with its own art — not the same crop as exp_continue
-#   exp_extract         Extract, offered beside that Continue at some checkpoints
-#   exp_extract_confirm the Extract on the panel Extract opens
-#   exp_extract_final   the last "end this run?" confirm, which does not always appear
+#   join         Start Game, then a Continue, then a second Continue
+#   defense/wave only Start Game — the same button, once per wave
+#   encounter    a Continue, then a second Continue
+#   checkpoint   Extract then a second Extract (the "end this run?" panel), *or* a
+#                Continue then a second Continue to keep playing
+#   boss         cleared, then the checkpoint's own Extract/Continue again
+#
+# So the whole vocabulary is one button pair repeated. There is no separate crop for the
+# Continue beside Extract: it is the same Continue the encounter shows.
+#
+#   exp_continue        the first Continue at a node
+#   exp_continue_2      the second Continue, on the panel the first one opens
+#   exp_extract         Extract at a checkpoint
+#   exp_extract_confirm the second Extract, on the "end this run?" panel
 #   exp_upgrade_card    the "Select an upgrade!" header
+#   exp_repeat          the victory screen's Repeat, if Expedition's differs from Story's
 #
-# All optional: a missing crop simply never matches, which leaves that step inert rather
-# than failing a run — and nothing outside an Expedition match ever searches for them.
+# All optional: a missing crop never matches, which leaves that step inert rather than
+# failing a run, and nothing outside an Expedition match searches for them.
 #
-# `exp_upgrade_card` is the level-up modal that hands out three cards. It is cropped from
-# the *header*, not a card face, because the three cards differ every time. It matters far
-# more than it looks: it renders over whatever is underneath, so a Continue or an Extract
-# behind it is unclickable, and it queues (dismissing one meets the next).
+# `exp_upgrade_card` is the level-up modal that hands out three cards. Cropped from the
+# *header*, not a card face, because the three faces differ every time. It matters more than
+# it looks: it renders over whatever is underneath, so an Extract or Continue behind it is
+# drawn but unclickable.
 EXP_CONTINUE_IMAGE = "exp_continue.png"
 EXP_CONTINUE_2_IMAGE = "exp_continue_2.png"
-EXP_EXTRACT_CONTINUE_IMAGE = "exp_extract_continue.png"
 EXP_EXTRACT_IMAGE = "exp_extract.png"
 EXP_EXTRACT_CONFIRM_IMAGE = "exp_extract_confirm.png"
-EXP_EXTRACT_FINAL_IMAGE = "exp_extract_final.png"
 EXP_UPGRADE_CARD_IMAGE = "exp_upgrade_card.png"
+EXP_REPEAT_IMAGE = "exp_repeat.png"
 
 # # The post-match panel's "change gamemode" control
 # Leaving a finished match lands on a panel showing the mode just played; this is the
@@ -247,28 +251,14 @@ def exp_continue_2_image() -> str:
     return os.path.join(IMAGES_DIR, MATCH_DIR, EXP_CONTINUE_2_IMAGE)
 
 
-def exp_extract_continue_image() -> str:
-    """The checkmarked Continue offered *beside* Extract — declining the extraction.
-
-    Its own crop, not `exp_continue_image()`: this one sits on the two-choice checkpoint
-    panel and carries a checkmark, so one template cannot serve both.
-    """
-    return os.path.join(IMAGES_DIR, MATCH_DIR, EXP_EXTRACT_CONTINUE_IMAGE)
-
-
 def exp_extract_image() -> str:
-    """Extract, offered beside Continue at a checkpoint. Accepting it ends the run."""
+    """Extract at a checkpoint. Accepting it ends the run on the victory screen."""
     return os.path.join(IMAGES_DIR, MATCH_DIR, EXP_EXTRACT_IMAGE)
 
 
 def exp_extract_confirm_image() -> str:
-    """The Extract on the panel that Extract opens."""
+    """The second Extract, on the "are you sure you'd like to end this run?" panel."""
     return os.path.join(IMAGES_DIR, MATCH_DIR, EXP_EXTRACT_CONFIRM_IMAGE)
-
-
-def exp_extract_final_image() -> str:
-    """The last "end this run?" confirm. Does not always appear, so never required."""
-    return os.path.join(IMAGES_DIR, MATCH_DIR, EXP_EXTRACT_FINAL_IMAGE)
 
 
 def exp_upgrade_card_image() -> str:
@@ -276,16 +266,29 @@ def exp_upgrade_card_image() -> str:
     return os.path.join(IMAGES_DIR, MATCH_DIR, EXP_UPGRADE_CARD_IMAGE)
 
 
+def exp_repeat_image() -> str:
+    """Expedition's own Repeat on the victory screen.
+
+    Optional, and only needed if it does not look like Story's `repeat.png` —
+    `LobbyNavigator.click_repeat` tries both, so capturing this costs nothing elsewhere.
+    """
+    return os.path.join(IMAGES_DIR, MATCH_DIR, EXP_REPEAT_IMAGE)
+
+
+def repeat_images() -> list[str]:
+    """Every crop that could be the victory screen's Repeat, best-known first."""
+    return [repeat_image(), exp_repeat_image()]
+
+
 def expedition_match_paths() -> list[str]:
     """Every template an Expedition match looks for, in the order the run meets them."""
     return [
         exp_continue_image(),
         exp_continue_2_image(),
-        exp_extract_continue_image(),
         exp_extract_image(),
         exp_extract_confirm_image(),
-        exp_extract_final_image(),
         exp_upgrade_card_image(),
+        exp_repeat_image(),
     ]
 
 

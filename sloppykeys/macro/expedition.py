@@ -5,10 +5,14 @@ screen this tick and answers with one action. No capture, no clicking, no UI —
 makes the part that is easy to get wrong (counting extract offers without double-counting a
 screen that is simply still up) testable without a game.
 
-Expedition shows no Victory between waves. Every wave transition is a Continue and then a
-smaller Continue on the panel it opens; at some checkpoints that same screen also offers
-Extract, and accepting it is how the run ends. So a match is: keep the screen clear, keep
-clicking Continue, and take Extract at the offer the task asked for.
+The flow, as observed in game rather than inferred: joining lands on a checkpoint, so Start
+Game is followed by a Continue and a second Continue. A defense wave shows only Start Game,
+once per wave. An encounter shows the Continue pair. A checkpoint offers Extract, which leads
+to a second Extract on an "end this run?" panel, or the Continue pair to keep playing. A
+cleared boss returns to a checkpoint offering the same two.
+
+So a match is: keep the screen clear, press Start Game whenever a wave offers it, click
+through Continue pairs, and take Extract at the offer the task asked for.
 
 The caller reports sightings by name (`CARD`, `START_GAME`, `EXTRACT`, `CONTINUE`) and
 performs whatever action comes back. Order inside `decide` is deliberate and load-bearing;
@@ -21,7 +25,8 @@ from __future__ import annotations
 # The "Select an upgrade!" level-up modal. Nothing else can be trusted while it is up: it
 # renders over the buttons underneath, so a Continue behind it is found and unclickable.
 CARD = "card"
-# The in-match Start Game button, mid-match. It means the round is re-staging.
+# The in-match Start Game button. Every defense wave puts it back, so this is the ordinary
+# "begin the next wave" signal and not a sign anything went wrong.
 START_GAME = "start_game"
 # Extract offered at a checkpoint, beside its own Continue.
 EXTRACT = "extract"
@@ -30,7 +35,7 @@ CONTINUE = "continue"
 
 # # What to do about it
 DISMISS_CARD = "dismiss_card"
-RESTART_ROUND = "restart_round"
+START_WAVE = "start_wave"
 ACCEPT_EXTRACT = "accept_extract"
 DECLINE_EXTRACT = "decline_extract"
 CONTINUE_WAVE = "continue_wave"
@@ -92,8 +97,8 @@ class ExpeditionMatch:
         self.extract_after = max(1, int(extract_after))
         self.sightings = 0
         self.failed_extracts = 0
+        self.waves_started = 0
         self._last_sighting_at = 0.0
-        self._restaged = False
 
     @property
     def playing_on(self) -> bool:
@@ -107,10 +112,10 @@ class ExpeditionMatch:
         if CARD in seen:
             return (DISMISS_CARD, "upgrade card is up")
 
-        # Then a mid-match Start Game, because it means the board has been reset and the
-        # placements are stale — a checkpoint click would be right but premature.
+        # Then Start Game, which is how a defense wave begins. Nothing else can be on screen
+        # at the same time, and the wave does not start until it is clicked.
         if START_GAME in seen:
-            return (RESTART_ROUND, "Start Game is up again mid-match")
+            return (START_WAVE, "Start Game is up — beginning the wave")
 
         # Extract before Continue: the checkpoint that offers Extract also offers a Continue
         # beside it, and checking Continue first would decline the offer without ever
@@ -137,14 +142,12 @@ class ExpeditionMatch:
         self.failed_extracts += 1
         return max(0, EXTRACT_ATTEMPTS_BEFORE_PLAYING_ON - self.failed_extracts)
 
-    def note_restage(self) -> bool:
-        """True the first time the round re-stages, False after.
+    def note_wave_started(self) -> int:
+        """A Start Game click landed. Returns how many waves this match has begun.
 
-        A mid-match Start Game sends the placed units off the board and frees their tiles,
-        so the Battle phase has to run again — but only once per match. A chatty popup must
-        not be able to rewind the phase repeatedly and leave the placements never finishing.
+        Counted only so the log can say which wave it is. The Battle phase is deliberately
+        *not* rewound here: a defense wave offers Start Game as its normal beginning, so
+        replaying placements on every one of them would fight the operation's own order.
         """
-        if self._restaged:
-            return False
-        self._restaged = True
-        return True
+        self.waves_started += 1
+        return self.waves_started
