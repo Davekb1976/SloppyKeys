@@ -153,6 +153,35 @@ input:focus, select:focus {
 .win-minimize { background: #f4bf4f; }
 .win-minimize:hover { background: #e0a520; color: var(--text); }
 
+/* ---- Tooltips ---- */
+/* `data-tip` instead of the native `title`: WebView2 shows the OS tooltip late, in its own
+   font, and never at all on some frameless-window paths. This one is ours, so it can carry
+   several lines (`\n` in the attribute) and an accent bar down its leading edge.
+   Not for anything the user must read — hover is not discoverable. */
+[data-tip] { position: relative; }
+[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute; z-index: 200;
+  top: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+  width: max-content; max-width: 260px; text-align: left;
+  padding: 5px 8px; white-space: pre-line; line-height: 1.45;
+  font-size: 10px; font-weight: 600; color: var(--text);
+  background: var(--surface-panel);
+  border: 1px solid var(--border); border-left: 2px solid var(--accent);
+  opacity: 0; pointer-events: none; transition: opacity 0.1s ease 0.25s;
+}
+[data-tip]:hover::after,
+[data-tip]:focus-visible::after { opacity: 1; }
+/* Placement variants. A tooltip below a control deep in a block row lands on the next row
+   and reads as part of it, so those take .tip-left. */
+.tip-left[data-tip]::after { top: 50%; bottom: auto; left: auto; right: calc(100% + 6px); transform: translateY(-50%); }
+.tip-above[data-tip]::after { top: auto; bottom: calc(100% + 6px); }
+/* The titlebar sits directly on top of the game window, and the game paints over any DOM it
+   overlaps — a tooltip dropped below a nav button renders inside Roblox, not over it. Keep
+   titlebar tooltips inside the bar by putting them beside the trigger. */
+#titlebar [data-tip]::after { top: 50%; bottom: auto; left: calc(100% + 6px); right: auto; transform: translateY(-50%); }
+#titlebar .titlebar-right [data-tip]::after { left: auto; right: calc(100% + 6px); }
+
 /* ---- Screens ---- */
 .screen { display: none; flex: 1; min-height: 0; overflow: hidden; }
 .screen.active { display: flex; flex-direction: column; }

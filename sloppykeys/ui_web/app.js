@@ -246,7 +246,7 @@
     host.innerHTML = Object.entries(PILL_ACTIONS).map(([action, label]) => {
       const key = hk[action];
       if (!key) return "";  // unbound: no key to advertise
-      return `<span class="hotkey-pill" title="${label}: ${key}">
+      return `<span class="hotkey-pill" data-tip="${label}: ${key}">
         <span class="hotkey-pill-key">${key}</span><span class="hotkey-pill-label">${label}</span>
       </span>`;
     }).join("");
@@ -750,11 +750,11 @@
     if (!r || !r.key) return;
     setRegionThumb(r.key, r.data_uri);
     const thumb = document.querySelector(`[data-vr-thumb="${r.key}"]`);
-    if (thumb) thumb.title = `${r.text} (score: ${r.score})`;
+    if (thumb) thumb.setAttribute("data-tip", `${r.text} (score: ${r.score})`);
     const read = document.querySelector(`[data-vr-read="${r.key}"]`);
     if (read) {
       read.textContent = `${r.text} (${r.score})`;
-      read.title = read.textContent;
+      read.setAttribute("data-tip", read.textContent);
     }
     window.addLog(`[OCR] ${r.key}: "${r.text}" (score: ${r.score})`);
   };
@@ -780,19 +780,19 @@
         <div class="vr-group-head">
           <span class="vr-group-title">${g.label}</span>
           <span class="vr-group-note">${g.where}</span>
-          <button class="btn btn--sm" data-vr-preview-group="${g.key}" title="Grab the game now and refresh every preview in this section — ${g.where}">Preview</button>
-          <button class="btn btn--sm" data-vr-test-group="${g.key}" title="Grab the game and OCR every box in this section — ${g.where}">Test Section</button>
+          <button class="btn btn--sm" data-vr-preview-group="${g.key}" data-tip="Grab the game now and refresh every preview in this section.&#10;${g.where}">Preview</button>
+          <button class="btn btn--sm" data-vr-test-group="${g.key}" data-tip="Grab the game and OCR every box in this section.&#10;${g.where}">Test Section</button>
         </div>
         ${g.rows.map(s => {
           const val = overrides[s.key] || s.default;
           const edited = !!overrides[s.key];
           return `<div class="vision-region-row">
             <span class="vr-label">${s.label}${edited ? '' : ' <span class="vr-default">default</span>'}</span>
-            <input type="number" value="${val[0]}" data-vr-key="${s.key}" data-vr-idx="0" title="x">
-            <input type="number" value="${val[1]}" data-vr-key="${s.key}" data-vr-idx="1" title="y">
-            <input type="number" value="${val[2]}" data-vr-key="${s.key}" data-vr-idx="2" title="w">
-            <input type="number" value="${val[3]}" data-vr-key="${s.key}" data-vr-idx="3" title="h">
-            <button class="btn btn--sm" data-vr-set="${s.key}" title="Draw this box on a screenshot">Set</button>
+            <input type="number" value="${val[0]}" data-vr-key="${s.key}" data-vr-idx="0" data-tip="X">
+            <input type="number" value="${val[1]}" data-vr-key="${s.key}" data-vr-idx="1" data-tip="Y">
+            <input type="number" value="${val[2]}" data-vr-key="${s.key}" data-vr-idx="2" data-tip="Width">
+            <input type="number" value="${val[3]}" data-vr-key="${s.key}" data-vr-idx="3" data-tip="Height">
+            <button class="btn btn--sm" data-vr-set="${s.key}" data-tip="Draw this box on a screenshot">Set</button>
             <img class="vr-thumb" data-vr-thumb="${s.key}" alt="" hidden>
             <span class="vr-read" data-vr-read="${s.key}"></span>
           </div>`;
@@ -995,7 +995,7 @@
         f += `<select class="setting-select" data-field="pathName" style="width:90px;height:22px;font-size:10px;" id="sel-walkpath-${key}"><option value="">Pick path...</option></select>
           <button class="btn btn--sm" id="btn-walkrec-${key}">Rec</button>
           <button class="btn btn--sm" id="btn-walktest-${key}">Test</button>
-          <button class="btn btn--sm btn--danger" id="btn-walkdel-${key}" title="Delete walk path">✕</button>`;
+          <button class="btn btn--sm btn--danger tip-left" id="btn-walkdel-${key}" data-tip="Delete this walk path">✕</button>`;
       }
       return f + `<span class="block-once-badge">RUNS ONCE</span>`;
     }
@@ -1009,7 +1009,7 @@
         if (found) break;
       }
       return `<span class="unit-ord">#${ord}</span>`
-        + blkField("Key", `<button class="btn btn--sm hotkey-capture" id="hk-${key}" title="Unit slot hotkey">${hk ? hk.toUpperCase() : "Key"}</button>`)
+        + blkField("Key", `<button class="btn btn--sm hotkey-capture tip-left" id="hk-${key}" data-tip="Unit slot hotkey">${hk ? hk.toUpperCase() : "Key"}</button>`)
         + blkField("X", `<input value="${b.params?.x || 0}" data-field="params.x" type="number">`)
         + blkField("Y", `<input value="${b.params?.y || 0}" data-field="params.y" type="number">`)
         + blkField("Position", `<button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button>`)
@@ -1019,7 +1019,7 @@
       // With Auto on, Times is the auto-upgrade level, not a repeat count.
       return unitIndexSelect(b)
         + blkField(b.autograde ? "Level" : "Times", `<input value="${b.params?.times || 1}" data-field="params.times" type="number" min="1" style="width:44px;">`)
-        + `<label class="check" title="Set auto-upgrade to the level in Times instead of pressing upgrade"><input type="checkbox" ${b.autograde ? "checked" : ""} data-field="autograde"><span class="check-box"></span>Auto</label>`;
+        + `<label class="check tip-left" data-tip="Set auto-upgrade to the level in Times&#10;instead of pressing upgrade"><input type="checkbox" ${b.autograde ? "checked" : ""} data-field="autograde"><span class="check-box"></span>Auto</label>`;
     }
     if (t === "sell_unit") return unitIndexSelect(b);
     if (t === "target_priority") {
@@ -1038,14 +1038,14 @@
     if (t === "send_key") {
       return blkField("Key", `<input value="${b.key || ""}" data-field="key" style="width:50px;">`)
         + blkField("Times", `<input value="${b.params?.count || 1}" data-field="params.count" type="number" min="1" style="width:44px;">`)
-        + `<label class="check" title="Hold the key down instead of tapping it"><input type="checkbox" ${b.hold ? "checked" : ""} data-field="hold"><span class="check-box"></span>Hold</label>`
+        + `<label class="check tip-left" data-tip="Hold the key down instead of tapping it"><input type="checkbox" ${b.hold ? "checked" : ""} data-field="hold"><span class="check-box"></span>Hold</label>`
         + (b.hold ? blkField("Hold (ms)", `<input value="${b.params?.hold_ms || 500}" data-field="params.hold_ms" type="number" min="1" style="width:60px;">`) : "");
     }
     if (t === "walk") {
-      return `<button class="btn btn--sm" id="btn-walk-rec-${key}">Rec</button><button class="btn btn--sm" id="btn-walktest-${key}">Test</button><button class="btn btn--sm btn--danger" id="btn-walkdel-${key}" title="Delete walk path">✕</button><select class="setting-select" data-field="pathName" style="width:100px;height:22px;font-size:10px;" id="sel-walk-${key}"><option value="">Pick path...</option></select><label class="check"><input type="checkbox" ${b.sprint ? "checked" : ""} data-field="sprint"><span class="check-box"></span>Sprint</label>`;
+      return `<button class="btn btn--sm" id="btn-walk-rec-${key}">Rec</button><button class="btn btn--sm" id="btn-walktest-${key}">Test</button><button class="btn btn--sm btn--danger tip-left" id="btn-walkdel-${key}" data-tip="Delete this walk path">✕</button><select class="setting-select" data-field="pathName" style="width:100px;height:22px;font-size:10px;" id="sel-walk-${key}"><option value="">Pick path...</option></select><label class="check"><input type="checkbox" ${b.sprint ? "checked" : ""} data-field="sprint"><span class="check-box"></span>Sprint</label>`;
     }
     if (t === "record") {
-      return `<select class="setting-select" data-field="recordingName" style="width:110px;height:22px;font-size:10px;" id="sel-rec-${key}"><option value="">Select...</option></select><button class="btn btn--sm" id="btn-record-${key}">Rec</button><button class="btn btn--sm" id="btn-test-rec-${key}">Test</button><button class="btn btn--sm btn--danger" id="btn-del-rec-${key}" title="Delete recording">✕</button>`;
+      return `<select class="setting-select" data-field="recordingName" style="width:110px;height:22px;font-size:10px;" id="sel-rec-${key}"><option value="">Select...</option></select><button class="btn btn--sm" id="btn-record-${key}">Rec</button><button class="btn btn--sm" id="btn-test-rec-${key}">Test</button><button class="btn btn--sm btn--danger tip-left" id="btn-del-rec-${key}" data-tip="Delete this recording">✕</button>`;
     }
     return "";
   }
@@ -1072,17 +1072,17 @@
           return `<div class="block-row block-detect" data-phase="${phase}" data-idx="${i}" data-type="detect">
             <div class="detect-header">
               <span class="block-type">detect</span>
-              <img class="detect-preview" id="detect-prev-${phase}-${i}" alt="" title="What this block searches for">
+              <img class="detect-preview" id="detect-prev-${phase}-${i}" alt="" data-tip="What this block searches for">
               ${blkField("Image", `<select class="blk-select" data-field="image" id="sel-detect-${phase}-${i}" style="width:110px;"><option value="">Pick image...</option></select>`)}
-              <button class="btn btn--sm" id="btn-detect-cap-${phase}-${i}" title="Capture a new image from the game">Capture</button>
-              <button class="btn btn--sm btn--danger" id="btn-detect-del-${phase}-${i}" title="Delete the selected image">✕</button>
-              <button class="btn btn--sm" id="btn-detect-test-${phase}-${i}" title="Search for this image on screen now">Test</button>
+              <button class="btn btn--sm tip-left" id="btn-detect-cap-${phase}-${i}" data-tip="Capture a new image from the game">Capture</button>
+              <button class="btn btn--sm btn--danger tip-left" id="btn-detect-del-${phase}-${i}" data-tip="Delete the selected image">✕</button>
+              <button class="btn btn--sm tip-left" id="btn-detect-test-${phase}-${i}" data-tip="Search for this image on screen now">Test</button>
               ${blkField("Match", `<input value="${b.threshold || 0.8}" data-field="threshold" type="number" step="0.05" min="0.5" max="0.99" style="width:55px;">`)}
-              <label class="check" title="Keep looking for a few attempts before taking the Else branch"><input type="checkbox" ${b.loop ? "checked" : ""} data-field="loop"><span class="check-box"></span>Loop</label>
+              <label class="check tip-left" data-tip="Keep looking for a few attempts&#10;before taking the Else branch"><input type="checkbox" ${b.loop ? "checked" : ""} data-field="loop"><span class="check-box"></span>Loop</label>
               ${b.loop ? blkField("Attempts", `<input value="${b.loopAttempts || 5}" data-field="loopAttempts" type="number" min="1" style="width:46px;">`) : ""}
               <span class="block-actions">
-                <span class="block-once${b.once ? " on" : ""}" data-phase="${phase}" data-idx="${i}" title="Run Once">1×</span>
-                <span class="block-clone" data-phase="${phase}" data-idx="${i}" title="Clone">⊕</span>
+                <span class="block-once tip-left${b.once ? " on" : ""}" data-phase="${phase}" data-idx="${i}" data-tip="Run once per run">1×</span>
+                <span class="block-clone tip-left" data-phase="${phase}" data-idx="${i}" data-tip="Clone">⊕</span>
                 <span class="block-remove" data-phase="${phase}" data-idx="${i}">&times;</span>
               </span>
             </div>
@@ -1104,8 +1104,8 @@
         }
         // Block actions: Once toggle + Clone + Remove (not on pinned)
         const actions = isPinned ? "" : `<span class="block-actions">
-          <span class="block-once${b.once ? " on" : ""}" data-phase="${phase}" data-idx="${i}" title="Run Once">1×</span>
-          <span class="block-clone" data-phase="${phase}" data-idx="${i}" title="Clone">⊕</span>
+          <span class="block-once tip-left${b.once ? " on" : ""}" data-phase="${phase}" data-idx="${i}" data-tip="Run once per run">1×</span>
+          <span class="block-clone tip-left" data-phase="${phase}" data-idx="${i}" data-tip="Clone">⊕</span>
           <span class="block-remove" data-phase="${phase}" data-idx="${i}">&times;</span>
         </span>`;
         return `<div class="block-row${isPinned ? " pinned" : ""}" data-phase="${phase}" data-idx="${i}" data-type="${b.type}" draggable="${isPinned ? "false" : "true"}">
@@ -1774,7 +1774,7 @@
           <span class="im-card-name">${img.name}</span>
           ${img.missing ? '<span class="im-missing-badge">MISSING</span>' : ''}
           <button class="im-card-add" data-path="${img.path}" data-kind="${img.kind}"
-            title="${img.kind === "map" ? "Capture the whole screen as this map" : "Capture &amp; add"}">+</button>
+            data-tip="${img.kind === "map" ? "Capture the whole screen as this map" : "Capture &amp; crop this template"}">+</button>
         </div>
         ${img.missing
           ? '<div class="im-card-missing-body">Capture from Roblox to add this template</div>'
@@ -1783,7 +1783,7 @@
           <span>Match</span>
           <input type="range" min="0.50" max="1.00" step="0.01" value="${img.threshold}" data-path="${img.path}">
           <span class="im-val">${img.threshold.toFixed(2)}</span>
-          ${!img.missing ? `<button class="btn btn--sm" data-test-image="${img.path}" title="Test search">Test</button>` : ''}
+          ${!img.missing ? `<button class="btn btn--sm tip-left" data-test-image="${img.path}" data-tip="Search for this template on screen now">Test</button>` : ''}
         </div>`}
       </div>
     `).join("");

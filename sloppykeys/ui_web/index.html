@@ -15,28 +15,28 @@
     </div>
 
     <nav class="titlebar-nav no-drag">
-      <button class="nav-btn active" data-screen="dashboard" title="Dashboard">
+      <button class="nav-btn active" data-screen="dashboard" data-tip="Dashboard">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polygon points="6,4 20,12 6,20"/>
         </svg>
       </button>
-      <button class="nav-btn" data-screen="queue" title="Task Queue">
+      <button class="nav-btn" data-screen="queue" data-tip="Task Queue">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
         </svg>
       </button>
-      <button class="nav-btn" data-screen="planner" title="Macro Manager">
+      <button class="nav-btn" data-screen="planner" data-tip="Macro Manager">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
           <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
         </svg>
       </button>
-      <button class="nav-btn" data-screen="route" title="Routes">
+      <button class="nav-btn" data-screen="route" data-tip="Routes">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 12h4l3-9 4 18 3-9h4"/>
         </svg>
       </button>
-      <button class="nav-btn" data-screen="settings" title="Settings">
+      <button class="nav-btn" data-screen="settings" data-tip="Settings">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <line x1="4" y1="6" x2="20" y2="6"/><circle cx="8" cy="6" r="2" fill="currentColor" stroke="none"/>
           <line x1="4" y1="12" x2="20" y2="12"/><circle cx="16" cy="12" r="2" fill="currentColor" stroke="none"/>
@@ -61,10 +61,10 @@
         </div>
       </div>
       <div class="win-btns">
-        <button class="titlebar-btn win-minimize" id="btn-minimize" title="Minimize">
+        <button class="titlebar-btn win-minimize" id="btn-minimize" data-tip="Minimize">
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="5" y1="12" x2="19" y2="12"/></svg>
         </button>
-        <button class="titlebar-btn win-close" id="btn-close" title="Close">
+        <button class="titlebar-btn win-close" id="btn-close" data-tip="Close">
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg>
         </button>
       </div>
@@ -86,9 +86,9 @@
         <div class="compact-strip" id="compact-strip">
           <span class="compact-status" id="compact-action">Idle</span>
           <div class="compact-btns">
-            <button class="compact-btn compact-start" id="cs-start" title="Start">▶</button>
-            <button class="compact-btn compact-pause" id="cs-pause" title="Pause" disabled>⏸</button>
-            <button class="compact-btn compact-stop" id="cs-stop" title="Stop" disabled>⏹</button>
+            <button class="compact-btn compact-start tip-above" id="cs-start" data-tip="Start">▶</button>
+            <button class="compact-btn compact-pause tip-above" id="cs-pause" data-tip="Pause" disabled>⏸</button>
+            <button class="compact-btn compact-stop tip-above" id="cs-stop" data-tip="Stop" disabled>⏹</button>
           </div>
         </div>
         <div class="dash-log">
@@ -160,7 +160,7 @@
         <div class="dash-section">
           <div class="dash-section-title">
             Challenge
-            <button class="btn btn--sm" id="btn-chal-scan" title="Open the Challenge panel in game first — the scan reads it off the screen.">Scan</button>
+            <button class="btn btn--sm tip-left" id="btn-chal-scan" data-tip="Open the Challenge panel in game first — the scan reads it off the screen.">Scan</button>
           </div>
           <div class="status-row"><span class="status-label">Re-roll</span><span class="status-value" id="chal-reroll">—</span></div>
           <div class="chal-slots" id="chal-slots">
@@ -261,7 +261,7 @@
             <input type="text" class="setting-input" id="queue-preset-name" placeholder="Preset name" style="width:110px;">
             <button class="btn btn--sm" id="btn-save-queue">Save</button>
             <select class="setting-select" id="queue-preset-load" style="width:120px;"><option value="">Load...</option></select>
-            <button class="btn btn--sm btn--danger" id="btn-del-queue-preset" title="Delete preset">✕</button>
+            <button class="btn btn--sm btn--danger" id="btn-del-queue-preset" data-tip="Delete preset">✕</button>
             <button class="btn btn--sm btn--danger" id="btn-clear-tasks" style="margin-left:auto;">Clear All</button>
           </div>
           <div class="panel-body">
@@ -504,7 +504,7 @@
       <span class="modal-title">Set OCR Region</span>
       <span id="ocr-region-key" style="font-size:11px; color:var(--text-muted); margin-left:8px;"></span>
       <span class="pos-readout" id="ocr-region-readout" style="margin-left:auto;">Draw a box</span>
-      <button class="btn btn--sm" id="ocr-region-recapture" title="Recapture Roblox">Recapture</button>
+      <button class="btn btn--sm" id="ocr-region-recapture" data-tip="Recapture Roblox">Recapture</button>
       <button class="modal-close" id="ocr-region-cancel">&times;</button>
     </div>
     <div class="modal-body" style="flex:1; min-height:0; display:flex; flex-direction:column; gap:8px;">
@@ -583,7 +583,7 @@
       <span class="modal-title">Image Manager</span>
       <div style="display:flex; gap:6px; margin-left:auto; align-items:center;">
         <input type="text" class="settings-search" id="im-filter" placeholder="Filter names..." style="width:160px; margin:0;">
-        <button class="btn btn--sm" id="im-camera" title="Run the macro's camera step in Roblox: pitch down, then zoom out. Do this before capturing a map.">Set Camera</button>
+        <button class="btn btn--sm" id="im-camera" data-tip="Run the macro's camera step in Roblox:&#10;pitch down, then zoom out.&#10;Do this before capturing a map.">Set Camera</button>
         <button class="btn btn--sm btn--primary" id="im-capture">Capture Roblox</button>
       </div>
       <button class="modal-close" id="im-close">&times;</button>

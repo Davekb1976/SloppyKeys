@@ -101,6 +101,29 @@ One square box that fills with a square dot when checked. Used for every on/off 
 - A grouped or multi-state choice is not a checkbox: use chunky `.slot-toggle` buttons or
   a `.blk-select` dropdown.
 
+## Tooltips: `data-tip`, never `title`
+
+```html
+<button class="btn btn--sm tip-left" data-tip="Delete this walk path">✕</button>
+<button data-tip="Grab the game now.&#10;The Challenge panel must be open">Preview</button>
+```
+
+A dark pill with an accent bar down its leading edge, appearing below the trigger after a
+0.25s hover. `white-space: pre-line`, so `&#10;` in the attribute (or `\n` from JS) breaks a
+line — keep it to three short lines.
+
+- **The native `title` attribute is not used anywhere.** WebView2 renders it late, in the
+  OS font, and not at all on some frameless paths. `[data-tip]` in `style.css` is the only
+  tooltip.
+- `.tip-left` for anything inside a block row or a dense list: a tooltip below lands on the
+  next row and reads as part of it. `.tip-above` for a bottom strip.
+- **Titlebar tooltips are automatic and sideways.** The game window sits directly below the
+  bar and paints over any DOM it overlaps, so a tooltip dropped downward renders inside
+  Roblox. `#titlebar [data-tip]` puts it beside the trigger; the right-hand group flips.
+- Hover is not discoverable: a tooltip explains an icon or adds a precondition. Anything the
+  user must read is a `.setting-desc` or a visible note.
+- Setting it from JS is `el.setAttribute("data-tip", …)`.
+
 ## Block rows
 
 A row in the Macro Manager: `.block-row` with a coloured left border per type
