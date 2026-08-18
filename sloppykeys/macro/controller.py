@@ -308,24 +308,39 @@ class MacroController:
             self.run_camera()
             return True
 
-        # Not in a match, but the previous task may have left us standing on its result
-        # screen — and every chain below opens with a click that does not exist there. Match
-        # Play leaves the stage and lands on the gamemode panel, which the chains do
-        # recognise. One look, so being in the lobby costs ~17ms and no click.
+        # Standing on a finished match — a loss, or a win whose Repeat was not taken. Every
+        # chain below opens with a click that does not exist on that screen, so leave it
+        # first: Match Play → the post-match panel → Change gamemode → the gamemode chooser.
+        # That chooser *is* where the cards are, so the lobby's Play is skipped rather than
+        # searched for on a screen it is not on. One look to decide, so being in the lobby
+        # costs ~17ms and no click.
+        from_gamemode_panel = False
         if self._nav.result_screen_up():
             ok, msg = self._nav.leave_match()
             self._log(f"  Leave match: {msg}")
             if not ok:
                 return False
             time.sleep(self._nav.click_settle)
+            # Not for Events: its route is the user's own recording and starts from the
+            # lobby's Events button, so opening the gamemode chooser would land it on the
+            # wrong screen.
+            if not is_custom(mode):
+                ok, msg = self._nav.change_gamemode()
+                self._log(f"  Change gamemode: {msg}")
+                if not ok:
+                    return False
+                from_gamemode_panel = True
+                time.sleep(self._nav.click_settle)
 
         # Events use route navigation
         if is_custom(mode):
             return self._navigate_route(map_name, stage)
 
         # Standard lobby chain
-        steps = [
-            ("Play", lambda: self._nav.click_play()),
+        steps = []
+        if not from_gamemode_panel:
+            steps.append(("Play", lambda: self._nav.click_play()))
+        steps += [
             (f"Open {mode}", lambda: self._nav.open_gamemode(mode)),
             (f"Select {map_name}", lambda: self._nav.select_stage(mode, map_name)),
         ]
@@ -427,9 +442,32 @@ class MacroController:
 
         self._log("  Match started — running blocks...")
 
+        # Park mode: once Battle is spent and there are no loops, there is nothing left to
+        # click, so the cursor retreats to the empty top-left corner and clicks it on a slow
+        # schedule. That click is not cosmetic — it keeps Roblox from idle-kicking the
+        # session through a long wave, and it is the only sign the macro is alive while it
+        # waits for a result. Announced once, because a line per click would bury the log.
+        park_interval = max(1.0, float(getattr(self._placer, "won_poll_click", 5.0)))
+        parked = False
+        last_park_click = 0.0
+
         while not self._stop_requested:
             if self._checkpoint():
                 return
+
+            if battle_idx >= len(battle) and not loop_a and not loop_b:
+                now = time.time()
+                if not parked:
+                    self._placer.park()
+                    parked = True
+                    last_park_click = now
+                    self._log(
+                        f"  Blocks finished — parked at the corner, clicking every "
+                        f"{park_interval:.0f}s until the match ends."
+                    )
+                elif now - last_park_click >= park_interval:
+                    self._placer.park_click()
+                    last_park_click = now
 
             # Advance Battle by one block (if not exhausted)
             if battle_idx < len(battle):

@@ -238,6 +238,16 @@ class UnitPlacer:
         """
         self._park()
 
+    def park_click(self) -> None:
+        """Public: click the empty corner. The keep-alive while there is nothing to do.
+
+        Not cosmetic — it is what stops Roblox idle-kicking the session during a long wave,
+        and it is the visible sign the macro is alive rather than hung. `won_poll_click` is
+        the interval; the corner is empty ground, so the click can't select or place
+        anything.
+        """
+        self._click_client(*PARK_CLIENT)
+
     def _park(self) -> None:
         point = self._screen(*PARK_CLIENT)
         if point is None or not self._ahk.available():
@@ -302,7 +312,7 @@ class UnitPlacer:
 
     def close_unit_panel(self) -> None:
         """Click the empty corner so the next step starts from a clean screen."""
-        self._click_client(*PARK_CLIENT)
+        self.park_click()
 
     # # Step execution
     def run_step(self, step: UnitStep) -> tuple[bool, str]:
