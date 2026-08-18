@@ -21,6 +21,7 @@ from __future__ import annotations
 import os
 import re
 
+from ..config.unit_configs import safe_component
 from .gamemodes import GAMEMODES
 
 IMAGES_DIR = "assets"
@@ -213,11 +214,13 @@ def map_reference_image(gamemode: str, map_name: str, act: str = "") -> str:
     """Placement backdrop for a map — or for one act, where the acts are separate areas.
 
     Display names, not slugs: these are hand-dropped files and the tree already holds
-    `assets/reference/Story/King's Tomb.png`.
+    `assets/reference/Story/King's Tomb.png`. Each name goes through `safe_component`
+    anyway — an event's map and act names are typed by the user, and one path segment
+    containing `..` would put a capture anywhere on disk.
     """
-    parts = [IMAGES_DIR, REFERENCE_DIR, gamemode, map_name]
+    parts = [IMAGES_DIR, REFERENCE_DIR, safe_component(gamemode), safe_component(map_name)]
     if act:
-        parts.append(act)
+        parts.append(safe_component(act))
     return os.path.join(*parts) + ".png"
 
 

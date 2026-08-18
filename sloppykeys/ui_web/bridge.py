@@ -1056,14 +1056,19 @@ class Api:
         return maps
 
     def get_map_image(self, category: str, name: str) -> dict:
-        """Base64 data URI of a map image for the position picker."""
+        """Base64 data URI of a map image for the position picker.
+
+        `name` can carry separators — "Villian Invasion/Act 1" for a per-act backdrop — so
+        it goes through `_template_path`, which is what keeps a `..` in either argument from
+        reading a PNG anywhere on disk. Both come from the page, so both are untrusted.
+        """
         if not self._app_root:
             return {"ok": False}
         import base64
 
-        # Name can be "Villian Invasion/Act 1" (with path separators)
-        path = os.path.join(self._app_root, "assets", "reference", category, name.replace("/", os.sep) + ".png")
-        if not os.path.isfile(path):
+        rel = f"assets/reference/{category}/{name}.png"
+        path = self._template_path(rel)
+        if path is None or not os.path.isfile(path):
             return {"ok": False, "reason": "not found"}
         try:
             with open(path, "rb") as f:
