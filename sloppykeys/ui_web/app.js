@@ -68,6 +68,7 @@
     logList.innerHTML = "";
   });
 
+
   // ---- Macro controls ----
   const btnStart = document.getElementById("btn-start");
   const btnPause = document.getElementById("btn-pause");
@@ -901,6 +902,13 @@
   const PHASES = ["pre_start", "battle", "loop_a", "loop_b"];
   let opPhases = { pre_start: [{ type: "walk_path", params: {}, mode: "auto", pathName: "" }], battle: [], loop_a: [], loop_b: [] };
   let opDirty = false;
+  // The Auto table: [{target, path, missing}]. Hover on Auto is the only place it shows, so
+  // it is kept fresh after anything that adds or removes a recording.
+  // Declared **here**, not down with the walk-path handlers: `walkDefaultsTip()` reads it
+  // while rendering the pinned walk_path block, and the first render runs at load. A `let`
+  // below that line put it in the temporal dead zone, so the render threw and every
+  // statement after it — the whole walk/record/detect wiring — never ran.
+  let walkDefaults = [];
 
   // List all place_unit blocks across phases as {n, name} for unit-index dropdowns.
   function listPlacedUnits() {
@@ -2381,9 +2389,7 @@
   // ---- Recording helpers ----
   let _cachedRecordings = null;
   let _cachedWalkPaths = null;
-  // The Auto table: [{target, path, missing}]. Hover on Auto is the only place it shows, so
-  // it is kept fresh after anything that adds or removes a recording.
-  let walkDefaults = [];
+
 
   async function refreshWalkDefaults() {
     if (!window.pywebview || !pywebview.api || !pywebview.api.get_walk_defaults) return;

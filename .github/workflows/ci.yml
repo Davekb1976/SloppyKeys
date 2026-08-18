@@ -60,3 +60,9 @@ jobs:
             if ($LASTEXITCODE -ne 0) { $failed += $_.Name }
           }
           if ($failed.Count) { throw "failed: $($failed -join ', ')" }
+
+      # `node --check` only parses app.js. This runs it against a stub DOM, which is the
+      # only thing that catches a top-level throw — it aborts every statement after it and
+      # WebView2 has no console to say so. Node is preinstalled on the runner.
+      - name: app.js loads
+        run: node tests\test_app_js_loads.js
