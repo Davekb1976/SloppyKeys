@@ -31,7 +31,7 @@
           <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
         </svg>
       </button>
-      <button class="nav-btn" data-screen="route" title="Route Editor">
+      <button class="nav-btn" data-screen="route" title="Routes">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 12h4l3-9 4 18 3-9h4"/>
         </svg>
@@ -341,16 +341,16 @@
     </div>
   </div>
 
-  <!-- ============ ROUTE (full page) ============ -->
-  <!-- Static: routes are authored into routes.json by hand until the editor exists, so
-       there is no state and no render function here. -->
+  <!-- ============ ROUTES (full page) ============ -->
+  <!-- Static: nothing is wired up yet, so no state and no render function. Routes is its
+       own upcoming feature — not the Events navigation steps, which live in routes.json. -->
   <div class="screen" id="screen-route">
     <div class="under-construction">
       <svg class="uc-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M3 21h18"/><path d="M5 21V10l7-5 7 5v11"/><path d="M9 21v-6h6v6"/>
       </svg>
-      <span class="uc-title">Route Editor under construction</span>
-      <span class="uc-note">Events routes are read from <code>routes.json</code> in the meantime</span>
+      <span class="uc-title">Routes under construction</span>
+      <span class="uc-note">A separate feature, still being built</span>
       <span class="uc-dots" aria-hidden="true"><i></i><i></i><i></i></span>
     </div>
   </div>
