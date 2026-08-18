@@ -31,8 +31,10 @@ DEFAULT_DEST = os.path.join(os.path.dirname(os.path.dirname(HERE)), "SLOPPYKEYS"
 
 # Copied beside the exe. Folders the user's work lives in, plus the route data.
 # `operations/`, `paths/` and `recordings/` are not here on purpose: they are created
-# by the app on first save and a shipped build has none.
-DATA_DIRS = ("assets",)
+# by the app on first save and a shipped build has none. `paths/defaults/` is the
+# exception — shipped walk paths the Auto mode looks up by name, shared game data rather
+# than anyone's recording, so without it Auto does nothing on a fresh install.
+DATA_DIRS = ("assets", os.path.join("paths", "defaults"))
 DATA_FILES = ("routes.json",)
 # `routes.json` again under a second name. The installer writes `routes.json` only if it is
 # missing (it is the user's own events once they have any) but always replaces this copy, so

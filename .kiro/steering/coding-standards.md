@@ -87,8 +87,10 @@ and the task queue's validation all derive from them, so one edit ripples consis
 - **Act coordinates** → `content/acts.py`. **Start sequence** (hard mode, confirm, start,
   Expedition's cycling difficulty) → `content/start_stage.py`.
 - **Navigation images** → `content/nav_images.py`; PNGs in `assets/` per its README.
-- **Challenge panel geometry** → `content/challenge.py`. **Walk presets** →
-  `content/start_position.py`. **Events routes** → `content/nav_route.py` (`NavStep` kinds:
+- **Challenge panel geometry** → `content/challenge.py`. **Auto walk paths** →
+  `content/walk_paths.py` (target → recording name, act row before map row); the recordings
+  themselves are JSON in `paths/defaults/`, shipped and listed beside the user's own, and a
+  user recording of the same name wins. **Events routes** → `content/nav_route.py` (`NavStep` kinds:
   click, find, expect, scroll, wait), authored by the user into `routes.json`.
 - **Delays** → `config/delays.py` (`DELAY_SPEC`). One entry is the whole change: the Delays
   tab builds itself from the spec and both `apply_delays` implementations read it by key.

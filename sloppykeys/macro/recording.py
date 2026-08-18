@@ -553,9 +553,27 @@ def replay_recording(
 # Walk Path Replay (via AHK — keys only, timing preserved)
 # ═══════════════════════════════════════════════════════════════════════════
 
+def walk_path_file(app_root: str, name: str) -> str:
+    """Where the walk path called `name` lives: the user's own recording if there is one,
+    otherwise the shipped default. Returns "" when neither exists.
+
+    Own-first is what lets a shipped path be replaced without deleting anything — record
+    under the same name and it wins.
+    """
+    slug = _safe_name(name)
+    for folder in (os.path.join(app_root, "paths"),
+                   os.path.join(app_root, "paths", "defaults")):
+        candidate = os.path.join(folder, f"{slug}.json")
+        if os.path.isfile(candidate):
+            return candidate
+    return ""
+
+
 def replay_walk_script(app_root: str, name: str) -> str:
     """Generate an AHK v2 script that replays a walk path recording."""
-    path = os.path.join(app_root, "paths", f"{name}.json")
+    path = walk_path_file(app_root, name)
+    if not path:
+        return ""
     try:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -671,14 +689,23 @@ def delete_recording(app_root: str, name: str) -> bool:
 
 
 def list_walk_paths(app_root: str) -> list[str]:
-    folder = os.path.join(app_root, "paths")
-    if not os.path.isdir(folder):
-        return []
-    return sorted(f[:-5] for f in os.listdir(folder) if f.endswith(".json"))
+    """Every walk path name available: the user's own and the shipped defaults, merged, so
+    a shipped one shows in the dropdowns exactly like a recorded one."""
+    names = set()
+    for folder in (os.path.join(app_root, "paths"),
+                   os.path.join(app_root, "paths", "defaults")):
+        if not os.path.isdir(folder):
+            continue
+        names.update(f[:-5] for f in os.listdir(folder) if f.endswith(".json"))
+    return sorted(names)
 
 
 def delete_walk_path(app_root: str, name: str) -> bool:
-    """Delete a walk path recording by name."""
+    """Delete the user's own recording of `name`.
+
+    A shipped default is never deleted — it is the same file for every install, and losing it
+    would silently change what Auto walks. Deleting an override just restores the default.
+    """
     path = os.path.join(app_root, "paths", f"{_safe_name(name)}.json")
     try:
         os.remove(path)

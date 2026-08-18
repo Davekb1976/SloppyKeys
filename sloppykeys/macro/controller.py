@@ -27,6 +27,7 @@ from sloppykeys.config.unified import UnifiedSettings
 from sloppykeys.content.acts import act_coord
 from sloppykeys.content.gamemodes import is_custom, selection_complete
 from sloppykeys.content.start_stage import difficulty_coord, difficulty_from_task
+from sloppykeys.content.walk_paths import default_walk_path
 from sloppykeys.core.ahk import AhkBridge
 from sloppykeys.core.image_search import ImageSearchEngine
 from sloppykeys.core.win32 import roblox_window as rbx
@@ -842,6 +843,30 @@ class MacroController:
                 wait=True,
                 timeout=8.0 + count * (hold_ms / 1000.0),
             )
+
+        elif btype == "walk_path":
+            # The pinned pre-start walk. Auto resolves the task's target through the table;
+            # Custom names a recording outright. Had no branch here at all, so both modes
+            # were silently skipped.
+            task = self._current_task or {}
+            if block.get("mode") == "custom":
+                path_name = str(block.get("pathName", "") or "")
+                source = "custom"
+            else:
+                path_name = default_walk_path(
+                    task.get("mode", ""), task.get("map", ""), task.get("stage", "")
+                )
+                source = "auto"
+            if not path_name:
+                self._log("    [block] walk path: nothing set for this target — skipping")
+                return
+            from sloppykeys.macro.recording import replay_walk_script
+            script = replay_walk_script(self._app_root, path_name)
+            if not script:
+                self._log(f"    [block] walk path '{path_name}' ({source}) not found or empty")
+                return
+            self._log(f"    [block] walking '{path_name}' ({source})")
+            self._ahk.run(script, wait=True, timeout=30.0)
 
         elif btype == "walk":
             # Replay a recorded walk path

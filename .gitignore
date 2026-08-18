@@ -32,6 +32,12 @@ assets/**/debug/
 # on every Preview/Test and specific to their calibration, so there is nothing to ship.
 /assets/regions/
 
+# The user's own walk recordings. `paths/defaults/` is the exception: those are the walk
+# paths Auto looks up by name (`content/walk_paths.py`), shared game data rather than
+# anyone's recording — without them Auto does nothing on a fresh clone.
+/paths/*
+!/paths/defaults/
+
 # Multi-root editor workspace: it points at sibling folders that only exist on one
 # machine (`../Anime-Expeditions-Creams-Macro-main`, `../../SLOPPYKEYS`), so committing it
 # hands the next clone a broken workspace.

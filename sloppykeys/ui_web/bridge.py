@@ -1595,11 +1595,36 @@ class Api:
         return list_walk_paths(self._app_root)
 
     def delete_walk_path(self, name: str) -> dict:
-        """Delete a saved walk path by name."""
+        """Delete the user's own recording of a walk path.
+
+        `shipped` says the name still resolves afterwards, i.e. deleting only dropped an
+        override and Auto is back on the shipped default.
+        """
         if not self._app_root:
             return {"ok": False}
-        from sloppykeys.macro.recording import delete_walk_path
-        return {"ok": delete_walk_path(self._app_root, name)}
+        from sloppykeys.macro.recording import delete_walk_path, walk_path_file
+        ok = delete_walk_path(self._app_root, name)
+        return {"ok": ok, "shipped": bool(walk_path_file(self._app_root, name))}
+
+    def get_walk_defaults(self) -> list:
+        """The Auto table: which walk path each target uses, and whether it exists on disk.
+
+        A missing recording is a state the UI shows, not an error — the name is what it has
+        to be recorded under for Auto to pick it up.
+        """
+        from sloppykeys.content.walk_paths import DEFAULT_WALK_PATHS
+        from sloppykeys.macro.recording import walk_path_file
+
+        if not self._app_root:
+            return []
+        return [
+            {
+                "target": target,
+                "path": name,
+                "missing": not walk_path_file(self._app_root, name),
+            }
+            for target, name in DEFAULT_WALK_PATHS.items()
+        ]
 
     def list_input_recordings(self) -> list:
         """Names of all input recordings."""

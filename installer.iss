@@ -92,6 +92,10 @@ Source: "{#Payload}\_internal\*"; DestDir: "{app}\_internal"; Flags: ignoreversi
 ; build with no routes yet is legitimate.
 Source: "{#Payload}\assets\*"; DestDir: "{app}\assets"; Flags: onlyifdoesntexist uninsneveruninstall recursesubdirs createallsubdirs skipifsourcedoesntexist
 Source: "{#Payload}\routes.json"; DestDir: "{app}"; Flags: onlyifdoesntexist uninsneveruninstall skipifsourcedoesntexist
+; Not user data either: the shipped walk paths Auto looks up by name. Replaced on every
+; upgrade — a user's own recording of the same name lives in `paths\` and still wins.
+Source: "{#Payload}\paths\defaults\*"; DestDir: "{app}\paths\defaults"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
+
 ; Not user data: the build's own copy of routes.json, replaced on every upgrade so the app
 ; can offer routes a new version ships (nav_routes.RouteStore.merge_shipped). `routes.json`
 ; itself must keep `onlyifdoesntexist` — it is the user's events.
