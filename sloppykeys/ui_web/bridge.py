@@ -86,6 +86,12 @@ DRAG_INTERVAL = 0.008  # ~125Hz, so a drag never misses a displayed frame.
 HOTKEY_INTERVAL = 0.04  # ~25Hz, same cadence as the PySide6 window's 40ms timer.
 # How long a just-revealed game window needs before mss sees a painted frame.
 GAME_REVEAL_SETTLE = 0.4
+# The game is covered for this long after startup, because the boot loader is a fullscreen
+# DOM overlay and the game paints over all DOM content — docked on the slot it would punch a
+# rectangle of Roblox through the middle of the loading screen. Kept in step with the loader
+# in `index.html`, whose hard cap is the same 3s; longer here would leave the Dashboard
+# briefly gameless, shorter would show the game through the tail of the fade.
+BOOT_COVER_SECONDS = 3.0
 
 
 class Api:
@@ -98,6 +104,11 @@ class Api:
         self._game_style: int | None = None
         self._slot = DEFAULT_SLOT
         self._game_visible = True
+        # Covered until the boot loader is gone. Timed rather than driven by the page: the
+        # loader is deliberately independent of the bridge, and a gate that waits for a
+        # callback would leave the game covered for good if that callback never came.
+        self._booting = True
+        self._boot_until = time.monotonic() + BOOT_COVER_SECONDS
         self._docked = False
         self._running = True
         self._dragging = False
@@ -2035,7 +2046,10 @@ class Api:
 
         SW_SHOWNOACTIVATE = 4
         user32.ShowWindow(game_hwnd, SW_SHOWNOACTIVATE)
-        if self._game_visible:
+        # `_booting` counts as covered: the game is positioned on the slot from the first tick,
+        # but the boot loader is on top of that slot in the DOM and the game would paint
+        # straight through it.
+        if self._game_visible and not self._booting:
             set_topmost(game_hwnd, True)
         else:
             # Covered, not hidden — see set_game_visible. Reasserted each tick
@@ -2110,6 +2124,13 @@ class Api:
         """
         while self._running:
             try:
+                # The boot cover expiring has to *do* something: a game docked while booting
+                # was docked covered, and this loop only re-docks when the window moves, so
+                # without re-asserting here it would stay under the page for the whole session.
+                if self._booting and time.monotonic() >= self._boot_until:
+                    self._booting = False
+                    self.set_game_visible(self._game_visible)
+
                 if self._dragging:
                     # The drag loop is moving both windows; two threads calling
                     # SetWindowPos on the same pair only fight each other.
