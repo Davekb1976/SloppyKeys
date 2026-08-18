@@ -88,4 +88,21 @@ with tempfile.TemporaryDirectory() as root:
     assert difficulty_coord("Expedition") is not None  # back to the default, not gone
     assert reloaded.get_vision_points() == {}
 
+# # The capture the picker opens with refuses a minimized game
+# mss grabs a screen *rectangle*, and a minimized window reports coordinates near -32000, so
+# without this the grab succeeds and hands back a picture of nothing — which reads as "the
+# picker captured the wrong thing" rather than "Roblox is minimized". Module globals are
+# patched last, since nothing after this runs.
+import sloppykeys.core.win32.roblox_window as roblox_window  # noqa: E402
+import sloppykeys.ui_web.bridge as bridge_module  # noqa: E402
+
+bridge_module.find_roblox_window = lambda: 4242
+roblox_window.is_minimized = lambda _hwnd: True
+snap = Api.__new__(Api)
+snap._app_root = os.getcwd()
+snap._game_visible = True
+snap._docked = False
+snap._game_hwnd = None
+assert snap.get_roblox_snapshot() == {"ok": False, "reason": "Roblox is minimized"}
+
 print("vision points: OK")

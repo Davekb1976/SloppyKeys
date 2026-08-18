@@ -1206,7 +1206,12 @@ class Api:
 
     def get_roblox_snapshot(self) -> dict:
         """Capture the live Roblox window as a base64 PNG for position picking.
-        Also caches the raw BGR array for save_image_crop."""
+        Also caches the raw BGR array for save_image_crop.
+
+        Refuses while Roblox is minimized: mss grabs a screen *rectangle*, and a minimized
+        window reports coordinates near -32000, so the grab succeeds and hands back a
+        picture of nothing — which reads as a bad capture rather than a missing window.
+        """
         import base64
 
         try:
@@ -1220,18 +1225,26 @@ class Api:
         if not hwnd:
             return {"ok": False, "reason": "Roblox not found"}
 
-        from sloppykeys.core.win32.roblox_window import client_to_screen, client_size
+        from sloppykeys.core.win32.roblox_window import (
+            client_size,
+            client_to_screen,
+            is_minimized,
+        )
 
-        origin = client_to_screen(hwnd, 0, 0)
-        size = client_size(hwnd)
-        if not origin or not size:
-            return {"ok": False, "reason": "couldn't read Roblox geometry"}
+        if is_minimized(hwnd):
+            return {"ok": False, "reason": "Roblox is minimized"}
 
-        monitor = {"left": origin[0], "top": origin[1], "width": size[0], "height": size[1]}
-        # Reveals the game first when we're on a screen that hides it, so a capture
-        # from the Image Manager, the position picker or the OCR tab isn't a grab of
-        # whatever was behind it.
+        # Read the geometry **inside** the reveal, not before it: the window is moved onto
+        # the slot as part of being shown, so an origin read while it was still tucked away
+        # can point at where it used to be.
         with self._game_revealed(), mss.mss() as sct:
+            origin = client_to_screen(hwnd, 0, 0)
+            size = client_size(hwnd)
+            if not origin or not size:
+                return {"ok": False, "reason": "couldn't read Roblox geometry"}
+            monitor = {
+                "left": origin[0], "top": origin[1], "width": size[0], "height": size[1]
+            }
             img = np.array(sct.grab(monitor))
 
         bgr = img[:, :, :3].copy()

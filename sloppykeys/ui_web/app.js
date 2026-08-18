@@ -987,7 +987,7 @@
       </div>`;
     }).join("");
     list.querySelectorAll("[data-vp-group]").forEach(btn => {
-      btn.addEventListener("click", () => openPointPicker(btn.dataset.vpGroup));
+      btn.addEventListener("click", () => openPointPicker(btn.dataset.vpGroup, btn));
     });
     list.querySelectorAll("[data-vp-reset]").forEach(btn => {
       btn.addEventListener("click", async () => {
@@ -2230,27 +2230,35 @@
   let posGroup = null;         // the group from list_vision_points
   let posArmed = null;         // key of the point the next canvas click sets
 
-  window.openPointPicker = async function (groupKey) {
+  window.openPointPicker = async function (groupKey, btn) {
     const group = pointGroups.find(g => g.key === groupKey);
     if (!group || !window.pywebview || !pywebview.api) return;
+    // **Capture before touching the game's z-order.** The backend reveals the game for the
+    // grab and puts it back itself (`_game_revealed`); a `set_game_visible(false)` fired
+    // from here does not await, so it lands *during* that reveal and tucks the game back
+    // under our window — mss grabs a screen rectangle, so the picture comes back as our own
+    // page. That is why only some of these captures looked wrong.
+    const label = btn ? btn.textContent : "";
+    if (btn) { btn.disabled = true; btn.textContent = "..."; }
+    const r = await pywebview.api.get_roblox_snapshot();
+    if (btn) { btn.disabled = false; btn.textContent = label; }
+    if (!r.ok) {
+      window.addLog("[Points] Capture failed: " + (r.reason || "error"));
+      return;
+    }
     posMode = "points";
     posGroup = group;
     posArmed = (group.points.find(p => !p.edited) || group.points[0]).key;
     posTarget = null;
+    posReadout.textContent = "Click a point";
     document.querySelector("#pos-modal .modal-title").textContent = group.label;
+    // Only now: on the Dashboard the game would paint over the modal.
     setGameVisible(false);
     posModal.style.display = "flex";
     posGrid.style.display = "none";
     document.getElementById("pos-back").style.display = "none";
     document.getElementById("pos-chips").style.display = "";
     renderPosChips();
-    // The game has to be up for the grab; the backend reveals it and re-hides it.
-    const r = await pywebview.api.get_roblox_snapshot();
-    if (!r.ok) {
-      posReadout.textContent = "Capture failed";
-      window.addLog("[Points] Capture failed: " + (r.reason || "error"));
-      return;
-    }
     loadPosImage(r.data_uri);
   };
 
