@@ -628,7 +628,9 @@ class MacroController:
 
         self._wave_check_time = now + 2.0
 
-        # Try to read the wave number via OCR
+        # Read the wave number. `OcrReader.read_line` is the only reader there is —
+        # this called a `read_text` that does not exist, and the bare `except` swallowed
+        # the AttributeError, so the block never finished and the phase stalled forever.
         try:
             from sloppykeys.core.ocr import OcrReader
             import mss
@@ -637,8 +639,18 @@ class MacroController:
             rect = self._rect()
             if rect is None:
                 return False
-            # Wave HUD is in the top-center area of the viewport
-            # Approximate region: x=420..580, y=15..55 in 1152x756 space
+
+            ocr = OcrReader()
+            ok, msg = ocr.available()
+            if not ok:
+                # Surfaced, not swallowed: without OCR this block can never complete, so
+                # skip it rather than hang the match.
+                self._log(f"    [block] wait wave: OCR unavailable ({msg}) — skipping")
+                return True
+
+            # ponytail: the box is hard-coded here and only roughly measured. It needs a
+            # `content/` table with a `*_key`/accessor/`*_specs` so Settings > OCR can
+            # correct it, like the challenge panel regions.
             vx, vy, vw, vh = rect
             wave_x = vx + int(420 * vw / 1152)
             wave_y = vy + int(15 * vh / 756)
@@ -647,20 +659,20 @@ class MacroController:
 
             with mss.mss() as sct:
                 mon = {"left": wave_x, "top": wave_y, "width": wave_w, "height": wave_h}
-                img = np.array(sct.grab(mon))[:, :, :3]
+                img = np.array(sct.grab(mon))[:, :, :3].copy()
 
-            ocr = OcrReader()
-            text = ocr.read_text(img)
-            # Parse "Wave X/Y" or just a number
+            read = ocr.read_line(img)
+            # OCR reads are approximate, so never require an exact string — take the
+            # first run of digits and compare numerically.
             import re
-            numbers = re.findall(r"\d+", text)
+            numbers = re.findall(r"\d+", read.text or "")
             if numbers:
                 current = int(numbers[0])
                 if current >= target:
                     self._log(f"    [block] wave {current} reached target {target}")
                     return True
-        except Exception:
-            pass  # OCR failed, retry next tick
+        except (OSError, ValueError, AttributeError) as exc:
+            self._log(f"    [block] wait wave: read failed: {exc}")
 
         return False
 
@@ -673,15 +685,16 @@ class MacroController:
         elapsed_min = (time.time() - started) / 60.0
 
         if elapsed_min < minutes:
-            return True  # not time yet, but this block is "done" for this tick — passive check
+            # False = "not done, look again next tick". Returning True here marked the
+            # block finished on its first tick, so in the Battle phase — which runs once
+            # through — the deadline was checked once, immediately, and never again.
+            return False
 
-        # Time to leave
         self._log(f"    [block] leave at minute {minutes:.1f} — elapsed {elapsed_min:.1f}min, leaving")
+        # ponytail: only raises the flag; `_run_match` ends the match loop on it. Nothing
+        # clicks a Leave button yet, so the run relies on the lobby navigator recovering.
+        # Needs the real in-match leave sequence measured before it can do more.
         self._battle_leave_requested = True
-        # Try to click the leave button
-        from sloppykeys.macro.input_scripts import nudge_click_script
-        # Look for the "to lobby" or "return" button — simple approach: press Esc or use a known position
-        # ponytail: for now just set the flag; the lobby navigator handles the actual leave
         return True
 
     def _send_webhook_result(self, result: str) -> None:
