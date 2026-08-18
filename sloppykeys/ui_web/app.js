@@ -894,6 +894,7 @@
     refreshChallengeInfo();
     loadChallengeMaps();
     window.renderHotkeyPills();
+    refreshWalkDefaults();
   };
 
   // ---- Macro Manager ----
@@ -988,8 +989,8 @@
     const t = b.type;
     if (t === "walk_path") {
       let f = `<svg class="pinned-walk-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4m-10-10h4m12 0h4"/></svg>
-        <button class="btn btn--sm${b.mode === "auto" ? " btn--primary" : ""}" onclick="setWalkPathMode('${phase}',${i},'auto')">Auto</button>
-        <button class="btn btn--sm${b.mode === "custom" ? " btn--primary" : ""}" onclick="setWalkPathMode('${phase}',${i},'custom')">Custom</button>
+        <button class="btn btn--sm tip-left${b.mode === "auto" ? " btn--primary" : ""}" data-tip="${walkDefaultsTip()}" onclick="setWalkPathMode('${phase}',${i},'auto')">Auto</button>
+        <button class="btn btn--sm tip-left${b.mode === "custom" ? " btn--primary" : ""}" data-tip="Walks one named recording, whatever the task is" onclick="setWalkPathMode('${phase}',${i},'custom')">Custom</button>
         <label class="check"><input type="checkbox" ${b.sprint ? "checked" : ""} data-field="sprint"><span class="check-box"></span>Sprint</label>`;
       if (b.mode === "custom") {
         f += `<select class="setting-select" data-field="pathName" style="width:90px;height:22px;font-size:10px;" id="sel-walkpath-${key}"><option value="">Pick path...</option></select>
@@ -2281,6 +2282,8 @@
       document.getElementById("walk-name-modal").style.display = "flex";
       const input = document.getElementById("walk-name-input");
       input.value = "";
+      await refreshWalkDefaults();
+      renderMissingWalkNames();
       setTimeout(() => input.focus(), 50);
     } else {
       // Start recording: switch to dashboard
@@ -2300,6 +2303,24 @@
     }
   }
 
+  // An Auto target whose recording does not exist is the one thing worth saying while the
+  // user is naming a recording: taking that name is what fills the gap.
+  function renderMissingWalkNames() {
+    const host = document.getElementById("walk-name-missing");
+    if (!host) return;
+    const missing = missingWalkDefaults();
+    if (!missing.length) { host.style.display = "none"; host.innerHTML = ""; return; }
+    host.style.display = "";
+    host.innerHTML = `<span class="walk-missing-head">Auto is missing a recording for:</span>`
+      + missing.map((d) => `<button class="btn btn--sm walk-missing-pick" data-walk-name="${d.path}"
+          data-tip="${d.target}">${d.path}</button>`).join("");
+    host.querySelectorAll("[data-walk-name]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.getElementById("walk-name-input").value = btn.dataset.walkName;
+      });
+    });
+  }
+
   // Walk path name modal handlers
   document.getElementById("walk-name-save").addEventListener("click", async () => {
     const input = document.getElementById("walk-name-input");
@@ -2314,7 +2335,10 @@
         opDirty = true;
       }
       _cachedWalkPaths = null;
-      window.addLog("Walk path saved: " + r.name);
+      await refreshWalkDefaults();
+      const filled = walkDefaults.find((d) => d.path === r.name && !d.missing);
+      window.addLog("Walk path saved: " + r.name
+        + (filled ? ` — Auto will use it for ${filled.target}` : ""));
     }
     walkRecBlock = null;
     renderPhases();
@@ -2335,6 +2359,28 @@
   // ---- Recording helpers ----
   let _cachedRecordings = null;
   let _cachedWalkPaths = null;
+  // The Auto table: [{target, path, missing}]. Hover on Auto is the only place it shows, so
+  // it is kept fresh after anything that adds or removes a recording.
+  let walkDefaults = [];
+
+  async function refreshWalkDefaults() {
+    if (!window.pywebview || !pywebview.api || !pywebview.api.get_walk_defaults) return;
+    walkDefaults = (await pywebview.api.get_walk_defaults()) || [];
+  }
+
+  function walkDefaultsTip() {
+    if (!walkDefaults.length) return "Walks the path recorded for the task's map and act";
+    const lines = walkDefaults.map(
+      (d) => `${d.target} → ${d.path}${d.missing ? "   NOT RECORDED" : ""}`
+    );
+    const missing = walkDefaults.filter((d) => d.missing).length;
+    if (missing) lines.push(`Record under that exact name and Auto picks it up.`);
+    return ["Walks the path recorded for the task's target:", ...lines].join("\n");
+  }
+
+  function missingWalkDefaults() {
+    return walkDefaults.filter((d) => d.missing);
+  }
 
   window.setWalkPathMode = function(phase, idx, mode) {
     opPhases[phase][idx].mode = mode;
@@ -2562,10 +2608,16 @@
       block.pathName = "";
       opDirty = true;
       _cachedWalkPaths = null;
-      window.addLog("[Walk] Deleted: " + name);
+      await refreshWalkDefaults();
+      // Still resolving means only an override went: the shipped recording is back.
+      window.addLog(r.shipped
+        ? `[Walk] Deleted your recording of ${name} — the shipped one is back.`
+        : "[Walk] Deleted: " + name);
+      const gap = walkDefaults.find((d) => d.path === name && d.missing);
+      if (gap) window.addLog(`[Walk] Auto now has nothing for ${gap.target}.`);
       renderPhases();
     } else {
-      window.addLog("[Walk] Delete failed: not found");
+      window.addLog("[Walk] Delete failed: no recording of your own under that name");
     }
   }
 

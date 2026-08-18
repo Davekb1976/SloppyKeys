@@ -569,6 +569,9 @@
     </div>
     <div class="modal-body" style="padding:16px; display:flex; flex-direction:column; gap:12px;">
       <input type="text" class="setting-input" id="walk-name-input" placeholder="Path name..." style="width:100%;">
+      <!-- Filled by renderMissingWalkNames(): the Auto targets with no recording yet. Naming
+           the recording after one of them is what makes Auto use it. -->
+      <div class="walk-missing" id="walk-name-missing" style="display:none;"></div>
       <div style="display:flex; gap:8px; justify-content:flex-end;">
         <button class="btn btn--sm" id="walk-name-discard">Discard</button>
         <button class="btn btn--sm btn--primary" id="walk-name-save">Save</button>
