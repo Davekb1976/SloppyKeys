@@ -203,6 +203,10 @@ input:focus, select:focus {
 .game-docked .game-slot { border-color: transparent; }
 .game-docked .game-slot-overlay { display: none; }
 
+/* The still frame left in the slot while a modal covers the game. Exact size, no scaling:
+   the slot is the client area, so the shot lands pixel-for-pixel. */
+.game-slot.game-frozen { background-size: 100% 100%; background-repeat: no-repeat; background-position: center; }
+
 .game-slot-size {
   font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
   padding: 3px 10px; background: color-mix(in srgb, var(--accent) 12%, transparent);

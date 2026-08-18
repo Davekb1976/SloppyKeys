@@ -19,10 +19,35 @@
   // is docked. The empty-slot placeholder (dashed border, "1152 × 756") means "no game
   // here", and the only time it is on screen is when the game has just been covered for a
   // modal — where it read as the game having disappeared.
+  //
+  // A modal cannot have the live game behind it: the game is its own topmost window and
+  // paints over all DOM content, which is what covering it is for. So a modal opened on the
+  // Dashboard leaves a still frame of the game in the slot instead of a black rectangle —
+  // grabbed *before* the cover goes on, and dropped when the game comes back.
   async function setGameVisible(visible) {
     if (!window.pywebview || !pywebview.api || !pywebview.api.set_game_visible) return;
+    if (!visible) await freezeGameFrame();
     const r = await pywebview.api.set_game_visible(visible);
+    if (visible) clearGameFrame();
     document.body.classList.toggle("game-docked", !!(r && r.docked));
+  }
+
+  async function freezeGameFrame() {
+    const slot = document.getElementById("game-slot");
+    // Only worth a grab while the slot is actually on screen: switching away from the
+    // Dashboard also covers the game, and nobody is looking at the slot then.
+    if (!slot || !document.getElementById("screen-dashboard").classList.contains("active")) return;
+    const snap = await pywebview.api.get_roblox_snapshot();
+    if (!snap || !snap.ok) return;
+    slot.style.backgroundImage = `url(${snap.data_uri})`;
+    slot.classList.add("game-frozen");
+  }
+
+  function clearGameFrame() {
+    const slot = document.getElementById("game-slot");
+    if (!slot) return;
+    slot.style.backgroundImage = "";
+    slot.classList.remove("game-frozen");
   }
 
   navButtons.forEach((btn) => {
