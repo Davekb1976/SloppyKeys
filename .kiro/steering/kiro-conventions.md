@@ -146,5 +146,26 @@ it.
   file — it sends work at something that no longer exists. `configs/` and `images/` both
   outlived their references here.
 
-Rough ceiling: a steering file over ~250 lines is probably carrying a skill inside it. A
-skill over ~200 lines probably needs a companion reference file.
+## Length
+
+**Hard stop: 500 lines for a steering file, 500 for a `SKILL.md`.** Past that, split it —
+the file has stopped being one topic.
+
+That number is **headroom, not a budget.** It exists so a genuinely dense file (the ban
+surface, the calibration constants, the measured dead ends) never has to be cut for the sake
+of a line count. It is not a target, and a file growing toward it is not a file getting
+better. Most of these should sit well under half of it: the useful ones here are 36–271
+lines, and `version-control.md` does its whole job in 36.
+
+The length test is never the length. It is the paragraph above: *would a competent stranger
+do the wrong thing without this line?* A 500-line file of necessary rules is fine; 120 lines
+of restating the obvious is not. If a file feels long, the question is which lines fail that
+test — not how to redistribute them to get under a number.
+
+Two signals that beat the count outright:
+
+- **Two audiences.** If half the file only matters while doing one kind of work, that half
+  is a skill (`ui-design.md` was 223 lines that no Win32 turn ever needed).
+- **A section you skim.** If you would skip it while reading for the answer, it is reference
+  material: move it to `references/` and point at it. `SKILL.md` is read in full on every
+  activation, so keep it actionable and push the tables out.
