@@ -251,6 +251,14 @@ class Api:
             return RouteStore(self._app_root).maps()
         return maps_for(gamemode)
 
+    def get_difficulty_options(self, gamemode: str) -> list[str]:
+        """What the task builder's Difficulty control offers for a gamemode: 1-3 where the
+        game has a cycling button, Normal/Hard everywhere else. Derived from the table, so
+        adding a cycling gamemode there is the whole change."""
+        from sloppykeys.content.start_stage import difficulty_options
+
+        return difficulty_options(gamemode)
+
     def get_targets(self, gamemode: str, map_name: str) -> list[str]:
         """Acts/targets for a gamemode+map combo."""
         from sloppykeys.content.gamemodes import is_custom, targets_for

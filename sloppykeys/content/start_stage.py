@@ -115,3 +115,27 @@ def difficulty_clicks(target: int) -> int:
     span = DIFFICULTY_MAX - DIFFICULTY_MIN + 1
     wanted = max(DIFFICULTY_MIN, min(DIFFICULTY_MAX, int(target)))
     return (wanted - DIFFICULTY_ON_OPEN) % span
+
+
+def difficulty_options(gamemode: str) -> list[str]:
+    """What a task's Difficulty field offers for this gamemode.
+
+    A gamemode with a cycling button counts 1..3; the rest get the Normal/Hard toggle. One
+    field, two meanings, because the game itself has two different controls there.
+    """
+    if difficulty_coord(gamemode) is None:
+        return ["Normal", "Hard"]
+    return [str(n) for n in range(DIFFICULTY_MIN, DIFFICULTY_MAX + 1)]
+
+
+def difficulty_from_task(raw: object) -> int:
+    """The cycling difficulty a task asks for, clamped.
+
+    The stored field is a string because the same control shows Normal/Hard for the modes
+    without a cycle, so anything non-numeric — including a task authored before this moved
+    out of Settings — means the default.
+    """
+    try:
+        return max(DIFFICULTY_MIN, min(DIFFICULTY_MAX, int(str(raw).strip())))
+    except (TypeError, ValueError):
+        return DIFFICULTY_ON_OPEN

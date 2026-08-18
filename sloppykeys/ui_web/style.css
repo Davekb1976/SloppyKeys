@@ -421,6 +421,22 @@ input:focus, select:focus {
 .palette-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 8px; }
 .palette-hint { font-size: 9px; color: var(--text-faint); margin-top: 12px; line-height: 1.4; }
 
+/* ---- Under construction (a whole screen that isn't built yet) ---- */
+.under-construction {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--space-2); text-align: center; padding: var(--space-8);
+}
+.uc-icon { color: var(--amber); opacity: 0.75; margin-bottom: var(--space-2); }
+.uc-title { font-size: 14px; font-weight: 700; color: var(--text); }
+.uc-note { font-size: 11px; color: var(--text-muted); }
+.uc-note code { font-family: inherit; color: var(--accent); }
+/* Square dots — nothing in this UI is round, so a round loader would be the only one. */
+.uc-dots { display: flex; gap: 5px; margin-top: var(--space-2); }
+.uc-dots i { width: 6px; height: 6px; background: var(--amber); opacity: 0.2; animation: uc-blink 1.2s steps(1, end) infinite; }
+.uc-dots i:nth-child(2) { animation-delay: 0.4s; }
+.uc-dots i:nth-child(3) { animation-delay: 0.8s; }
+@keyframes uc-blink { 0%, 32% { opacity: 1; } 33%, 100% { opacity: 0.2; } }
+
 .placeholder-body {
   padding: var(--space-8) var(--space-4); font-size: 12px; color: var(--text-faint); text-align: center;
   border: 1px dashed var(--border); border-radius: 0;

@@ -30,7 +30,6 @@ DEFAULTS: dict[str, Any] = {
     "hard_mode": False,
     "camera_once_per_session": False,
     "auto_update": True,
-    "expedition_difficulty": 1,
     "run_challenges": False,
     # New settings
     "start_minimized": False,

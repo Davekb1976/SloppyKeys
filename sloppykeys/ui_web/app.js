@@ -310,7 +310,7 @@
     } else {
       loadMaps(task.mode, task.map);
       loadStages(task.mode, task.map, task.stage);
-      tbDifficulty.value = task.difficulty || "Normal";
+      loadDifficulty(task.mode, task.difficulty);
       tbRepeat.value = task.repeat || 1;
       tbMacro.value = task.macro || "";
     }
@@ -346,6 +346,20 @@
     const stages = await pywebview.api.get_targets(mode, map);
     if (!stages.length) { tbStage.innerHTML = '<option value="">—</option>'; return; }
     tbStage.innerHTML = '<option value="">—</option>' + stages.map((s) => `<option value="${s}"${s === selected ? " selected" : ""}>${s}</option>`).join("");
+  }
+
+  // Difficulty means two different game controls: a 1-3 cycling button on Expedition, a
+  // Normal/Hard toggle elsewhere. The backend says which, so the option list follows the
+  // table rather than a hard-coded mode name here.
+  async function loadDifficulty(mode, selected) {
+    if (!window.pywebview || !pywebview.api || !mode) return;
+    const options = await pywebview.api.get_difficulty_options(mode);
+    if (!options || !options.length) return;
+    const pick = options.includes(String(selected)) ? String(selected) : options[0];
+    tbDifficulty.innerHTML = options.map(
+      (o) => `<option value="${o}"${o === pick ? " selected" : ""}>${o}</option>`
+    ).join("");
+    return pick;
   }
 
   function saveCurrentTask() {
@@ -385,6 +399,10 @@
     } else {
       loadMaps(tbMode.value, "");
       tbStage.innerHTML = '<option value="">—</option>';
+      // The new mode may not offer the difficulty the old one had, so save after the
+      // rebuild rather than storing a value the control no longer lists.
+      loadDifficulty(tbMode.value, tbDifficulty.value).then(() => saveCurrentTask());
+      return;
     }
     saveCurrentTask();
   });

@@ -29,8 +29,10 @@ CAMERA_ONCE_KEY = "camera_once_per_session"
 # downloads anything by itself — see `core/updates.py`. Deliberately left out of
 # `build_exe.py`'s SHIPPED_SETTINGS_KEYS so a build always ships it on.
 AUTO_UPDATE_KEY = "auto_update"
-EXPEDITION_DIFFICULTY_KEY = "expedition_difficulty"
-EXPEDITION_DIFFICULTY_DEFAULT = 1
+# Expedition difficulty is **not** here. It was one global 1-3 for every Expedition task,
+# which contradicted the queue: two tasks on the same map can want different difficulties.
+# It lives on the task now (`content/start_stage.difficulty_from_task`), and a leftover
+# `expedition_difficulty` key in settings.json is simply ignored.
 # There is deliberately no **global** match-tolerance setting. One existed and was removed:
 # a single tunable threshold was observed swinging between 0.57 (false matches) and 0.95
 # (rejecting nearly everything, since a good match scores 0.95-1.00), and each value broke
@@ -55,7 +57,6 @@ class AppSettings:
             HARD_MODE_KEY: False,
             CAMERA_ONCE_KEY: False,
             AUTO_UPDATE_KEY: True,
-            EXPEDITION_DIFFICULTY_KEY: EXPEDITION_DIFFICULTY_DEFAULT,
         }
 
     def read(self) -> dict[str, object]:
@@ -115,18 +116,6 @@ class AppSettings:
 
     def set_auto_update(self, enabled: bool) -> None:
         self._set(AUTO_UPDATE_KEY, bool(enabled))
-
-    def get_expedition_difficulty(self) -> int:
-        """Expedition difficulty 1-3. A toggle for how hard the same map gets, so
-        it lives here rather than being a separate farm target."""
-        try:
-            value = int(self.read().get(EXPEDITION_DIFFICULTY_KEY, EXPEDITION_DIFFICULTY_DEFAULT))
-        except (TypeError, ValueError):
-            return EXPEDITION_DIFFICULTY_DEFAULT
-        return value if 1 <= value <= 3 else EXPEDITION_DIFFICULTY_DEFAULT
-
-    def set_expedition_difficulty(self, value: int) -> None:
-        self._set(EXPEDITION_DIFFICULTY_KEY, max(1, min(3, int(value))))
 
     def get_hard_mode(self) -> bool:
         return bool(self.read().get(HARD_MODE_KEY, False))

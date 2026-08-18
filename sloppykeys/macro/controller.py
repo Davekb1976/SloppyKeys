@@ -26,7 +26,7 @@ from sloppykeys.config.stats import StatsTracker
 from sloppykeys.config.unified import UnifiedSettings
 from sloppykeys.content.acts import act_coord
 from sloppykeys.content.gamemodes import is_custom, selection_complete
-from sloppykeys.content.start_stage import difficulty_coord
+from sloppykeys.content.start_stage import difficulty_coord, difficulty_from_task
 from sloppykeys.core.ahk import AhkBridge
 from sloppykeys.core.image_search import ImageSearchEngine
 from sloppykeys.core.win32 import roblox_window as rbx
@@ -317,7 +317,9 @@ class MacroController:
             steps.append((f"Select {stage}", lambda s=stage: self._nav.select_act(mode, s)))
 
         if difficulty_coord(mode) is not None:
-            diff = self._settings.get_expedition_difficulty()
+            # Per task, not a global setting: two Expedition tasks in one queue can want
+            # different difficulties, and the queue is where the rest of the run is chosen.
+            diff = difficulty_from_task((self._current_task or {}).get("difficulty"))
             steps.append((f"Difficulty {diff}", lambda: self._nav.set_difficulty(mode, diff)))
 
         hard = self._settings.get_hard_mode()
