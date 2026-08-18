@@ -116,7 +116,11 @@ input:focus, select:focus {
 .nav-btn:hover svg { transform: scale(1.08); }
 .nav-btn:active { transform: scale(0.92); }
 .nav-btn.active { background: var(--accent-soft); color: var(--accent); }
-.nav-btn.active::after {
+/* ::before, not ::after: every nav button carries a `data-tip`, and the tooltip is an
+   ::after. Both rules landed on the one pseudo-element, so the active button's tooltip
+   came out as a 12x2 accent-coloured blob with no text and lost its indicator. An element
+   has one of each pseudo — a decorative marker never takes the tooltip's. */
+.nav-btn.active::before {
   content: ''; position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%);
   width: 12px; height: 2px; background: var(--accent);
 }
@@ -157,7 +161,10 @@ input:focus, select:focus {
 /* `data-tip` instead of the native `title`: WebView2 shows the OS tooltip late, in its own
    font, and never at all on some frameless-window paths. This one is ours, so it can carry
    several lines (`\n` in the attribute) and an accent bar down its leading edge.
-   Not for anything the user must read — hover is not discoverable. */
+   Not for anything the user must read — hover is not discoverable.
+   **The tooltip owns ::after on anything with a `data-tip`.** A decorative marker on the
+   same element goes in ::before — there is only one of each, and the two rules merge into
+   a textless blob (see `.nav-btn.active::before`). */
 [data-tip] { position: relative; }
 [data-tip]::after {
   content: attr(data-tip);
