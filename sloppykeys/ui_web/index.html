@@ -7,6 +7,68 @@
 </head>
 <body>
 
+  <!-- Boot loader. Static chrome, so no render function: a turning hollow cube, the
+       wordmark, and a bar that fills over the same period. It never swallows clicks
+       (`pointer-events: none` in the stylesheet), so the titlebar stays usable even if the
+       script below never runs — and the stylesheet fades it out on its own after 4s as the
+       second backstop. -->
+  <div id="loader" class="loader" role="status" aria-label="Loading SloppyKeys">
+    <div class="loader-inner">
+      <div class="loader-stage">
+        <div class="cube" aria-hidden="true">
+          <span class="cube-face front"></span>
+          <span class="cube-face back"></span>
+          <span class="cube-face right"></span>
+          <span class="cube-face left"></span>
+          <span class="cube-face top cap"></span>
+          <span class="cube-face bottom cap"></span>
+        </div>
+      </div>
+      <div class="loader-word">SloppyKeys</div>
+    </div>
+    <div class="loader-bar" aria-hidden="true"><div class="loader-bar-fill"></div></div>
+  </div>
+  <script>
+    // Inline and before app.js on purpose: a throw anywhere in app.js aborts every statement
+    // after it, and the one thing that must not depend on that is the overlay covering the
+    // whole window. Nothing here touches the bridge.
+    (function () {
+      var loader = document.getElementById("loader");
+      if (!loader) return;
+      var fill = loader.querySelector(".loader-bar-fill");
+      var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      var MIN = reduce ? 200 : 2200;   // on screen long enough for the cube to read
+      var MAX = 3000;                  // hard cap, so the whole thing is over in 3s
+      var start = Date.now();
+      var done = false;
+
+      if (fill) {
+        if (reduce) fill.style.width = "100%";
+        else requestAnimationFrame(function () {
+          fill.style.transition = "width " + MIN + "ms cubic-bezier(0.25, 0.6, 0.3, 1)";
+          fill.style.width = "100%";
+        });
+      }
+
+      function remove() {
+        if (loader && loader.parentNode) loader.parentNode.removeChild(loader);
+      }
+      function finish() {
+        if (done) return;
+        done = true;
+        setTimeout(function () {
+          loader.classList.add("is-done");
+          loader.addEventListener("transitionend", remove, { once: true });
+          setTimeout(remove, 800);  // fallback if transitionend never fires
+        }, Math.max(0, MIN - (Date.now() - start)));
+      }
+
+      if (document.readyState === "complete") finish();
+      else window.addEventListener("load", finish, { once: true });
+      setTimeout(finish, MAX);
+    })();
+  </script>
+
   <!-- Titlebar -->
   <header id="titlebar" class="titlebar">
     <div class="titlebar-left no-drag">

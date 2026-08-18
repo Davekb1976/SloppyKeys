@@ -930,3 +930,117 @@ button.vp-chip { cursor: pointer; }
     transition-duration: 0.001ms !important;
   }
 }
+
+/* ---- Boot loader ----
+   A turning wireframe cube over a glow pool, with the wordmark under it. Shown while the
+   page comes up and removed by the inline script in index.html.
+
+   Two deliberate differences from a web loader:
+   - **`pointer-events: none`.** It is a visual, not a modal. The window is frameless, so its
+     own titlebar close button is the only way out — a fullscreen overlay that swallowed
+     clicks would trap the user behind it if the script ever failed to run.
+   - **No web font.** The design it came from used a pixel font fetched from the network, and
+     this app makes no outbound requests, so it uses the mono stack already in `--font-mono`.
+   The CSS-only safety fade is the second belt: if the script never runs, the overlay still
+   goes away on its own. */
+.loader {
+  position: fixed; inset: 0; z-index: 10000;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 44px;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 42%, rgba(139, 92, 246, 0.18), transparent 72%),
+    radial-gradient(circle at 50% 122%, rgba(124, 77, 222, 0.12), transparent 60%),
+    var(--surface-sunken);
+  opacity: 1; visibility: visible;
+  transition: opacity 0.55s ease, transform 0.55s ease, visibility 0s linear 0.55s;
+  animation: loaderSafety 0s linear 4s forwards;
+}
+@keyframes loaderSafety {
+  to { opacity: 0; visibility: hidden; }
+}
+.loader.is-done { opacity: 0; visibility: hidden; transform: scale(1.06); }
+
+.loader-inner {
+  display: flex; flex-direction: column; align-items: center; gap: 36px;
+  animation: loaderInnerIn 0.7s ease-out both;
+}
+@keyframes loaderInnerIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* The cube is hollow on purpose — six panes of tinted glass, nothing inside. */
+.loader-stage { position: relative; width: 140px; height: 140px; perspective: 900px; }
+.cube {
+  position: absolute; inset: 0; margin: auto;
+  width: 120px; height: 120px;
+  transform-style: preserve-3d;
+  animation: cubeSpin 9s linear infinite;
+}
+@keyframes cubeSpin {
+  from { transform: rotateX(-24deg) rotateY(0deg); }
+  to   { transform: rotateX(-24deg) rotateY(360deg); }
+}
+.cube-face {
+  position: absolute; inset: 0;
+  border: 1px solid rgba(139, 92, 246, 0.45);
+  box-shadow: inset 0 0 30px rgba(139, 92, 246, 0.14);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(124, 77, 222, 0.04));
+  backface-visibility: visible;
+}
+.cube-face.cap { background: linear-gradient(135deg, rgba(139, 92, 246, 0.18), rgba(124, 77, 222, 0.06)); }
+.cube-face.front  { transform: rotateY(0deg)   translateZ(60px); }
+.cube-face.back   { transform: rotateY(180deg) translateZ(60px); }
+.cube-face.right  { transform: rotateY(90deg)  translateZ(60px); }
+.cube-face.left   { transform: rotateY(-90deg) translateZ(60px); }
+.cube-face.top    { transform: rotateX(90deg)  translateZ(60px); }
+.cube-face.bottom { transform: rotateX(-90deg) translateZ(60px); }
+
+/* Glow pool beneath the cube. */
+.loader-stage::after {
+  content: ""; position: absolute; left: 50%; bottom: -24px;
+  width: 150px; height: 28px; transform: translateX(-50%);
+  background: radial-gradient(ellipse, rgba(139, 92, 246, 0.5), transparent 70%);
+  filter: blur(8px);
+  animation: glowPulse 9s ease-in-out infinite;
+}
+@keyframes glowPulse {
+  0%, 100% { opacity: 0.45; transform: translateX(-50%) scaleX(1); }
+  50%      { opacity: 0.85; transform: translateX(-50%) scaleX(1.3); }
+}
+
+/* The wordmark carries the whole brand here, so it is the anchor rather than a caption. The
+   gradient is a palindrome, which is what makes the shine loop seamlessly. */
+.loader-word {
+  font-family: var(--font-mono);
+  font-size: 30px; font-weight: 600;
+  letter-spacing: 0.34em; text-transform: uppercase;
+  padding-left: 0.34em; /* offset the trailing tracking so it reads centred */
+  background: linear-gradient(90deg, #2dd4ef, #4f86f7, #8b5cf6, #d94ff0, #8b5cf6, #4f86f7, #2dd4ef);
+  background-size: 200% auto;
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+  animation: wordShine 5s linear infinite;
+}
+@keyframes wordShine {
+  from { background-position: 0% center; }
+  to   { background-position: 200% center; }
+}
+
+.loader-bar {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  height: 5px; background: rgba(139, 92, 246, 0.14); overflow: hidden;
+}
+.loader-bar-fill {
+  height: 100%; width: 0;
+  background: linear-gradient(90deg, var(--accent), #c4b5fd);
+  box-shadow: 0 0 12px rgba(139, 92, 246, 0.7);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loader-inner, .cube, .loader-stage::after, .loader-word { animation: none !important; }
+  .cube { transform: rotateX(-24deg) rotateY(-32deg); }
+  .loader-word { -webkit-text-fill-color: var(--text); color: var(--text); }
+  .loader { transition: opacity 0.3s ease; }
+}
