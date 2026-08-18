@@ -89,9 +89,9 @@ GAME_REVEAL_SETTLE = 0.4
 # The game is covered for this long after startup, because the boot loader is a fullscreen
 # DOM overlay and the game paints over all DOM content — docked on the slot it would punch a
 # rectangle of Roblox through the middle of the loading screen. Kept in step with the loader
-# in `index.html`, whose hard cap is the same 3s; longer here would leave the Dashboard
+# in `index.html`, whose hard cap is the same 5s; longer here would leave the Dashboard
 # briefly gameless, shorter would show the game through the tail of the fade.
-BOOT_COVER_SECONDS = 3.0
+BOOT_COVER_SECONDS = 5.0
 
 
 class Api:
@@ -2198,6 +2198,10 @@ def main() -> None:
         frameless=True,
         easy_drag=False,
         on_top=True,
+        # WebView2 paints its host white until the first frame of the page, which read as a
+        # white flash on launch and on every reload. Matching `--surface-sunken` makes that
+        # gap indistinguishable from the loading screen that follows it.
+        background_color="#0f0e13",
         js_api=api,
     )
     api._window = window

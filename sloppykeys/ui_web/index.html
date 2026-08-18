@@ -10,7 +10,7 @@
   <!-- Boot loader. Static chrome, so no render function: a turning hollow cube, the
        wordmark, and a bar that fills over the same period. It never swallows clicks
        (`pointer-events: none` in the stylesheet), so the titlebar stays usable even if the
-       script below never runs — and the stylesheet fades it out on its own after 4s as the
+       script below never runs — and the stylesheet fades it out on its own after 6s as the
        second backstop. -->
   <div id="loader" class="loader" role="status" aria-label="Loading SloppyKeys">
     <div class="loader-inner">
@@ -37,8 +37,8 @@
       if (!loader) return;
       var fill = loader.querySelector(".loader-bar-fill");
       var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      var MIN = reduce ? 200 : 2200;   // on screen long enough for the cube to read
-      var MAX = 3000;                  // hard cap, so the whole thing is over in 3s
+      var MIN = reduce ? 200 : 4500;   // on screen long enough for the cube to turn
+      var MAX = 5000;                  // hard cap, so the whole thing is over in 5s
       var start = Date.now();
       var done = false;
 

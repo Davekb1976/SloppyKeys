@@ -931,6 +931,18 @@ button.vp-chip { cursor: pointer; }
   }
 }
 
+/* Pixel font for the boot wordmark, loaded from beside this stylesheet.
+   **Local file only.** The design this came from pulled Monocraft from a CDN, and this app
+   makes no outbound requests, so a remote `url()` is not an option. A missing file fails
+   quietly and the stack below falls through to whatever pixel family is installed, then to
+   the mono stack — so the loader always renders, just less sharply.
+   Monocraft is SIL Open Font License; keep its licence file beside the .ttf if it ships. */
+@font-face {
+  font-family: 'PixelBrand';
+  src: url("fonts/Monocraft.ttf") format('truetype');
+  font-weight: normal; font-style: normal; font-display: block;
+}
+
 /* ---- Boot loader ----
    A turning wireframe cube over a glow pool, with the wordmark under it. Shown while the
    page comes up and removed by the inline script in index.html.
@@ -954,7 +966,7 @@ button.vp-chip { cursor: pointer; }
     var(--surface-sunken);
   opacity: 1; visibility: visible;
   transition: opacity 0.55s ease, transform 0.55s ease, visibility 0s linear 0.55s;
-  animation: loaderSafety 0s linear 4s forwards;
+  animation: loaderSafety 0s linear 6s forwards;
 }
 @keyframes loaderSafety {
   to { opacity: 0; visibility: hidden; }
@@ -1013,10 +1025,14 @@ button.vp-chip { cursor: pointer; }
 /* The wordmark carries the whole brand here, so it is the anchor rather than a caption. The
    gradient is a palindrome, which is what makes the shine loop seamlessly. */
 .loader-word {
-  font-family: var(--font-mono);
-  font-size: 30px; font-weight: 600;
-  letter-spacing: 0.34em; text-transform: uppercase;
-  padding-left: 0.34em; /* offset the trailing tracking so it reads centred */
+  /* PixelBrand is the bundled file; the two named families cover a machine that already has
+     one installed; the mono stack is the floor. */
+  font-family: 'PixelBrand', 'Monocraft', 'Press Start 2P', var(--font-mono);
+  font-size: 46px; font-weight: 600;
+  letter-spacing: 0.3em; text-transform: uppercase;
+  padding-left: 0.3em; /* offset the trailing tracking so it reads centred */
+  /* Pixel fonts are drawn at exact sizes; smoothing them muddies the edges. */
+  -webkit-font-smoothing: none;
   background: linear-gradient(90deg, #2dd4ef, #4f86f7, #8b5cf6, #d94ff0, #8b5cf6, #4f86f7, #2dd4ef);
   background-size: 200% auto;
   -webkit-background-clip: text; background-clip: text;
@@ -1030,7 +1046,7 @@ button.vp-chip { cursor: pointer; }
 
 .loader-bar {
   position: absolute; left: 0; right: 0; bottom: 0;
-  height: 5px; background: rgba(139, 92, 246, 0.14); overflow: hidden;
+  height: 14px; background: rgba(139, 92, 246, 0.14); overflow: hidden;
 }
 .loader-bar-fill {
   height: 100%; width: 0;
