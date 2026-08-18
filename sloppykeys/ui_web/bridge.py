@@ -664,6 +664,11 @@ class Api:
         img, vw, vh = cap
 
         def _run():
+            import base64
+            import json as _json
+
+            import cv2
+
             from sloppykeys.core.ocr import OcrReader
             ocr = OcrReader()
             ok_avail, msg = ocr.available()
@@ -684,12 +689,23 @@ class Api:
                 h = min(max(1, int(box[3] * vh / 756)), ih - y)
                 crop = img[y:y + h, x:x + w].copy()
                 result = ocr.read_line(crop)
-                text = result.text or "(empty)"
-                score = round(result.score, 3)
-                safe_text = text.replace("\\", "\\\\").replace('"', '\\"')
+                # The crop itself goes back with the read: a wrong box reads as junk text
+                # either way, and only the picture says whether it was aimed at the digits
+                # or at the border beside them. In-memory data URI like every other
+                # thumbnail here — nothing lands on disk to go stale.
+                payload = {
+                    "key": key,
+                    "text": result.text or "(empty)",
+                    "score": round(result.score, 3),
+                }
+                ok_png, buf = cv2.imencode(".png", crop)
+                if ok_png:
+                    b64 = base64.b64encode(buf.tobytes()).decode("ascii")
+                    payload["data_uri"] = f"data:image/png;base64,{b64}"
                 if self._window:
                     self._window.evaluate_js(
-                        f'window.addLog && window.addLog("[OCR] {key}: \\"{safe_text}\\" (score: {score})");'
+                        "window.onOcrRegionResult && "
+                        f"window.onOcrRegionResult({_json.dumps(payload)});"
                     )
             self._log_to_ui("[OCR] Scan complete.")
 

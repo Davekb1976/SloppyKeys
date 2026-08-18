@@ -681,6 +681,25 @@
   });
 
   // ---- Vision regions ----
+
+  // One region's crop + read, pushed from Python during a section scan. The picture is
+  // what tells the user the box is aimed right; the text alone can't.
+  window.onOcrRegionResult = function (r) {
+    if (!r || !r.key) return;
+    const thumb = document.querySelector(`[data-vr-thumb="${r.key}"]`);
+    if (thumb && r.data_uri) {
+      thumb.src = r.data_uri;
+      thumb.hidden = false;
+      thumb.title = `${r.text} (score: ${r.score})`;
+    }
+    const read = document.querySelector(`[data-vr-read="${r.key}"]`);
+    if (read) {
+      read.textContent = `${r.text} (${r.score})`;
+      read.title = read.textContent;
+    }
+    window.addLog(`[OCR] ${r.key}: "${r.text}" (score: ${r.score})`);
+  };
+
   async function loadVisionRegions() {
     if (!window.pywebview || !pywebview.api) return;
     const specs = await pywebview.api.get_vision_region_specs();
@@ -701,7 +720,7 @@
         <div class="vr-group-head">
           <span class="vr-group-title">${g.label}</span>
           <span class="vr-group-note">${g.where}</span>
-          <button class="btn btn--sm" data-vr-test-group="${g.key}" title="OCR every box in this section">Test Section</button>
+          <button class="btn btn--sm" data-vr-test-group="${g.key}" title="Crop every box in this section and show what it cut out, with the text read from it">Preview + Test</button>
         </div>
         ${g.rows.map(s => {
           const val = overrides[s.key] || s.default;
@@ -713,6 +732,8 @@
             <input type="number" value="${val[2]}" data-vr-key="${s.key}" data-vr-idx="2" title="w">
             <input type="number" value="${val[3]}" data-vr-key="${s.key}" data-vr-idx="3" title="h">
             <button class="btn btn--sm" data-vr-set="${s.key}" title="Draw this box on a screenshot">Set</button>
+            <img class="vr-thumb" data-vr-thumb="${s.key}" alt="" hidden>
+            <span class="vr-read" data-vr-read="${s.key}"></span>
           </div>`;
         }).join("")}
       </div>`).join("");

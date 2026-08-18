@@ -303,6 +303,14 @@ input:focus, select:focus {
 .vision-region-row { display: flex; align-items: center; gap: 6px; font-size: 11px; }
 .vision-region-row .vr-label { min-width: 130px; color: var(--text-muted); font-weight: 600; }
 .vision-region-row input { width: 50px; height: 22px; font-size: 10px; padding: 0 4px; background: var(--surface-sunken); color: var(--text); border: 1px solid var(--border); }
+/* What the box actually cut out of the game, at native pixels — scaling a 20px-tall crop
+   to fit smears the glyphs the read depends on. */
+.vr-thumb {
+  max-height: 26px; max-width: 200px; object-fit: contain; object-position: left center;
+  background: var(--surface-panel); border: 1px solid var(--border); flex-shrink: 0;
+  image-rendering: pixelated;
+}
+.vr-read { font-size: 10px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .status-action { font-size: 18px; font-weight: 700; color: var(--text); }
 .status-row {
   display: flex; align-items: center; justify-content: space-between;
