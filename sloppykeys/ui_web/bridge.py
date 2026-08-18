@@ -487,10 +487,36 @@ class Api:
 
     # ---- Game Keybinds (in-game keys the macro presses) ----
 
+    # Every table of OCR boxes, in the order the editor shows them. `where` says which
+    # screen the boxes live on, which is the one thing a tester has to get right before a
+    # read means anything. Add a table here and the OCR tab grows a section for it.
+    _REGION_GROUPS = (
+        ("challenge", "Challenge Panel", "the Challenge panel must be open"),
+        ("match", "In Match", "a stage must be running"),
+    )
+
+    @staticmethod
+    def _region_tables():
+        from sloppykeys.content import challenge as _challenge
+        from sloppykeys.content import match_regions as _match
+
+        return {"challenge": _challenge, "match": _match}
+
     def get_vision_region_specs(self) -> list:
-        """All editable vision regions with key, label, default box."""
-        from sloppykeys.content.challenge import region_specs
-        return [{"key": k, "label": l, "default": list(d)} for k, l, d in region_specs()]
+        """Every editable OCR box, tagged with the group whose screen it belongs to."""
+        tables = self._region_tables()
+        out = []
+        for group, label, where in self._REGION_GROUPS:
+            for key, spec_label, default in tables[group].region_specs():
+                out.append({
+                    "key": key,
+                    "label": spec_label,
+                    "default": list(default),
+                    "group": group,
+                    "groupLabel": label,
+                    "groupWhere": where,
+                })
+        return out
 
     def get_vision_regions(self) -> dict:
         """Current region overrides from settings."""
@@ -499,17 +525,43 @@ class Api:
         settings = UnifiedSettings(self._app_root)
         return settings.get("vision_regions", {})
 
+    def _apply_region_overrides(self, regions: dict) -> None:
+        """Push the stored boxes into every table. Each ignores keys that aren't its own,
+        so one dict serves them all."""
+        for table in self._region_tables().values():
+            table.apply_region_overrides(regions)
+
+    def apply_stored_overrides(self) -> dict:
+        """Load the user's measured boxes and per-template thresholds into the modules that
+        read them.
+
+        Called once at startup. Without it the tables held their defaults until the user
+        happened to edit something, so a run used the shipped boxes and the shipped 0.70
+        while the Settings screen showed the corrected values — the edits looked saved and
+        silently did nothing.
+        """
+        if not self._app_root:
+            return {"ok": False}
+        settings = UnifiedSettings(self._app_root)
+        regions = settings.get("vision_regions", {})
+        if isinstance(regions, dict):
+            self._apply_region_overrides(regions)
+        thresholds = settings.get("image_thresholds", {})
+        if isinstance(thresholds, dict) and thresholds:
+            from sloppykeys.core.image_search import apply_confidence_overrides
+
+            apply_confidence_overrides(thresholds)
+        return {"ok": True, "regions": len(regions or {}), "thresholds": len(thresholds or {})}
+
     def set_vision_region(self, key: str, box: list) -> dict:
-        """Set one vision region override."""
+        """Set one OCR box override."""
         if not self._app_root:
             return {"ok": False}
         settings = UnifiedSettings(self._app_root)
         regions = settings.get("vision_regions", {})
         regions[key] = tuple(box[:4])
         settings.set("vision_regions", regions)
-        # Apply live
-        from sloppykeys.content.challenge import apply_region_overrides
-        apply_region_overrides(regions)
+        self._apply_region_overrides(regions)
         return {"ok": True}
 
     def reset_vision_regions(self) -> dict:
@@ -518,8 +570,7 @@ class Api:
             return {"ok": False}
         settings = UnifiedSettings(self._app_root)
         settings.set("vision_regions", {})
-        from sloppykeys.content.challenge import apply_region_overrides
-        apply_region_overrides({})
+        self._apply_region_overrides({})
         return {"ok": True}
 
     def test_ocr_region(self, key: str, box: list) -> dict:
@@ -594,12 +645,17 @@ class Api:
         except Exception:
             return None
 
-    def test_ocr_all(self) -> dict:
-        """Capture the game once (synchronously, while visible), then OCR every
-        region from that snapshot off-thread. Returns after the capture, so the
-        caller can restore the Settings screen without racing the read."""
+    def test_ocr_all(self, group: str = "") -> dict:
+        """Capture the game once (synchronously, while visible), then OCR the regions from
+        that snapshot off-thread. Returns after the capture, so the caller can restore the
+        Settings screen without racing the read.
+
+        `group` limits it to one table — only one group's screen is ever up, so testing
+        all of them at once guarantees half the rows read nonsense.
+        """
         if not self._app_root:
             return {"ok": False}
+        group_filter = group or None
 
         cap = self._capture_client_image()
         if cap is None:
@@ -609,7 +665,6 @@ class Api:
 
         def _run():
             from sloppykeys.core.ocr import OcrReader
-            from sloppykeys.content.challenge import region_specs
             ocr = OcrReader()
             ok_avail, msg = ocr.available()
             if not ok_avail:
@@ -617,7 +672,11 @@ class Api:
                 return
             regions = UnifiedSettings(self._app_root).get("vision_regions", {})
             ih, iw = img.shape[:2]
-            for key, label, default in region_specs():
+            # Every group, so a Match box is testable too. Only one group's screen can be
+            # up at a time, so the other's rows are expected to read as junk.
+            specs = [(s["key"], s["default"]) for s in self.get_vision_region_specs()
+                     if group_filter in (None, s["group"])]
+            for key, default in specs:
                 box = list(regions.get(key, default))
                 x = min(max(0, int(box[0] * vw / 1152)), iw - 1)
                 y = min(max(0, int(box[1] * vh / 756)), ih - 1)
@@ -1732,6 +1791,14 @@ def main() -> None:
             api._app_root,
             log=api._log_to_ui,
         )
+        # Before anything can read a box or a threshold: the tables hold defaults until
+        # the stored values are pushed in.
+        applied = api.apply_stored_overrides()
+        if applied.get("regions") or applied.get("thresholds"):
+            api._log_to_ui(
+                f"Loaded {applied['regions']} OCR region override(s) and "
+                f"{applied['thresholds']} image threshold(s)."
+            )
 
         window.evaluate_js(
             'document.getElementById("version-badge").textContent = '

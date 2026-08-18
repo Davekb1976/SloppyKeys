@@ -665,17 +665,46 @@
     const overrides = await pywebview.api.get_vision_regions();
     const list = document.getElementById("vision-regions-list");
     if (!list || !specs) return;
-    list.innerHTML = specs.map(s => {
-      const val = overrides[s.key] || s.default;
-      return `<div class="vision-region-row">
-        <span class="vr-label">${s.label}</span>
-        <input type="number" value="${val[0]}" data-vr-key="${s.key}" data-vr-idx="0" title="x">
-        <input type="number" value="${val[1]}" data-vr-key="${s.key}" data-vr-idx="1" title="y">
-        <input type="number" value="${val[2]}" data-vr-key="${s.key}" data-vr-idx="2" title="w">
-        <input type="number" value="${val[3]}" data-vr-key="${s.key}" data-vr-idx="3" title="h">
-        <button class="btn btn--sm" data-vr-set="${s.key}" title="Set from Roblox screenshot">Set</button>
-      </div>`;
-    }).join("");
+    // One section per group, because each group's boxes only exist on its own screen —
+    // a Match box read on the challenge panel is meaningless, so they get separate
+    // Test buttons rather than one that scans everything at once.
+    const groups = [];
+    specs.forEach(s => {
+      let g = groups.find(x => x.key === s.group);
+      if (!g) { g = { key: s.group, label: s.groupLabel, where: s.groupWhere, rows: [] }; groups.push(g); }
+      g.rows.push(s);
+    });
+    list.innerHTML = groups.map(g => `
+      <div class="vr-group">
+        <div class="vr-group-head">
+          <span class="vr-group-title">${g.label}</span>
+          <span class="vr-group-note">${g.where}</span>
+          <button class="btn btn--sm" data-vr-test-group="${g.key}" title="OCR every box in this section">Test Section</button>
+        </div>
+        ${g.rows.map(s => {
+          const val = overrides[s.key] || s.default;
+          const edited = !!overrides[s.key];
+          return `<div class="vision-region-row">
+            <span class="vr-label">${s.label}${edited ? '' : ' <span class="vr-default">default</span>'}</span>
+            <input type="number" value="${val[0]}" data-vr-key="${s.key}" data-vr-idx="0" title="x">
+            <input type="number" value="${val[1]}" data-vr-key="${s.key}" data-vr-idx="1" title="y">
+            <input type="number" value="${val[2]}" data-vr-key="${s.key}" data-vr-idx="2" title="w">
+            <input type="number" value="${val[3]}" data-vr-key="${s.key}" data-vr-idx="3" title="h">
+            <button class="btn btn--sm" data-vr-set="${s.key}" title="Draw this box on a screenshot">Set</button>
+          </div>`;
+        }).join("")}
+      </div>`).join("");
+    list.querySelectorAll("[data-vr-test-group]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        if (!window.pywebview || !pywebview.api) return;
+        btn.disabled = true;
+        const label = btn.textContent;
+        btn.textContent = "...";
+        await pywebview.api.test_ocr_all(btn.dataset.vrTestGroup);
+        btn.disabled = false;
+        btn.textContent = label;
+      });
+    });
     list.querySelectorAll("input[data-vr-key]").forEach(inp => {
       inp.addEventListener("change", () => {
         if (!window.pywebview || !pywebview.api) return;
@@ -713,12 +742,8 @@
     window.addLog("Vision regions reset to defaults.");
   });
 
-  document.getElementById("btn-vision-test-all").addEventListener("click", async () => {
-    if (!window.pywebview || !pywebview.api) return;
-    // Stays on this screen: test_ocr_all reveals the game, grabs one frame, and
-    // re-hides it before the OCR pass runs off-thread.
-    await pywebview.api.test_ocr_all();
-  });
+  // Testing is per section now — each group's boxes only exist on its own screen, so a
+  // single "test everything" button could only ever have half its rows read real text.
 
   // Populate gamemodes in the task builder mode dropdown
   window.addEventListener("pywebviewready", () => {

@@ -280,9 +280,28 @@ input:focus, select:focus {
 .slot-toggle:hover { border-color: var(--accent); }
 
 /* Vision regions editor */
-.vision-regions { display: flex; flex-direction: column; gap: 4px; width: 100%; }
+.vision-regions { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+/* One section per screen the boxes are read on. */
+.vr-group {
+  display: flex; flex-direction: column; gap: 4px;
+  border: 1px solid var(--border); padding: 8px;
+  background: var(--surface-sunken);
+}
+.vr-group-head { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+.vr-group-title {
+  font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+  padding: 2px 8px; color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+}
+/* The precondition for a read to mean anything, so it sits with the section. */
+.vr-group-note { font-size: 10px; color: var(--amber); flex: 1; min-width: 0; }
+.vr-default {
+  font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--text-faint); border: 1px solid var(--border); padding: 1px 4px; margin-left: 4px;
+}
 .vision-region-row { display: flex; align-items: center; gap: 6px; font-size: 11px; }
-.vision-region-row .vr-label { min-width: 110px; color: var(--text-muted); font-weight: 600; }
+.vision-region-row .vr-label { min-width: 130px; color: var(--text-muted); font-weight: 600; }
 .vision-region-row input { width: 50px; height: 22px; font-size: 10px; padding: 0 4px; background: var(--surface-sunken); color: var(--text); border: 1px solid var(--border); }
 .status-action { font-size: 18px; font-weight: 700; color: var(--text); }
 .status-row {

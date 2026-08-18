@@ -694,14 +694,16 @@ class MacroController:
                 self._log(f"    [block] wait wave: OCR unavailable ({msg}) — skipping")
                 return True
 
-            # ponytail: the box is hard-coded here and only roughly measured. It needs a
-            # `content/` table with a `*_key`/accessor/`*_specs` so Settings > OCR can
-            # correct it, like the challenge panel regions.
+            # Through the accessor, so the user's Settings > OCR measurement is what gets
+            # read. The default is an approximation and has never been confirmed in a stage.
+            from sloppykeys.content.match_regions import wave_region
+
+            bx, by, bw, bh = wave_region()
             vx, vy, vw, vh = rect
-            wave_x = vx + int(420 * vw / 1152)
-            wave_y = vy + int(15 * vh / 756)
-            wave_w = int(160 * vw / 1152)
-            wave_h = int(40 * vh / 756)
+            wave_x = vx + int(bx * vw / 1152)
+            wave_y = vy + int(by * vh / 756)
+            wave_w = max(1, int(bw * vw / 1152))
+            wave_h = max(1, int(bh * vh / 756))
 
             with mss.mss() as sct:
                 mon = {"left": wave_x, "top": wave_y, "width": wave_w, "height": wave_h}

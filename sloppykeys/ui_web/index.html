@@ -495,13 +495,11 @@
           <div class="setting-group">
             <div class="setting-row" style="flex-direction:column; align-items:flex-start; gap:6px;">
               <div class="setting-info">
-                <span class="setting-name">Challenge Panel Regions</span>
-                <span class="setting-desc">Crop boxes for OCR reading of the challenge panel (x, y, w, h in 1152×756 space)</span>
+                <span class="setting-name">Text Regions</span>
+                <span class="setting-desc">Crop boxes the macro reads text from, in 1152×756 client space. Each section reads a different screen — put that screen up in Roblox before you Set or Test it.</span>
               </div>
-              <div style="font-size:10px; color:var(--amber); padding:4px 8px; border:1px solid color-mix(in srgb, var(--amber) 30%, var(--border)); margin-bottom:4px;">⚠ Navigate to the Challenge panel in Roblox before using Set or Test All</div>
               <div id="vision-regions-list" class="vision-regions"></div>
               <button class="btn btn--sm" id="btn-vision-reset">Reset to Defaults</button>
-              <button class="btn btn--sm" id="btn-vision-test-all">Test All</button>
             </div>
           </div>
         </div>
