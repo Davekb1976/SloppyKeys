@@ -233,6 +233,11 @@ def map_reference_paths() -> list[str]:
         # Events' maps are the user's own events, known only to routes.json.
         if gamemode.custom:
             continue
+        # A side task plays another mode's maps — Challenge rotates through Story's five, on
+        # the same playfields — so it reads Story's backdrops. Its own folder would be six
+        # duplicate captures of the same ground.
+        if gamemode.side_task:
+            continue
         for map_name in gamemode.maps:
             if gamemode.per_act_reference:
                 paths.extend(map_reference_image(name, map_name, act) for act in gamemode.targets)

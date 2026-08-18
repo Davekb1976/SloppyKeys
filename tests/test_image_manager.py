@@ -47,7 +47,9 @@ def main() -> None:
     # maps at all. Raid is the per-act layout, Expedition the per-map one.
     listed = {e["path"] for e in maps["names"]}
     for name, gamemode in GAMEMODES.items():
-        if gamemode.custom:
+        # Events' maps live in routes.json; Challenge plays Story's maps and reads Story's
+        # backdrops, so neither gets cards of its own.
+        if gamemode.custom or gamemode.side_task:
             continue
         for map_name in gamemode.maps:
             acts = gamemode.targets if gamemode.per_act_reference else [""]
@@ -56,6 +58,7 @@ def main() -> None:
                 assert want in listed, f"no card for {want}"
     assert "assets/reference/Expedition/East Town.png" in listed
     assert "assets/reference/Raid/Spirit City/Act 2.png" in listed
+    assert not [p for p in listed if p.startswith("assets/reference/Challenge/")]
     # Grouping the page renders sections from: category-relative subfolder.
     groups = {e["group"] for e in maps["names"]}
     assert {"Story", "Expedition", "Raid/Spirit City"} <= groups, groups

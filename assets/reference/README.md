@@ -16,8 +16,12 @@ Which layout a gamemode uses is `per_act_reference` in `content/gamemodes.py`, a
 Image Manager's **Maps** section offers a card per expected file, captured or not.
 Hit `+` on one to save the current Roblox screen into it; there is no crop step,
 because a reference is the full client area or the coordinates read off it land
-somewhere else in the stage. Events is the exception: its maps are the user's own
-events in `routes.json`, so only files already on disk show up.
+somewhere else in the stage.
+
+Two gamemodes have no folder here. Events' maps are the user's own events in
+`routes.json`, so only files already on disk show up. Challenge rotates through
+Story's maps on the same playfields, so it reads Story's backdrops — a
+`Challenge/` folder would be duplicate captures of the same ground.
 
 **Don't mix the two layouts for one map.** The per-act file wins, so a per-act file
 under a per-map gamemode is used by the picker and shown nowhere, which reads as the
