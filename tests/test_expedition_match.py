@@ -48,6 +48,21 @@ def test_priority() -> None:
     assert match.decide(set(), 103.0) == (NOTHING, "")
 
 
+def test_blocks_run_before_a_node_is_advanced() -> None:
+    match = ExpeditionMatch(extract_after=1)
+    # A node's Continue advances the run, so with placements still to make it waits — and
+    # the offer must not be counted while waiting, or it is spent before anything decided.
+    assert match.decide({CONTINUE}, 100.0, blocks_pending=True) == (NOTHING, "")
+    assert match.decide({EXTRACT}, 101.0, blocks_pending=True) == (NOTHING, "")
+    assert match.sightings == 0
+    # The card and Start Game are never deferred: one covers the board, the other has to be
+    # pressed before there is a wave to place into.
+    assert match.decide({CARD}, 102.0, blocks_pending=True)[0] == DISMISS_CARD
+    assert match.decide({START_GAME}, 103.0, blocks_pending=True)[0] == START_WAVE
+    # Blocks done, so now the node is taken.
+    assert match.decide({CONTINUE}, 104.0, blocks_pending=False)[0] == CONTINUE_WAVE
+
+
 def test_offer_counting() -> None:
     match = ExpeditionMatch(extract_after=3)
     # One offer, still on screen across four looks a second apart: one sighting.
@@ -210,6 +225,7 @@ def test_clear_screen_is_not_handled() -> None:
 
 def main() -> None:
     test_priority()
+    test_blocks_run_before_a_node_is_advanced()
     test_offer_counting()
     test_playing_on()
     test_waves_counted()

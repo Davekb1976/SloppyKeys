@@ -514,7 +514,12 @@ class MacroController:
 
             # Before the blocks and before parking: Expedition's own screens are what a
             # placement click would otherwise land on.
-            handled = self._exp is not None and self._expedition_tick() == "handled"
+            # The Battle phase runs before a node's Continue is pressed, because that Continue
+            # advances the run and units placed after it are placed into the next wave.
+            handled = (
+                self._exp is not None
+                and self._expedition_tick(battle_idx < len(battle)) == "handled"
+            )
 
             # `handled` means a panel is up and was clicked, so this tick does nothing else:
             # a block's coordinate and the keep-alive click both land on that panel instead of
@@ -635,7 +640,7 @@ class MacroController:
         self._log(f"  Expedition: extracting at offer {after}.")
         return ExpeditionMatch(after)
 
-    def _expedition_tick(self) -> str | None:
+    def _expedition_tick(self, blocks_pending: bool = False) -> str | None:
         """Handle whatever Expedition screen is up. "handled" when one is, None when clear.
 
         "handled" is what stops the run loop running a block in the same tick: a checkpoint is
@@ -666,7 +671,7 @@ class MacroController:
             elif self._nav.sighted(exp_continue_image()):
                 seen.add(CONTINUE)
 
-        action, note = self._exp.decide(seen, now)
+        action, note = self._exp.decide(seen, now, blocks_pending)
         self._exp_busy = action != NOTHING
         if action == NOTHING:
             return None

@@ -105,8 +105,15 @@ class ExpeditionMatch:
         """Has extraction been tried and refused often enough to stop asking?"""
         return self.failed_extracts >= EXTRACT_ATTEMPTS_BEFORE_PLAYING_ON
 
-    def decide(self, seen: set[str], now: float) -> tuple[str, str]:
-        """(action, note) for this tick. `seen` is which screens are up right now."""
+    def decide(self, seen: set[str], now: float, blocks_pending: bool = False) -> tuple[str, str]:
+        """(action, note) for this tick. `seen` is which screens are up right now.
+
+        `blocks_pending` is True while the Battle phase still has blocks to run. A node's
+        Continue advances the run, so clicking it then would move on with units unplaced —
+        the placements come first and the node waits. The upgrade card and Start Game are
+        **not** deferred: the card covers the board so a placement click lands on it instead,
+        and a wave that has not been started has nothing to place into.
+        """
         # The card first, always. It covers everything else, so acting on a Continue found
         # behind it clicks the card instead and the log reads as a click that did nothing.
         if CARD in seen:
@@ -116,6 +123,11 @@ class ExpeditionMatch:
         # at the same time, and the wave does not start until it is clicked.
         if START_GAME in seen:
             return (START_WAVE, "Start Game is up — beginning the wave")
+
+        if blocks_pending and (EXTRACT in seen or CONTINUE in seen):
+            # Deliberately not counted as a sighting: the offer is still there next look, and
+            # counting it now would spend an offer the run has not decided about yet.
+            return (NOTHING, "")
 
         # Extract before Continue: the checkpoint that offers Extract also offers a Continue
         # beside it, and checking Continue first would decline the offer without ever
