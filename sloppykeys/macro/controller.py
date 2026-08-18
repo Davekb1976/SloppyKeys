@@ -308,6 +308,17 @@ class MacroController:
             self.run_camera()
             return True
 
+        # Not in a match, but the previous task may have left us standing on its result
+        # screen — and every chain below opens with a click that does not exist there. Match
+        # Play leaves the stage and lands on the gamemode panel, which the chains do
+        # recognise. One look, so being in the lobby costs ~17ms and no click.
+        if self._nav.result_screen_up():
+            ok, msg = self._nav.leave_match()
+            self._log(f"  Leave match: {msg}")
+            if not ok:
+                return False
+            time.sleep(self._nav.click_settle)
+
         # Events use route navigation
         if is_custom(mode):
             return self._navigate_route(map_name, stage)

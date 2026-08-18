@@ -666,6 +666,19 @@ class LobbyNavigator:
         # No sleep here: the caller's next step is `wait_for_match_ready`, a 60s poll.
         return (True, f"clicked {'+'.join(trail)} ({message})")
 
+    def result_screen_up(self) -> bool:
+        """One look for the in-stage Play button: are we standing on a finished match?
+
+        The lobby's own Play does not exist on a result screen, so a task switch has to leave
+        the stage first (`leave_match`). Same single-look contract as `in_match`, and for the
+        same reason: this answers "where are we", not "get there". False when the template is
+        missing, so an uncaptured `match_play.png` costs the handover, not the run.
+        """
+        path = match_play_image()
+        if not self._engine.template_exists(path):
+            return False
+        return self._find(path) is not None
+
     def in_match(self) -> bool:
         """One look for the in-match Start Game button: are we already inside a
         stage, with the wave not yet started?
