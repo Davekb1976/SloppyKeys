@@ -3,9 +3,8 @@
 name: ci
 
 # Nothing here can fail because of a prose change, so documentation, steering and the landing
-# page are excluded: a full Windows runner installing PySide6, OpenCV and onnxruntime to
-# compile code that didn't change is minutes spent on nothing. `website/` has its own
-# workflow (pages.yml).
+# page are excluded: a full Windows runner installing OpenCV and onnxruntime to compile code
+# that didn't change is minutes spent on nothing. `website/` has its own workflow (pages.yml).
 on:
   push:
     branches: [main]

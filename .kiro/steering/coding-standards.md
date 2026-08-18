@@ -173,7 +173,7 @@ a **global** match-tolerance setting (drifted to 0.57 and matched wrong screens;
 per-template now — `DEFAULT_CONFIDENCE` 0.70, bounds `CONFIDENCE_USER_MIN`/`CONFIDENCE_MAX`,
 no auto-calibrate).
 
-## Python / PySide6
+## Python
 
 - **AHK owns synthetic input.** Python never moves the mouse or presses a key via Win32; it
   renders a script with `macro/input_scripts.py` and runs it through `AhkBridge`.
@@ -211,8 +211,9 @@ no auto-calibrate).
 ## UI
 
 The front end is `ui_web/` — pywebview + HTML/CSS/JS over WebView2, with `bridge.py` as the
-`js_api` surface. The old PySide6 `ui/` package is gone, so anything about QSS,
-`QThreadPool`, `sizeHint` or `RailIcon` no longer applies.
+`js_api` surface. The old PySide6 `ui/` package is gone and **PySide6 is no longer a
+dependency**, so anything about QSS, `QThreadPool`, `sizeHint` or `RailIcon` no longer
+applies, and neither does a Qt entry in `requirements.txt` or `build_exe.py`.
 
 **How to build one is the `ui-feature` skill** — the four-layer split, the component
 checklist, the design vocabulary. Load it before touching `ui_web/`; it is not repeated here.

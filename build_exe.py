@@ -2,9 +2,9 @@
 
     .venv\\Scripts\\python.exe build_exe.py [--dest PATH] [--console] [--keep-settings]
 
-**Onedir, not onefile.** A onefile build unpacks ~400MB of PySide6 + onnxruntime to a temp
-directory on every launch (seconds of delay, and antivirus dislikes it). Onedir starts fast
-and the exe sits beside its own data.
+**Onedir, not onefile.** A onefile build unpacks the whole payload — OpenCV and onnxruntime
+carry most of it now that Qt is gone — to a temp directory on every launch (seconds of delay,
+and antivirus dislikes it). Onedir starts fast and the exe sits beside its own data.
 
 **Nothing is bundled that the user edits.** `assets/`, `routes.json` and
 `settings.json` are *copied next to the exe*, not packed inside it, because the app writes
@@ -55,27 +55,16 @@ COLLECT_ALL = ("rapidocr", "onnxruntime")
 # Imported lazily or by string, so the scan can miss them.
 HIDDEN = ("rapidocr", "onnxruntime", "cv2", "mss")
 
-# Nothing in the app imports these — grep before adding one. The Qt entries matter most:
-# PySide6 ships every module it was built with, and QML/Quick alone is ~11MB of DLLs for a
-# UI built entirely from QWidgets.
+# Nothing in the app imports these — grep before adding one.
+#
+# The thirteen `PySide6.*` entries that used to head this list are gone with the dependency
+# itself: the UI is pywebview over WebView2 and no module imports Qt, so PyInstaller collects
+# none of it and there is nothing left to exclude.
 #
 # **Not excluded, though it looks tempting:** `PIL` and `shapely` (12.8MB + 3.8MB) are
 # imported by rapidocr itself — `from PIL import Image` and `from shapely.geometry import
 # Polygon` — so dropping them breaks OCR, which is required. `numpy.libs` is OpenBLAS.
 EXCLUDE_MODULES = (
-    "PySide6.QtQml",
-    "PySide6.QtQuick",
-    "PySide6.QtQuickWidgets",
-    "PySide6.QtPdf",
-    "PySide6.QtPdfWidgets",
-    "PySide6.QtWebEngineCore",
-    "PySide6.QtWebEngineWidgets",
-    "PySide6.Qt3DCore",
-    "PySide6.QtCharts",
-    "PySide6.QtDataVisualization",
-    "PySide6.QtMultimedia",
-    "PySide6.QtSql",
-    "PySide6.QtTest",
     "tkinter",
     "unittest",
     "pydoc_data",
@@ -85,30 +74,14 @@ EXCLUDE_MODULES = (
 # `cv2.VideoCapture` or any other videoio entry point (grep for it before trusting that),
 # and the ffmpeg DLL is 29MB of video decoding for an app that reads pixels from mss.
 #
-# **Deliberately kept:** `PySide6/opengl32sw.dll` (19.7MB). It is Qt's software OpenGL
-# fallback, used only on a machine whose GPU driver can't provide GL — exactly the machine
-# a distributed build has to survive. Dropping it saves size and buys "blank window on some
-# user's PC", which no size number is worth.
-# The Qt DLLs are orphans, not guesses: `EXCLUDE_MODULES` removes the bindings that could
-# load them (only QtCore/QtGui/QtWidgets/QtNetwork `.pyd` survive), but PyInstaller's PySide6
-# hook copies the DLLs anyway. Qt6Quick depends on Qt6Qml and nothing depends on Qt6Quick;
-# Qt6Pdf stands alone. Verified by launching the pruned build.
-#
-# The last three entries are **not** optional extras: `qpdf.dll` (an imageformats plugin)
-# links Qt6Pdf, and `qtvirtualkeyboardplugin.dll` links Qt6VirtualKeyboard, which links
-# Qt6Qml and Qt6Quick. Leaving them behind after pruning their libraries would leave Qt
-# trying to load plugins whose dependencies are gone. Found by scanning every remaining
-# binary for the pruned filenames — a single successful launch does *not* prove this, since
-# Qt loads plugins lazily. Neither plugin is wanted anyway: nothing here opens a PDF as an
-# image or wants an on-screen keyboard.
+# The six Qt globs that were here are gone with PySide6. They were the orphaned DLLs
+# PyInstaller's Qt hook copied in regardless of `EXCLUDE_MODULES` — Qt6Quick/Qml/Pdf/
+# VirtualKeyboard plus the two plugins that linked them — and `PySide6/opengl32sw.dll`
+# (19.7MB) was deliberately kept as Qt's software GL fallback. None of it is collected now,
+# so all of that reasoning is history rather than configuration. WebView2 is an OS component
+# and brings no runtime of its own.
 PRUNE_GLOBS = (
     "opencv_videoio_ffmpeg*.dll",
-    "Qt6Quick*.dll",
-    "Qt6Qml*.dll",
-    "Qt6Pdf*.dll",
-    "Qt6VirtualKeyboard*.dll",
-    "qpdf.dll",
-    "qtvirtualkeyboardplugin.dll",
 )
 
 
@@ -275,7 +248,7 @@ def main() -> None:
     parser.add_argument(
         "--console",
         action="store_true",
-        help="keep a console window — tracebacks from Qt timers are visible in it",
+        help="keep a console window — tracebacks from the worker threads are visible in it",
     )
     parser.add_argument(
         "--keep-settings",

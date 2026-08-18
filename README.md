@@ -159,7 +159,7 @@ Framework-free assert scripts, run one at a time:
 
 Onedir, not onefile: a onefile build unpacks ~400MB to a temp folder on every launch. Lands
 in `..\..\SLOPPYKEYS` unless you pass `--dest`. `--console` keeps a console so tracebacks
-from Qt timers are visible. Close the app first — a running exe can't be overwritten.
+from the worker threads are visible. Close the app first — a running exe can't be overwritten.
 
 The installer needs [Inno Setup 6](https://jrsoftware.org/isdl.php), and takes the version
 on the command line rather than defaulting to a stale one:

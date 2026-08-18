@@ -1,9 +1,17 @@
 # Everything is pinned to the versions the macro has actually been run against in game.
 # A release is built on a GitHub runner from a fresh install of this file, so an unpinned
-# line means the published exe contains a PySide6 or numpy nobody has tested — and the
+# line means the published exe contains a numpy or onnxruntime nobody has tested — and the
 # failure would land on someone else's machine, mid-run, looking like a macro bug.
 # Bump one at a time, deliberately.
-PySide6==6.11.1
+#
+# **No PySide6.** The UI is pywebview over WebView2, which is an OS component — the whole Qt
+# stack was ~400MB of the build and nothing has imported it since `sloppykeys/ui/` was
+# deleted. WebView2 ships with Windows 11 and with any recent Edge, so there is no runtime to
+# bundle in its place.
+#
+# pywebview itself was **missing from this file** while PySide6 sat in it: a fresh install
+# could not start the app at all, and the version here is the one in the working `.venv`.
+pywebview==6.2.1
 mss==10.2.0
 numpy==2.5.1
 
@@ -14,8 +22,8 @@ numpy==2.5.1
 #
 # **It is not smaller.** Measured on 5.0.0: `cv2.pyd` is 81.9MB headless against 82.3MB
 # with the GUI, and the 29MB videoio ffmpeg DLL ships either way (`build_exe.py` prunes it).
-# The reason to keep headless is that it carries no Qt plugins of its own to collide with
-# PySide6's — a real class of bug in Qt apps that also import OpenCV.
+# It stays headless anyway: the GUI build drags in Qt plugins of its own, which is the whole
+# category of weight and collision this project no longer has.
 opencv-python-headless==5.0.0.93
 
 # OCR for the challenge panel's daily limit and map name — neither string is
