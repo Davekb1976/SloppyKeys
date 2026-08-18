@@ -28,6 +28,10 @@ log.prev.txt
 /assets/debug/
 assets/**/debug/
 
+# Saved crops of the user's own OCR boxes, shown as previews in Settings > OCR. Rewritten
+# on every Preview/Test and specific to their calibration, so there is nothing to ship.
+/assets/regions/
+
 # Multi-root editor workspace: it points at sibling folders that only exist on one
 # machine (`../Anime-Expeditions-Creams-Macro-main`, `../../SLOPPYKEYS`), so committing it
 # hands the next clone a broken workspace.

@@ -571,7 +571,119 @@ class Api:
         settings = UnifiedSettings(self._app_root)
         settings.set("vision_regions", {})
         self._apply_region_overrides({})
+        # The saved previews are crops of the boxes just discarded, so they'd show the user
+        # a picture of coordinates that no longer exist.
+        folder = self._region_preview_dir()
+        for spec in self.get_vision_region_specs():
+            try:
+                os.remove(os.path.join(folder, f"{spec['key']}.png"))
+            except OSError:
+                pass
         return {"ok": True}
+
+    # ---- Region previews ----
+    #
+    # The crop each box cuts out, kept as a PNG under assets/regions/. On disk because the
+    # screens these boxes live on (the Challenge panel, a running stage) are almost never
+    # up when Settings is opened, so the alternative to a saved crop is grabbing the game
+    # at launch for a picture of the wrong screen. Written whenever a capture already
+    # happened for this tab; read back on render, with no capture at all.
+
+    def _region_preview_dir(self) -> str:
+        return os.path.join(self._app_root or "", "assets", "regions")
+
+    def _known_region_key(self, key) -> str:
+        """The key as a filename, or "" — whitelisted against the tables, since it comes
+        from the page and becomes a path."""
+        if not isinstance(key, str):
+            return ""
+        return key if any(s["key"] == key for s in self.get_vision_region_specs()) else ""
+
+    @staticmethod
+    def _crop_region(img, box):
+        """Slice a 1152×756-space box out of a captured client image, clamped to it."""
+        ih, iw = img.shape[:2]
+        x = min(max(0, int(box[0] * iw / VIEWPORT_W)), iw - 1)
+        y = min(max(0, int(box[1] * ih / VIEWPORT_H)), ih - 1)
+        w = min(max(1, int(box[2] * iw / VIEWPORT_W)), iw - x)
+        h = min(max(1, int(box[3] * ih / VIEWPORT_H)), ih - y)
+        return img[y:y + h, x:x + w].copy()
+
+    def _write_region_preview(self, key: str, crop) -> str:
+        """Save one crop and return it as a data URI. Empty string if it can't be written."""
+        import base64
+
+        import cv2
+
+        safe = self._known_region_key(key)
+        if not safe:
+            return ""
+        ok, buf = cv2.imencode(".png", crop)
+        if not ok:
+            return ""
+        png = buf.tobytes()
+        try:
+            os.makedirs(self._region_preview_dir(), exist_ok=True)
+            with open(os.path.join(self._region_preview_dir(), f"{safe}.png"), "wb") as f:
+                f.write(png)
+        except OSError as exc:
+            self._log_to_ui(f"Failed to save region preview: {exc}")
+        return "data:image/png;base64," + base64.b64encode(png).decode("ascii")
+
+    def get_region_previews(self) -> dict:
+        """Every saved crop as a data URI, keyed by region. No capture."""
+        import base64
+
+        out = {}
+        folder = self._region_preview_dir()
+        if not os.path.isdir(folder):
+            return out
+        for spec in self.get_vision_region_specs():
+            path = os.path.join(folder, f"{spec['key']}.png")
+            try:
+                with open(path, "rb") as f:
+                    b64 = base64.b64encode(f.read()).decode("ascii")
+            except OSError:
+                continue
+            out[spec["key"]] = f"data:image/png;base64,{b64}"
+        return out
+
+    def save_region_preview(self, key: str, box: list) -> dict:
+        """Crop the last snapshot — the one the Set modal drew on — and save it as this
+        box's preview. No capture, so it does nothing before the first grab."""
+        if not self._known_region_key(key):
+            return {"ok": False, "reason": "unknown region"}
+        img = getattr(self, "_cached_snapshot", None)
+        if img is None:
+            return {"ok": False, "reason": "no snapshot yet"}
+        try:
+            box = [int(v) for v in list(box)[:4]]
+        except (TypeError, ValueError):
+            return {"ok": False, "reason": "bad box"}
+        if len(box) < 4:
+            return {"ok": False, "reason": "bad box"}
+        uri = self._write_region_preview(key, self._crop_region(img, box))
+        return {"ok": bool(uri), "data_uri": uri}
+
+    def preview_ocr_regions(self, group: str = "") -> dict:
+        """Grab the game once and save a preview for every box in one section. Its screen
+        has to be up — which is what the section's note says."""
+        if not self._app_root:
+            return {"ok": False, "reason": "no app root"}
+        cap = self._capture_client_image()
+        if cap is None:
+            return {"ok": False, "reason": "Roblox not running or not visible"}
+        img, _vw, _vh = cap
+        regions = UnifiedSettings(self._app_root).get("vision_regions", {})
+        previews = {}
+        for spec in self.get_vision_region_specs():
+            if group and spec["group"] != group:
+                continue
+            box = list(regions.get(spec["key"], spec["default"]))
+            uri = self._write_region_preview(spec["key"], self._crop_region(img, box))
+            if uri:
+                previews[spec["key"]] = uri
+        return {"ok": True, "previews": previews}
 
     def test_ocr_region(self, key: str, box: list) -> dict:
         """Capture the Roblox screen and OCR the given region. Returns the text read."""
@@ -664,10 +776,7 @@ class Api:
         img, vw, vh = cap
 
         def _run():
-            import base64
             import json as _json
-
-            import cv2
 
             from sloppykeys.core.ocr import OcrReader
             ocr = OcrReader()
@@ -676,32 +785,22 @@ class Api:
                 self._log_to_ui(f"[OCR] {msg}")
                 return
             regions = UnifiedSettings(self._app_root).get("vision_regions", {})
-            ih, iw = img.shape[:2]
             # Every group, so a Match box is testable too. Only one group's screen can be
             # up at a time, so the other's rows are expected to read as junk.
             specs = [(s["key"], s["default"]) for s in self.get_vision_region_specs()
                      if group_filter in (None, s["group"])]
             for key, default in specs:
-                box = list(regions.get(key, default))
-                x = min(max(0, int(box[0] * vw / 1152)), iw - 1)
-                y = min(max(0, int(box[1] * vh / 756)), ih - 1)
-                w = min(max(1, int(box[2] * vw / 1152)), iw - x)
-                h = min(max(1, int(box[3] * vh / 756)), ih - y)
-                crop = img[y:y + h, x:x + w].copy()
+                crop = self._crop_region(img, list(regions.get(key, default)))
                 result = ocr.read_line(crop)
-                # The crop itself goes back with the read: a wrong box reads as junk text
-                # either way, and only the picture says whether it was aimed at the digits
-                # or at the border beside them. In-memory data URI like every other
-                # thumbnail here — nothing lands on disk to go stale.
+                # The crop rides back with the read, and lands in assets/regions/ on the
+                # way: a wrong box reads as junk text either way, and only the picture says
+                # whether it was aimed at the digits or at the border beside them.
                 payload = {
                     "key": key,
                     "text": result.text or "(empty)",
                     "score": round(result.score, 3),
+                    "data_uri": self._write_region_preview(key, crop),
                 }
-                ok_png, buf = cv2.imencode(".png", crop)
-                if ok_png:
-                    b64 = base64.b64encode(buf.tobytes()).decode("ascii")
-                    payload["data_uri"] = f"data:image/png;base64,{b64}"
                 if self._window:
                     self._window.evaluate_js(
                         "window.onOcrRegionResult && "

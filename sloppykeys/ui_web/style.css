@@ -311,7 +311,6 @@ input:focus, select:focus {
   image-rendering: pixelated;
 }
 .vr-read { font-size: 10px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.vr-actions { display: flex; gap: 6px; }
 .status-action { font-size: 18px; font-weight: 700; color: var(--text); }
 .status-row {
   display: flex; align-items: center; justify-content: space-between;

@@ -16,9 +16,6 @@
     if (window.pywebview && pywebview.api && pywebview.api.set_game_visible) {
       pywebview.api.set_game_visible(name === "dashboard");
     }
-    // The OCR rows show what each box crops, so the shot they crop out of is grabbed on
-    // the way in rather than waiting for a button. Cached, so this is one grab per visit.
-    if (name === "settings") refreshRegionThumbs(false);
   }
 
   navButtons.forEach((btn) => {
@@ -511,10 +508,6 @@
   // drawing over the wrong picture entirely — switching section forces a fresh capture.
   let ocrCachedSnapshot = null;
   let ocrCachedGroup = null;
-  // The same shot decoded, kept because the row previews crop out of it. Cleared whenever
-  // ocrCachedSnapshot is replaced, so the next preview reloads instead of drawing a stale
-  // screen.
-  let ocrPreviewImg = null;
   let ocrRegionSpecs = [];       // [{key,label,default}] for onion-skin overlays
   let ocrRegionOverrides = {};   // saved region boxes by key
 
@@ -664,8 +657,8 @@
       if (window.pywebview && pywebview.api) {
         pywebview.api.set_vision_region(ocrRegionKey, [ocrRegionRect.x, ocrRegionRect.y, ocrRegionRect.w, ocrRegionRect.h]);
       }
-      // Redraw off the shot just used for the picker, so the row shows the new box.
-      refreshRegionThumbs(false);
+      // The preview is this crop, out of the shot the box was just drawn on.
+      saveRegionPreview(ocrRegionKey, [ocrRegionRect.x, ocrRegionRect.y, ocrRegionRect.w, ocrRegionRect.h]);
     }
     window.addLog(`[OCR] Region set for ${ocrRegionKey}: ${ocrRegionRect.x},${ocrRegionRect.y} ${ocrRegionRect.w}×${ocrRegionRect.h}`);
     ocrRegionKey = null; ocrRegionRect = null;
@@ -684,7 +677,6 @@
     const snap = await pywebview.api.get_roblox_snapshot();
     if (!snap.ok) { window.addLog("[OCR] Recapture failed."); return; }
     ocrCachedSnapshot = snap.data_uri;
-    ocrPreviewImg = null;
     // The retake belongs to whichever group we're editing, not the one last captured.
     ocrCachedGroup = (ocrRegionSpecs.find(s => s.key === ocrRegionKey) || {}).group || null;
     openRegionPicker(ocrRegionKey, ocrCachedSnapshot);
@@ -692,78 +684,31 @@
 
   // ---- Vision regions ----
 
-  // Row previews are cropped in the page out of one cached full-client shot, not fetched
-  // per box: editing coords redraws with no bridge call and no second grab of the game.
-  function rowRegionBox(row) {
-    const inputs = row.querySelectorAll("input[data-vr-key]");
-    const box = [...inputs].slice(0, 4).map((i) => parseInt(i.value, 10));
-    if (box.length < 4 || box.some((n) => !Number.isFinite(n))) return null;
-    return box;
-  }
-
-  function drawRegionThumb(key, box) {
+  // Previews come from assets/regions/, written whenever a capture already happened for
+  // this tab. Nothing here grabs the game on its own: the screen a box lives on is rarely
+  // the one that's up, so an unasked-for capture would only ever save the wrong picture.
+  function setRegionThumb(key, uri) {
     const el = document.querySelector(`[data-vr-thumb="${key}"]`);
-    if (!el || !ocrPreviewImg) return;
-    // Boxes are authored in 1152×756 client space; the shot is whatever the client is now.
-    const iw = ocrPreviewImg.naturalWidth, ih = ocrPreviewImg.naturalHeight;
-    const x = Math.min(Math.max(0, Math.round(box[0] * iw / 1152)), iw - 1);
-    const y = Math.min(Math.max(0, Math.round(box[1] * ih / 756)), ih - 1);
-    const w = Math.min(Math.max(1, Math.round(box[2] * iw / 1152)), iw - x);
-    const h = Math.min(Math.max(1, Math.round(box[3] * ih / 756)), ih - y);
-    const cv = document.createElement("canvas");
-    cv.width = w; cv.height = h;
-    cv.getContext("2d").drawImage(ocrPreviewImg, x, y, w, h, 0, 0, w, h);
-    el.src = cv.toDataURL("image/png");
+    if (!el || !uri) return;
+    el.src = uri;
     el.hidden = false;
   }
 
-  async function ensureOcrShot(force) {
-    if (!window.pywebview || !pywebview.api) return null;
-    if (force || !ocrCachedSnapshot) {
-      const snap = await pywebview.api.get_roblox_snapshot();
-      if (!snap || !snap.ok) return null;
-      ocrCachedSnapshot = snap.data_uri;
-      ocrPreviewImg = null;
-      ocrCachedGroup = null;  // a preview grab has no group: it shows whatever screen was up
-    }
-    if (!ocrPreviewImg) {
-      ocrPreviewImg = await new Promise((resolve) => {
-        const im = new Image();
-        im.onload = () => resolve(im);
-        im.onerror = () => resolve(null);
-        im.src = ocrCachedSnapshot;
-      });
-    }
-    return ocrPreviewImg;
-  }
-
-  async function refreshRegionThumbs(force) {
-    const rows = document.querySelectorAll(".vision-region-row");
-    if (!rows.length) return;
-    // loadVisionRegions also runs at startup, on the dashboard, where grabbing the game
-    // for previews nobody can see is pure cost.
-    if (!force && !document.getElementById("screen-settings")?.classList.contains("active")) return;
-    if (!(await ensureOcrShot(force))) {
-      if (force) window.addLog("[OCR] Preview capture failed — is Roblox running?");
-      return;
-    }
-    rows.forEach((row) => {
-      const box = rowRegionBox(row);
-      const key = row.querySelector("input[data-vr-key]")?.dataset.vrKey;
-      if (key && box) drawRegionThumb(key, box);
-    });
+  // The box just drawn or typed, cropped out of the shot already in hand — no new grab, so
+  // it silently does nothing until something has captured this session.
+  async function saveRegionPreview(key, box) {
+    if (!window.pywebview || !pywebview.api) return;
+    const r = await pywebview.api.save_region_preview(key, box);
+    if (r && r.ok) setRegionThumb(key, r.data_uri);
   }
 
   // One region's crop + read, pushed from Python during a section scan. That crop comes
   // from a shot taken for the scan, so it also freshens what the row was showing.
   window.onOcrRegionResult = function (r) {
     if (!r || !r.key) return;
+    setRegionThumb(r.key, r.data_uri);
     const thumb = document.querySelector(`[data-vr-thumb="${r.key}"]`);
-    if (thumb && r.data_uri) {
-      thumb.src = r.data_uri;
-      thumb.hidden = false;
-      thumb.title = `${r.text} (score: ${r.score})`;
-    }
+    if (thumb) thumb.title = `${r.text} (score: ${r.score})`;
     const read = document.querySelector(`[data-vr-read="${r.key}"]`);
     if (read) {
       read.textContent = `${r.text} (${r.score})`;
@@ -776,6 +721,7 @@
     if (!window.pywebview || !pywebview.api) return;
     const specs = await pywebview.api.get_vision_region_specs();
     const overrides = await pywebview.api.get_vision_regions();
+    const previews = (await pywebview.api.get_region_previews()) || {};
     const list = document.getElementById("vision-regions-list");
     if (!list || !specs) return;
     // One section per group, because each group's boxes only exist on its own screen —
@@ -792,7 +738,8 @@
         <div class="vr-group-head">
           <span class="vr-group-title">${g.label}</span>
           <span class="vr-group-note">${g.where}</span>
-          <button class="btn btn--sm" data-vr-test-group="${g.key}" title="Grab the game and OCR every box in this section, refreshing its preview">Test Section</button>
+          <button class="btn btn--sm" data-vr-preview-group="${g.key}" title="Grab the game now and refresh every preview in this section — ${g.where}">Preview</button>
+          <button class="btn btn--sm" data-vr-test-group="${g.key}" title="Grab the game and OCR every box in this section — ${g.where}">Test Section</button>
         </div>
         ${g.rows.map(s => {
           const val = overrides[s.key] || s.default;
@@ -809,6 +756,20 @@
           </div>`;
         }).join("")}
       </div>`).join("");
+    Object.entries(previews).forEach(([key, uri]) => setRegionThumb(key, uri));
+    list.querySelectorAll("[data-vr-preview-group]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        if (!window.pywebview || !pywebview.api) return;
+        btn.disabled = true;
+        const label = btn.textContent;
+        btn.textContent = "...";
+        const r = await pywebview.api.preview_ocr_regions(btn.dataset.vrPreviewGroup);
+        btn.disabled = false;
+        btn.textContent = label;
+        if (!r || !r.ok) { window.addLog(`[OCR] Preview failed: ${(r && r.reason) || "unknown"}`); return; }
+        Object.entries(r.previews || {}).forEach(([key, uri]) => setRegionThumb(key, uri));
+      });
+    });
     list.querySelectorAll("[data-vr-test-group]").forEach(btn => {
       btn.addEventListener("click", async () => {
         if (!window.pywebview || !pywebview.api) return;
@@ -828,7 +789,7 @@
         const inputs = row.querySelectorAll("input");
         const box = [parseInt(inputs[0].value), parseInt(inputs[1].value), parseInt(inputs[2].value), parseInt(inputs[3].value)];
         pywebview.api.set_vision_region(key, box);
-        drawRegionThumb(key, box);
+        saveRegionPreview(key, box);
       });
     });
     // Set buttons — capture Roblox + draw region to set coords
@@ -847,20 +808,11 @@
         btn.textContent = "Set";
         if (!snap.ok) { window.addLog("[OCR] Capture failed — is Roblox running?"); return; }
         ocrCachedSnapshot = snap.data_uri;
-        ocrPreviewImg = null;
         ocrCachedGroup = group;
         openRegionPicker(key, ocrCachedSnapshot);
       });
     });
-    refreshRegionThumbs(false);
   }
-
-  document.getElementById("btn-vision-refresh").addEventListener("click", async (e) => {
-    const btn = e.currentTarget;
-    btn.disabled = true;
-    await refreshRegionThumbs(true);
-    btn.disabled = false;
-  });
 
   document.getElementById("btn-vision-reset").addEventListener("click", async () => {
     if (!window.pywebview || !pywebview.api) return;
