@@ -351,6 +351,8 @@
   const tbStage = document.getElementById("tb-stage");
   const tbDifficulty = document.getElementById("tb-difficulty");
   const tbRepeat = document.getElementById("tb-repeat");
+  const tbExtract = document.getElementById("tb-extract");
+  const tbExtractRow = document.getElementById("tb-extract-row");
   const tbMacro = document.getElementById("tb-macro");
 
   function renderTaskList() {
@@ -396,8 +398,16 @@
       loadStages(task.mode, task.map, task.stage);
       loadDifficulty(task.mode, task.difficulty);
       tbRepeat.value = task.repeat || 1;
+      tbExtract.value = task.extract_after || 1;
+      showExtractRow(task.mode);
       tbMacro.value = task.macro || "";
     }
+  }
+
+  // Only Expedition ends by extracting, so the field is hidden everywhere else rather than
+  // offered as a setting that does nothing.
+  function showExtractRow(mode) {
+    tbExtractRow.style.display = mode === "Expedition" ? "" : "none";
   }
 
   function showBuilderEmpty() {
@@ -456,6 +466,11 @@
       repeat: Math.max(1, parseInt(tbRepeat.value) || 1),
       macro: tbMacro.value,
     };
+    // Only where it means something: every other mode would carry a stored field nothing
+    // reads, and the runner defaults a missing one to the first offer anyway.
+    if (tbMode.value === "Expedition") {
+      changes.extract_after = Math.max(1, parseInt(tbExtract.value) || 1);
+    }
     // Challenge-specific: per-map macros + slot enables
     if (tbMode.value === "Challenge") {
       const t = tasks.find(x => x.id === selectedTaskId);
@@ -483,6 +498,7 @@
     } else {
       loadMaps(tbMode.value, "");
       tbStage.innerHTML = '<option value="">—</option>';
+      showExtractRow(tbMode.value);
       // The new mode may not offer the difficulty the old one had, so save after the
       // rebuild rather than storing a value the control no longer lists.
       loadDifficulty(tbMode.value, tbDifficulty.value).then(() => saveCurrentTask());
@@ -497,6 +513,7 @@
   tbStage.addEventListener("change", saveCurrentTask);
   tbDifficulty.addEventListener("change", saveCurrentTask);
   tbRepeat.addEventListener("change", saveCurrentTask);
+  tbExtract.addEventListener("change", saveCurrentTask);
   tbMacro.addEventListener("change", saveCurrentTask);
 
   document.getElementById("btn-add-task").addEventListener("click", () => {
