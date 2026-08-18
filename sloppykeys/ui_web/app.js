@@ -11,11 +11,18 @@
   function switchScreen(name) {
     screens.forEach((s) => s.classList.toggle("active", s.id === "screen-" + name));
     navButtons.forEach((b) => b.classList.toggle("active", b.dataset.screen === name));
-    // When wired to pywebview: show/hide the Roblox HWND based on whether
-    // the dashboard is active (the only screen that needs the game visible).
-    if (window.pywebview && pywebview.api && pywebview.api.set_game_visible) {
-      pywebview.api.set_game_visible(name === "dashboard");
-    }
+    // Only the dashboard needs the game visible.
+    setGameVisible(name === "dashboard");
+  }
+
+  // Every show/hide goes through here, because the backend also answers whether the game
+  // is docked. The empty-slot placeholder (dashed border, "1152 × 756") means "no game
+  // here", and the only time it is on screen is when the game has just been covered for a
+  // modal — where it read as the game having disappeared.
+  async function setGameVisible(visible) {
+    if (!window.pywebview || !pywebview.api || !pywebview.api.set_game_visible) return;
+    const r = await pywebview.api.set_game_visible(visible);
+    document.body.classList.toggle("game-docked", !!(r && r.docked));
   }
 
   navButtons.forEach((btn) => {
@@ -1662,7 +1669,7 @@
   function restoreGameIfDashboard() {
     const dash = document.getElementById("screen-dashboard");
     if (dash && dash.classList.contains("active") && window.pywebview && pywebview.api) {
-      pywebview.api.set_game_visible(true);
+      setGameVisible(true);
     }
   }
 
@@ -1674,7 +1681,7 @@
       return;
     }
     // Hide the game so the modal isn't behind it
-    if (window.pywebview && pywebview.api) pywebview.api.set_game_visible(false);
+    setGameVisible(false);
     imModal.style.display = "flex";
     if (!window.pywebview || !pywebview.api) return;
     const result = await pywebview.api.list_vision_templates();
@@ -1695,6 +1702,23 @@
     if (r.ok) window.addLog("[Image Manager] Captured Roblox screen.");
     else window.addLog("[Image Manager] Capture failed: " + (r.reason || "error"));
   });
+
+  document.getElementById("im-camera").addEventListener("click", async (e) => {
+    if (!window.pywebview || !pywebview.api) return;
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    // The script drives the real cursor, so the game has to be up while it runs.
+    setGameVisible(true);
+    const r = await pywebview.api.run_camera_setup();
+    if (r.ok) window.addLog("[Camera] Pitching down, then zooming out...");
+    else { window.addLog("[Camera] " + (r.reason || "failed")); setGameVisible(false); }
+    btn.disabled = false;
+  });
+
+  // Pushed when the camera script exits, so the modal gets its cover back.
+  window.onCameraDone = function () {
+    if (imModal.style.display === "flex") setGameVisible(false);
+  };
 
   document.getElementById("im-filter").addEventListener("input", () => renderImGrid());
 
@@ -1722,7 +1746,7 @@
       if (imCategory !== "all" && cat.key !== imCategory) return;
       cat.names.forEach((img) => {
         if (q && !img.name.toLowerCase().includes(q)) return;
-        items.push({ ...img, catKey: cat.key, catLabel: cat.label });
+        items.push({ ...img, catKey: cat.key, catLabel: cat.label, kind: cat.kind || "template" });
       });
     });
     // The card is identified by its path, not its name: Story, Expedition and
@@ -1733,17 +1757,18 @@
           <span class="im-card-cat">${img.group ? img.catKey + " / " + img.group : img.catKey}</span>
           <span class="im-card-name">${img.name}</span>
           ${img.missing ? '<span class="im-missing-badge">MISSING</span>' : ''}
-          <button class="im-card-add" data-path="${img.path}" title="Capture &amp; add">+</button>
+          <button class="im-card-add" data-path="${img.path}" data-kind="${img.kind}"
+            title="${img.kind === "map" ? "Capture the whole screen as this map" : "Capture &amp; add"}">+</button>
         </div>
         ${img.missing
           ? '<div class="im-card-missing-body">Capture from Roblox to add this template</div>'
           : `<img class="im-card-thumb" src="${img.data_uri}" alt="${img.name}">`}
-        <div class="im-card-slider">
+        ${img.kind === "map" ? "" : `<div class="im-card-slider">
           <span>Match</span>
           <input type="range" min="0.50" max="1.00" step="0.01" value="${img.threshold}" data-path="${img.path}">
           <span class="im-val">${img.threshold.toFixed(2)}</span>
           ${!img.missing ? `<button class="btn btn--sm" data-test-image="${img.path}" title="Test search">Test</button>` : ''}
-        </div>
+        </div>`}
       </div>
     `).join("");
     // Wire sliders
@@ -1756,14 +1781,36 @@
         pywebview.api.set_image_threshold(e.target.dataset.path, parseFloat(e.target.value));
       });
     });
-    // Wire + buttons (capture & crop)
+    // Wire + buttons. A template gets the crop view; a map is saved whole.
     gridEl.querySelectorAll(".im-card-add").forEach((btn) => {
-      btn.addEventListener("click", () => startImageCapture(btn.dataset.path));
+      btn.addEventListener("click", () => {
+        if (btn.dataset.kind === "map") captureMapReference(btn.dataset.path, btn);
+        else startImageCapture(btn.dataset.path);
+      });
     });
     // Wire test buttons
     gridEl.querySelectorAll("[data-test-image]").forEach((btn) => {
       btn.addEventListener("click", () => testImageSearch(btn.dataset.testImage));
     });
+  }
+
+  // A map reference is the whole client area, so there is no crop step: grab and save.
+  // The camera has to already be where the macro puts it — that is what Set Camera is for.
+  async function captureMapReference(path, btn) {
+    if (!window.pywebview || !pywebview.api) return;
+    btn.disabled = true;
+    const snap = await pywebview.api.get_roblox_snapshot();
+    if (!snap.ok) {
+      btn.disabled = false;
+      window.addLog("[Image Manager] Capture failed: " + (snap.reason || "error"));
+      return;
+    }
+    const r = await pywebview.api.save_map_reference(path);
+    btn.disabled = false;
+    if (!r.ok) { window.addLog("[Image Manager] Save failed: " + (r.reason || "error")); return; }
+    window.addLog("[Image Manager] Saved map reference: " + path);
+    const result = await pywebview.api.list_vision_templates();
+    if (result.ok) { imData = result; renderImTabs(); renderImGrid(); }
   }
 
   // ---- Image capture + crop flow ----
@@ -1773,7 +1820,7 @@
     if (!window.pywebview || !pywebview.api) return;
     // Hide modal, show game
     imModal.style.display = "none";
-    if (pywebview.api.set_game_visible) pywebview.api.set_game_visible(true);
+    setGameVisible(true);
     switchScreen("dashboard");
     await new Promise(r => setTimeout(r, 400));
     window.addLog("[Image Test] Searching for: " + imagePath);
@@ -1784,7 +1831,7 @@
       window.addLog(`[Image Test] Not found. Best: ${r.best ? r.best.toFixed(3) : "—"} (threshold: ${r.threshold || 0.70})`);
     }
     // Return to image manager
-    if (pywebview.api.set_game_visible) pywebview.api.set_game_visible(false);
+    setGameVisible(false);
     imModal.style.display = "flex";
   }
   let cropImage = null;
@@ -1942,7 +1989,7 @@
         // Re-render using cached data
         renderImTabs();
         renderImGrid();
-        if (window.pywebview && pywebview.api) pywebview.api.set_game_visible(false);
+        setGameVisible(false);
       });
       document.getElementById("crop-retake").addEventListener("click", () => {
         if (opts.onRetake) { opts.onRetake(); return; }
@@ -1997,7 +2044,7 @@
     const block = opPhases[phase][idx];
     posReadout.textContent = (block.params?.x && block.params?.y) ? `X ${block.params.x}, Y ${block.params.y}` : "Not set";
     // Hide the game so the modal isn't behind it
-    if (window.pywebview && pywebview.api) pywebview.api.set_game_visible(false);
+    setGameVisible(false);
     posModal.style.display = "flex";
 
     // If we have a recently used map, jump straight to the canvas

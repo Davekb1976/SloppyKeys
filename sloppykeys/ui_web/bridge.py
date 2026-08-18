@@ -171,8 +171,12 @@ class Api:
 
     # ---- Screens ----
 
-    def set_game_visible(self, visible: bool) -> None:
+    def set_game_visible(self, visible: bool) -> dict:
         """Only the Dashboard shows the game; elsewhere it is covered, not hidden.
+
+        Returns whether the game is actually docked, because the page draws an empty-slot
+        placeholder that only means anything while it isn't — and that placeholder is only
+        ever *visible* when the game has just been covered for a modal.
 
         The game rides the topmost band over our slot, so leaving the band is not
         enough — HWND_NOTOPMOST lands it at the top of the normal band, still above
@@ -185,7 +189,7 @@ class Api:
         """
         self._game_visible = bool(visible)
         if not self._docked or not is_window(self._game_hwnd) or self._game_hwnd is None:
-            return
+            return {"docked": False}
         SW_SHOWNOACTIVATE = 4
         user32.ShowWindow(self._game_hwnd, SW_SHOWNOACTIVATE)
         if visible:
@@ -195,6 +199,7 @@ class Api:
             host = self._host_hwnd()
             if host:
                 set_window_below(self._game_hwnd, host)
+        return {"docked": True}
 
     @contextlib.contextmanager
     def _game_revealed(self):
@@ -1111,13 +1116,18 @@ class Api:
             return {"ok": False, "categories": []}
         import base64
 
+        # `kind` says what the folder holds. Everything is a searched template except the
+        # map references, which are whole-screen backdrops the position picker draws
+        # placement coordinates on — no threshold, nothing to test, and a capture saves the
+        # full frame instead of a crop.
         IMAGE_CATEGORIES = {
-            "lobby": "Lobby Navigation",
-            "match": "Match State",
-            "gamemodes": "Gamemode Cards",
-            "stages": "Stage Selection",
-            "challenge": "Challenge",
-            "events": "Events",
+            "lobby": ("Lobby Navigation", "template"),
+            "match": ("Match State", "template"),
+            "gamemodes": ("Gamemode Cards", "template"),
+            "stages": ("Stage Selection", "template"),
+            "challenge": ("Challenge", "template"),
+            "events": ("Events", "template"),
+            "reference": ("Maps", "map"),
         }
 
         # Read current thresholds from settings
@@ -1138,7 +1148,7 @@ class Api:
 
         found_paths = set()
 
-        for key, label in IMAGE_CATEGORIES.items():
+        for key, (label, kind) in IMAGE_CATEGORIES.items():
             folder = os.path.join(images_root, key)
             names = []
             # Walk recursively to find all PNGs (some categories have subfolders)
@@ -1197,7 +1207,7 @@ class Api:
                 })
 
             if names:
-                categories.append({"key": key, "label": label, "names": names})
+                categories.append({"key": key, "label": label, "kind": kind, "names": names})
 
         return {"ok": True, "categories": categories, "default_threshold": default_threshold}
 
@@ -1324,6 +1334,51 @@ class Api:
         os.makedirs(os.path.dirname(target), exist_ok=True)
         cv2.imwrite(target, crop)
         return {"ok": True, "path": target}
+
+    def save_map_reference(self, path: str) -> dict:
+        """Save the cached snapshot **whole** as a map reference.
+
+        No crop, unlike every other image here: the position picker draws placement
+        coordinates on these, so a reference has to be the full client area or the
+        coordinates read off it land somewhere else in the stage.
+        """
+        if not self._app_root:
+            return {"ok": False, "reason": "no app root"}
+        target = self._template_path(path)
+        if target is None:
+            return {"ok": False, "reason": "bad reference path"}
+        img = getattr(self, "_cached_snapshot", None)
+        if img is None:
+            return {"ok": False, "reason": "no cached snapshot — capture first"}
+        try:
+            import cv2
+        except ImportError:
+            return {"ok": False, "reason": "cv2 not available"}
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        cv2.imwrite(target, img)
+        return {"ok": True, "path": target}
+
+    def run_camera_setup(self) -> dict:
+        """Run the camera step on its own, so a map reference can be captured at the same
+        angle the macro plays at.
+
+        Off-thread: it is several seconds of AHK input. Refused mid-run — two camera
+        scripts fighting would leave the pitch somewhere neither of them intended.
+        """
+        if self._ctrl is None:
+            return {"ok": False, "reason": "backend not ready"}
+        if self._ctrl.is_running:
+            return {"ok": False, "reason": "macro is running"}
+
+        def _run():
+            self._ctrl.run_camera()
+            # The caller has the game revealed for the duration; tell it when to put the
+            # cover back, since only the page knows what is open over it.
+            if self._window:
+                self._window.evaluate_js("window.onCameraDone && window.onCameraDone();")
+
+        threading.Thread(target=_run, daemon=True).start()
+        return {"ok": True}
 
     # ---- Walk Path Recording ----
 
