@@ -68,6 +68,22 @@
     logList.innerHTML = "";
   });
 
+  // WebView2 has no console anyone can open, so a throw used to be completely silent: the
+  // Macro Manager sat there unwired because one statement at load raised and took every
+  // statement after it with it. Put the message somewhere it can be read.
+  function reportJsError(what) {
+    try {
+      window.addLog("[JS] " + what);
+    } catch (_) { /* the log panel is what failed — nothing left to say it in */ }
+  }
+  window.addEventListener("error", (e) => {
+    reportJsError((e.message || "error") + (e.lineno ? ` (line ${e.lineno})` : ""));
+  });
+  window.addEventListener("unhandledrejection", (e) => {
+    const r = e.reason;
+    reportJsError("unhandled promise: " + ((r && (r.message || r)) || "unknown"));
+  });
+
 
   // ---- Macro controls ----
   const btnStart = document.getElementById("btn-start");
