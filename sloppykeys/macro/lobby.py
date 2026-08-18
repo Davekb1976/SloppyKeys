@@ -614,11 +614,15 @@ class LobbyNavigator:
         return (True, f"difficulty {difficulty} ({clicks} clicks)")
 
     def start_stage(self, gamemode: str, hard_mode: bool) -> tuple[bool, str]:
-        """After an act is selected: (optional) Hard Mode, confirm, Start, then
-        wait the join delay. Coordinate-based; Story only for now."""
-        coords = start_coords(gamemode)
-        if coords is None:
-            return (False, f"no start sequence for {gamemode}")
+        """After an act is selected: (optional) Hard Mode, Select Stage, Start.
+
+        **A gamemode needs no entry in `START_COORDS` to get here.** Select Stage and Start
+        are template searches and one implementation serves every mode; the table only holds
+        Story's Hard Mode toggle plus missing-template fallbacks. Requiring an entry is what
+        stopped an Expedition run dead at `no start sequence for Expedition`, one step after
+        the stage was correctly selected.
+        """
+        coords = start_coords(gamemode) or {}
         rect = self._rect()
         if rect is None:
             return (False, "Roblox not found")
