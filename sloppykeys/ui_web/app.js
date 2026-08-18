@@ -949,6 +949,56 @@
     window.addLog("Vision regions reset to defaults.");
   });
 
+  // ---- Click points (acts, Hard Mode, the difficulty cycle) ----
+  // One section per screen the points are picked on, so all of Story's seven acts come off
+  // one capture of the act list. A row per point would mean typing fourteen numbers; the
+  // Set button opens the capture with every point in the group drawn on it instead.
+  let pointGroups = [];
+
+  async function loadVisionPoints() {
+    if (!window.pywebview || !pywebview.api || !pywebview.api.list_vision_points) return;
+    const r = await pywebview.api.list_vision_points();
+    if (!r || !r.ok) return;
+    pointGroups = r.groups || [];
+    renderVisionPoints();
+  }
+
+  function renderVisionPoints() {
+    const list = document.getElementById("vision-points-list");
+    if (!list) return;
+    if (!pointGroups.length) {
+      list.innerHTML = '<div class="empty-state">No click points in this build.</div>';
+      return;
+    }
+    list.innerHTML = pointGroups.map(g => {
+      const setCount = g.points.filter(p => p.edited).length;
+      return `<div class="vr-group">
+        <div class="vr-group-head">
+          <span class="vr-group-title">${g.label}</span>
+          <span class="vr-group-note">${g.where}</span>
+          <span class="vr-default">${setCount}/${g.points.length} measured</span>
+          <button class="btn btn--sm" data-vp-group="${g.key}" data-tip="Grab the game and click each point on it.&#10;${g.where}">Set points</button>
+          <button class="btn btn--sm btn--danger tip-left" data-vp-reset="${g.key}" data-tip="Back to the shipped coordinates">Reset</button>
+        </div>
+        <div class="vp-row">
+          ${g.points.map(p => `<span class="vp-chip${p.edited ? " on" : ""}">${p.label}
+            <span class="vp-chip-xy">${p.x},${p.y}</span></span>`).join("")}
+        </div>
+      </div>`;
+    }).join("");
+    list.querySelectorAll("[data-vp-group]").forEach(btn => {
+      btn.addEventListener("click", () => openPointPicker(btn.dataset.vpGroup));
+    });
+    list.querySelectorAll("[data-vp-reset]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        if (!window.pywebview || !pywebview.api) return;
+        await pywebview.api.reset_vision_points(btn.dataset.vpReset);
+        await loadVisionPoints();
+        window.addLog(`Click points reset: ${btn.dataset.vpReset}`);
+      });
+    });
+  }
+
   // Testing is per section now — each group's boxes only exist on its own screen, so a
   // single "test everything" button could only ever have half its rows read real text.
 
@@ -977,6 +1027,7 @@
     loadTasks();
     loadQueuePresets();
     loadVisionRegions();
+    loadVisionPoints();
     refreshChallengeInfo();
     loadChallengeMaps();
     window.renderHotkeyPills();
@@ -2171,7 +2222,79 @@
   const posReadout = document.getElementById("pos-readout");
   const posCtx = posCanvas.getContext("2d");
 
+  // ---- Point mode ----
+  // Same canvas, different subject: a lobby click point instead of a block's coordinate.
+  // It has to be a *live* capture — an act row only exists on the act list, so there is no
+  // stored backdrop to pick it on, which is why the map grid is skipped entirely here.
+  let posMode = "blocks";      // "blocks" | "points"
+  let posGroup = null;         // the group from list_vision_points
+  let posArmed = null;         // key of the point the next canvas click sets
+
+  window.openPointPicker = async function (groupKey) {
+    const group = pointGroups.find(g => g.key === groupKey);
+    if (!group || !window.pywebview || !pywebview.api) return;
+    posMode = "points";
+    posGroup = group;
+    posArmed = (group.points.find(p => !p.edited) || group.points[0]).key;
+    posTarget = null;
+    document.querySelector("#pos-modal .modal-title").textContent = group.label;
+    setGameVisible(false);
+    posModal.style.display = "flex";
+    posGrid.style.display = "none";
+    document.getElementById("pos-back").style.display = "none";
+    document.getElementById("pos-chips").style.display = "";
+    renderPosChips();
+    // The game has to be up for the grab; the backend reveals it and re-hides it.
+    const r = await pywebview.api.get_roblox_snapshot();
+    if (!r.ok) {
+      posReadout.textContent = "Capture failed";
+      window.addLog("[Points] Capture failed: " + (r.reason || "error"));
+      return;
+    }
+    loadPosImage(r.data_uri);
+  };
+
+  function renderPosChips() {
+    const host = document.getElementById("pos-chips");
+    if (!host || !posGroup) return;
+    host.innerHTML = `<span class="vr-group-note">${posGroup.where}</span>`
+      + posGroup.points.map(p => `<button class="vp-chip${p.edited ? " on" : ""}${p.key === posArmed ? " armed" : ""}" data-vp-point="${p.key}">${p.label}
+        <span class="vp-chip-xy">${p.x},${p.y}</span></button>`).join("");
+    host.querySelectorAll("[data-vp-point]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        posArmed = btn.dataset.vpPoint;
+        renderPosChips();
+        drawPosCanvas();
+      });
+    });
+  }
+
+  // Writes the armed point, then arms the next one that has never been measured — setting
+  // seven acts in a row is the normal case, and re-picking the chip each time is the bit
+  // that made the old numeric rows tedious.
+  async function setArmedPoint(x, y) {
+    if (!posGroup || !posArmed || !window.pywebview || !pywebview.api) return;
+    const r = await pywebview.api.set_vision_point(posArmed, x, y);
+    if (!r || !r.ok) {
+      window.addLog(`[Points] Refused: ${(r && r.reason) || "unknown"}`);
+      return;
+    }
+    const point = posGroup.points.find(p => p.key === posArmed);
+    if (point) { point.x = r.x; point.y = r.y; point.edited = true; }
+    posReadout.textContent = `${point ? point.label : posArmed}: X ${r.x}, Y ${r.y}`;
+    const next = posGroup.points.find(p => !p.edited);
+    if (next) posArmed = next.key;
+    renderPosChips();
+    drawPosCanvas();
+    renderVisionPoints();
+  }
+
   window.openPositionPicker = async function (phase, idx) {
+    posMode = "blocks";
+    posGroup = null;
+    posArmed = null;
+    document.getElementById("pos-chips").style.display = "none";
+    document.querySelector("#pos-modal .modal-title").textContent = "Set Position";
     posTarget = { phase, idx };
     const block = opPhases[phase][idx];
     posReadout.textContent = (block.params?.x && block.params?.y) ? `X ${block.params.x}, Y ${block.params.y}` : "Not set";
@@ -2251,8 +2374,12 @@
     const img = new Image();
     img.onload = () => {
       posImage = img;
-      posLastMap = posLastMap || {};
-      posLastMap.dataUri = dataUri;
+      // Not in point mode: that capture is a lobby screen, and remembering it as the recent
+      // *map* would open the next placement pick on the lobby instead of the map grid.
+      if (posMode !== "points") {
+        posLastMap = posLastMap || {};
+        posLastMap.dataUri = dataUri;
+      }
       posGrid.style.display = "none";
       posCanvasWrap.style.display = "";
       document.getElementById("pos-back").style.display = "";
@@ -2278,6 +2405,31 @@
     posPanY = (h - posImage.naturalHeight * scale) / 2;
   }
 
+  // One dot per point in the group, so the spacing of Story's seven acts is visible at a
+  // glance and a mis-set one stands out against the row.
+  function drawPointMarkers(scale) {
+    if (!posGroup) return;
+    posGroup.points.forEach((p) => {
+      const x = p.x * scale;
+      const y = p.y * scale;
+      const armed = p.key === posArmed;
+      posCtx.beginPath();
+      posCtx.arc(x, y, (armed ? 9 : 6) / posZoom, 0, Math.PI * 2);
+      posCtx.fillStyle = armed
+        ? "rgba(139, 92, 246, 0.95)"
+        : (p.edited ? "rgba(34, 197, 94, 0.8)" : "rgba(232, 162, 58, 0.7)");
+      posCtx.fill();
+      posCtx.strokeStyle = "#fff";
+      posCtx.lineWidth = 2 / posZoom;
+      posCtx.stroke();
+      posCtx.fillStyle = "#fff";
+      posCtx.font = `bold ${Math.round(10 / posZoom)}px sans-serif`;
+      posCtx.textAlign = "left";
+      posCtx.textBaseline = "middle";
+      posCtx.fillText(p.label, x + 12 / posZoom, y);
+    });
+  }
+
   function drawPosCanvas() {
     if (!posImage) return;
     const scale = parseFloat(posCanvas.dataset.scale) || 1;
@@ -2286,6 +2438,12 @@
     posCtx.translate(posPanX, posPanY);
     posCtx.scale(posZoom, posZoom);
     posCtx.drawImage(posImage, 0, 0, posImage.naturalWidth * scale, posImage.naturalHeight * scale);
+
+    if (posMode === "points") {
+      drawPointMarkers(scale);
+      posCtx.restore();
+      return;
+    }
 
     // Draw ALL blocks with x/y coords as numbered markers
     const COORD_TYPES = ["place_unit", "upgrade_unit", "sell_unit", "target_priority", "click"];
@@ -2358,7 +2516,8 @@
   posCanvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
   posCanvas.addEventListener("click", (e) => {
-    if (!posTarget || !posImage) return;
+    if (!posImage) return;
+    if (posMode !== "points" && !posTarget) return;
     const rect = posCanvas.getBoundingClientRect();
     const scale = parseFloat(posCanvas.dataset.scale) || 1;
     // Convert screen coords to image coords (undo pan + zoom + scale)
@@ -2366,6 +2525,10 @@
     const sy = e.clientY - rect.top;
     const x = Math.round((sx - posPanX) / posZoom / scale);
     const y = Math.round((sy - posPanY) / posZoom / scale);
+    if (posMode === "points") {
+      setArmedPoint(x, y);
+      return;
+    }
     // Write back to the block
     const block = opPhases[posTarget.phase][posTarget.idx];
     block.params = block.params || {};

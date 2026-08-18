@@ -88,8 +88,8 @@ STEP_LABELS = {
 }
 
 
-def point_specs() -> list[tuple[str, str, tuple[int, int]]]:
-    """(key, label, default) for the start-sequence points that are actually clicked blind.
+def point_specs() -> list[tuple[str, str, str, tuple[int, int]]]:
+    """(key, gamemode, label, default) for the start-sequence points clicked blind.
 
     `confirm` and `start` are **excluded on purpose.** `LobbyNavigator.click_select_stage`
     and `click_start_match` search `select_stage.png` / `start_match.png` and only touch
@@ -98,13 +98,13 @@ def point_specs() -> list[tuple[str, str, tuple[int, int]]]:
     than no row. Fix a missed Select Stage or Start by recapturing its template instead.
     """
     specs = [
-        (start_key(gamemode, step), f"{gamemode} · {STEP_LABELS.get(step, step)}", coord)
+        (start_key(gamemode, step), gamemode, STEP_LABELS.get(step, step), coord)
         for gamemode, steps in START_COORDS.items()
         for step, coord in steps.items()
         if step in BLIND_STEPS
     ]
     specs += [
-        (difficulty_key(gamemode), f"{gamemode} · difficulty cycle", coord)
+        (difficulty_key(gamemode), gamemode, "Difficulty cycle", coord)
         for gamemode, coord in DIFFICULTY_COORDS.items()
     ]
     return specs

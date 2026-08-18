@@ -800,6 +800,22 @@ input:focus, select:focus {
 .pos-thumb-label { font-size: 10px; font-weight: 600; padding: 4px 6px; color: var(--text); background: var(--surface-panel); }
 .pos-readout { font-size: 11px; font-weight: 700; color: var(--accent); padding: 4px 8px; border: 1px solid var(--accent); }
 
+/* Click points: one chip per act / toggle. Same chip in Settings (read-only, a <span>) and
+   in the picker (a <button> that arms the next canvas click), so the row you set them from
+   looks like the row that reports them. `on` = measured, `armed` = takes the next click. */
+.pos-chips { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+.vp-row { display: flex; flex-wrap: wrap; gap: 4px; }
+.vp-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 7px; font-size: 10px; font-weight: 600;
+  color: var(--text-muted); background: var(--surface-panel);
+  border: 1px solid var(--border); cursor: default;
+}
+button.vp-chip { cursor: pointer; }
+.vp-chip.on { color: var(--text); border-color: color-mix(in srgb, var(--teal) 55%, var(--border)); }
+.vp-chip.armed { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.vp-chip-xy { font-family: var(--font-mono); font-size: 9px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+
 /* ---- Image Manager ---- */
 /* A column of sections, each holding its own 3-up card grid. The heading sticks while its
    section scrolls, so which folder a card belongs to is readable without checking a badge. */

@@ -62,10 +62,14 @@ def act_coord(gamemode: str, act: str) -> tuple[int, int] | None:
     return _OVERRIDES.get(act_key(gamemode, act), default)
 
 
-def act_specs() -> list[tuple[str, str, tuple[int, int]]]:
-    """(key, label, default) for every act point, for the Vision editor."""
+def act_specs() -> list[tuple[str, str, str, tuple[int, int]]]:
+    """(key, gamemode, label, default) for every act point, for the Vision editor.
+
+    The gamemode is its own field because the editor groups by it: all of Story's acts are
+    set from one screenshot of Story's act list, and the number of rows differs per mode.
+    """
     return [
-        (act_key(gamemode, act), f"{gamemode} · {act}", coord)
+        (act_key(gamemode, act), gamemode, act, coord)
         for gamemode, acts in ACT_COORDS.items()
         for act, coord in acts.items()
     ]

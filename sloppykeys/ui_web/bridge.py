@@ -546,7 +546,8 @@ class Api:
         Called once at startup. Without it the tables held their defaults until the user
         happened to edit something, so a run used the shipped boxes and the shipped 0.70
         while the Settings screen showed the corrected values — the edits looked saved and
-        silently did nothing.
+        silently did nothing. `points` was worse: it had no editor at all in this UI and was
+        never applied, so a corrected act coordinate in settings.json did nothing whatsoever.
         """
         if not self._app_root:
             return {"ok": False}
@@ -554,12 +555,138 @@ class Api:
         regions = settings.get("vision_regions", {})
         if isinstance(regions, dict):
             self._apply_region_overrides(regions)
+        points = settings.get("points", {})
+        if isinstance(points, dict) and points:
+            self._apply_point_overrides(points)
         thresholds = settings.get("image_thresholds", {})
         if isinstance(thresholds, dict) and thresholds:
             from sloppykeys.core.image_search import apply_confidence_overrides
 
             apply_confidence_overrides(thresholds)
-        return {"ok": True, "regions": len(regions or {}), "thresholds": len(thresholds or {})}
+        return {
+            "ok": True,
+            "regions": len(regions or {}),
+            "points": len(points or {}),
+            "thresholds": len(thresholds or {}),
+        }
+
+    # ---- Click points (acts, Hard Mode, the difficulty cycle) ----
+    #
+    # A coordinate the macro clicks blind, so being 20px out doesn't fail: it clicks the act
+    # above the one you asked for and farms the wrong stage. Grouped by the screen they are
+    # picked on, because all of Story's seven acts come off one screenshot of the act list
+    # and the count differs per gamemode.
+
+    _POINT_GROUPS = (
+        ("acts", "Acts", "open the gamemode and a map, so the act list is on screen"),
+        ("start", "Start panel", "select an act, so the Hard Mode / difficulty panel is up"),
+    )
+
+    @staticmethod
+    def _point_tables():
+        from sloppykeys.content import acts as _acts
+        from sloppykeys.content import start_stage as _start
+
+        return {"acts": _acts, "start": _start}
+
+    @staticmethod
+    def _point_specs() -> list[tuple[str, str, str, str, tuple[int, int]]]:
+        """(kind, key, gamemode, label, default) for every editable click point."""
+        from sloppykeys.content.acts import act_specs
+        from sloppykeys.content.start_stage import point_specs
+
+        rows = [("acts", *spec) for spec in act_specs()]
+        rows += [("start", *spec) for spec in point_specs()]
+        return rows
+
+    def list_vision_points(self) -> dict:
+        """Editable click points, grouped by the screen they are picked on."""
+        stored = self.get_vision_points()
+        groups: dict[str, dict] = {}
+        labels = {kind: (label, where) for kind, label, where in self._POINT_GROUPS}
+        for kind, key, gamemode, label, default in self._point_specs():
+            group_key = f"{kind}.{gamemode}"
+            group_label, where = labels[kind]
+            group = groups.setdefault(group_key, {
+                "key": group_key,
+                "gamemode": gamemode,
+                "label": f"{gamemode} · {group_label}",
+                "where": where,
+                "points": [],
+            })
+            saved = stored.get(key)
+            point = saved if isinstance(saved, (list, tuple)) and len(saved) >= 2 else default
+            group["points"].append({
+                "key": key,
+                "label": label,
+                "x": int(point[0]),
+                "y": int(point[1]),
+                "edited": saved is not None,
+            })
+        return {"ok": True, "groups": list(groups.values()), "viewport": [VIEWPORT_W, VIEWPORT_H]}
+
+    def get_vision_points(self) -> dict:
+        """Current click-point overrides from settings."""
+        if not self._app_root:
+            return {}
+        stored = UnifiedSettings(self._app_root).get("points", {})
+        return stored if isinstance(stored, dict) else {}
+
+    def _apply_point_overrides(self, points: dict) -> None:
+        """Push the stored points into every table; each ignores keys that aren't its own."""
+        clean = {}
+        for key, value in (points or {}).items():
+            if isinstance(value, (list, tuple)) and len(value) >= 2:
+                try:
+                    clean[str(key)] = (int(value[0]), int(value[1]))
+                except (TypeError, ValueError):
+                    continue  # dropped, not repaired: a half-read point clicks somewhere else
+        for table in self._point_tables().values():
+            table.apply_point_overrides(clean)
+
+    def set_vision_point(self, key: str, x: int, y: int) -> dict:
+        """Set one click point, in 1152x756 client space. Auto-saves and applies live."""
+        if not self._app_root:
+            return {"ok": False}
+        known = {spec[1] for spec in self._point_specs()}
+        if str(key) not in known:
+            # Whitelisted rather than sanitised: an unknown key would sit in settings.json
+            # forever, matching nothing, and read as a calibration that had been saved.
+            return {"ok": False, "reason": "unknown point"}
+        try:
+            px, py = int(x), int(y)
+        except (TypeError, ValueError):
+            return {"ok": False, "reason": "not a coordinate"}
+        if not (0 <= px < VIEWPORT_W and 0 <= py < VIEWPORT_H):
+            return {"ok": False, "reason": "outside the viewport"}
+        settings = UnifiedSettings(self._app_root)
+        points = settings.get("points", {})
+        if not isinstance(points, dict):
+            points = {}
+        points[str(key)] = [px, py]
+        settings.set("points", points)
+        self._apply_point_overrides(points)
+        return {"ok": True, "x": px, "y": py}
+
+    def reset_vision_points(self, group: str = "") -> dict:
+        """Clear the overrides for one group, or all of them when `group` is empty."""
+        if not self._app_root:
+            return {"ok": False}
+        settings = UnifiedSettings(self._app_root)
+        points = settings.get("points", {})
+        if not isinstance(points, dict):
+            points = {}
+        if group:
+            keys = {
+                spec[1] for spec in self._point_specs()
+                if f"{spec[0]}.{spec[2]}" == group
+            }
+            points = {k: v for k, v in points.items() if k not in keys}
+        else:
+            points = {}
+        settings.set("points", points)
+        self._apply_point_overrides(points)
+        return {"ok": True}
 
     def set_vision_region(self, key: str, box: list) -> dict:
         """Set one OCR box override."""
@@ -2053,9 +2180,10 @@ def main() -> None:
         # Before anything can read a box or a threshold: the tables hold defaults until
         # the stored values are pushed in.
         applied = api.apply_stored_overrides()
-        if applied.get("regions") or applied.get("thresholds"):
+        if applied.get("regions") or applied.get("thresholds") or applied.get("points"):
             api._log_to_ui(
-                f"Loaded {applied['regions']} OCR region override(s) and "
+                f"Loaded {applied['regions']} OCR region override(s), "
+                f"{applied['points']} click point(s) and "
                 f"{applied['thresholds']} image threshold(s)."
             )
 
