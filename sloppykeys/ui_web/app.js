@@ -208,6 +208,18 @@
     if (csStop) csStop.disabled = !running;
   };
 
+  // Python only pushes status on an event — start, pause, resume, stop — so during a run the
+  // target and the cycle count froze at whatever they were when Start was pressed. A queue
+  // moving to its next task, or a cycle completing, is not an event anyone pushes, so the
+  // page asks. One dict a second costs nothing and stops the label lying for a whole run.
+  setInterval(async () => {
+    if (!window.pywebview || !pywebview.api || !pywebview.api.get_macro_status) return;
+    try {
+      const s = await pywebview.api.get_macro_status();
+      if (s) window.onMacroStatus(s.running, s.cycle, s.target, s.phase);
+    } catch (e) { /* the bridge is not up yet, or the window is closing */ }
+  }, 1000);
+
   // Called from Python after a match result is recorded.
   window.onMatchResult = function (won, wins, losses) {
     document.getElementById("stat-wins").textContent = String(wins);
