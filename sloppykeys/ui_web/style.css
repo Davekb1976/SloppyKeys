@@ -196,17 +196,6 @@ input:focus, select:focus {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   color: var(--text-faint); opacity: 0.6; pointer-events: none;
 }
-/* Docked: the game paints over this slot, so the "no game here" placeholder is a lie. It
-   is only ever visible when the game has been covered for a modal, where it read as the
-   game having vanished. Border-colour only — the slot's box size is reported to the
-   backend and positions the game window, so its width must not change. */
-.game-docked .game-slot { border-color: transparent; }
-.game-docked .game-slot-overlay { display: none; }
-
-/* The still frame left in the slot while a modal covers the game. Exact size, no scaling:
-   the slot is the client area, so the shot lands pixel-for-pixel. */
-.game-slot.game-frozen { background-size: 100% 100%; background-repeat: no-repeat; background-position: center; }
-
 .game-slot-size {
   font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
   padding: 3px 10px; background: color-mix(in srgb, var(--accent) 12%, transparent);

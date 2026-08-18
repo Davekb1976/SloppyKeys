@@ -171,12 +171,8 @@ class Api:
 
     # ---- Screens ----
 
-    def set_game_visible(self, visible: bool) -> dict:
+    def set_game_visible(self, visible: bool) -> None:
         """Only the Dashboard shows the game; elsewhere it is covered, not hidden.
-
-        Returns whether the game is actually docked, because the page draws an empty-slot
-        placeholder that only means anything while it isn't — and that placeholder is only
-        ever *visible* when the game has just been covered for a modal.
 
         The game rides the topmost band over our slot, so leaving the band is not
         enough — HWND_NOTOPMOST lands it at the top of the normal band, still above
@@ -189,7 +185,7 @@ class Api:
         """
         self._game_visible = bool(visible)
         if not self._docked or not is_window(self._game_hwnd) or self._game_hwnd is None:
-            return {"docked": False}
+            return
         SW_SHOWNOACTIVATE = 4
         user32.ShowWindow(self._game_hwnd, SW_SHOWNOACTIVATE)
         if visible:
@@ -199,7 +195,6 @@ class Api:
             host = self._host_hwnd()
             if host:
                 set_window_below(self._game_hwnd, host)
-        return {"docked": True}
 
     @contextlib.contextmanager
     def _game_revealed(self):

@@ -139,12 +139,10 @@ quitting cannot take the game down. The frame is restored on the way out
 - **Resolve the client origin with `ClientToScreen`**, never by arithmetic on window rects.
 - **The slot position comes from the page**, which reports its placeholder's
   `getBoundingClientRect()` — not from a constant that can drift from the stylesheet.
-- **A modal over the Dashboard gets a still frame, not the live game.** The game paints over
-  all DOM content, so it has to be covered for a modal to be visible at all — which left the
-  viewport a black rectangle. `app.js::freezeGameFrame` grabs one shot *before* the cover
-  goes on and paints it into the slot; `clearGameFrame` drops it when the game returns. Both
-  run inside `setGameVisible`, so every modal gets it for free. There is no way to show the
-  live game behind the page: see the dead ends below.
+- **A modal covers the game and shows the empty slot behind itself.** The game paints over
+  all DOM content, so there is no live game behind a modal — and faking one by grabbing a
+  still per modal open was tried and removed: it cost a capture and a reveal for a picture
+  nobody needed.
 - **Off the Dashboard the game is covered, not hidden.** `set_topmost(False)` alone is not
   enough (`HWND_NOTOPMOST` lands it at the top of the normal band, still above the page), so
   it is tucked directly beneath our window with `set_window_below`. `SW_HIDE` works but
