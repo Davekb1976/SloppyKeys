@@ -68,9 +68,13 @@ resolution still hold · **a commit** (`version-control.md`).
 
 ## Reporting
 
-**6 lines or fewer.** Files touched, one line each, naming the function or setting. Then
-one line for what you verified, one for what still needs the user. Name the commits rather
-than re-describing them.
+**Hard cap: 6 lines.** Not 6 bullets of three sentences — 6 lines. One line per file touched
+naming the function or setting, one line for what you verified, one for what still needs the
+user. Over the cap, cut a file line; the diff and the commit are both there to be read.
+
+**The commit subject is the summary.** Name the commit and stop; do not restate its body,
+and do not explain the same change twice at two levels of detail. A three-commit turn is
+three named subjects plus the verification line, not three paragraphs.
 
 Stop when the facts run out. Do not add a closing paragraph, a "worth noting", a suggested
 next step nobody asked for, or an offer to do more work — the user asks for the next thing
@@ -91,13 +95,23 @@ or documentation. Commit messages describe only the technical change in our code
 
 ## Shell
 
-- **Don't read or search the tree through the shell.** Use the editor's own file tools to
-  read a file, list a folder or grep the project; `Get-Content`, `Select-String`, `dir` and
-  `findstr` are the wrong instrument for it. The shell decodes UTF-8 as the console
-  codepage, so every em dash and `·` in this project comes back as `â€"` or `ù` — output
-  that has to be mentally un-mangled before it can be read, and that gets quoted back into
-  code or a commit message wrong. It also truncates, wraps and reorders. Reserve the shell
-  for things that must actually execute: git, the tests, `compileall`, a probe.
+**The editor's own tools are the only way to touch a file.** Read, list, search, create,
+edit, rename, delete — all of it. The shell is for the four things that must *execute*:
+git, the tests, `compileall`, a probe. Nothing else. If a file operation seems to need the
+shell, that is the signal to look for the tool that does it.
+
+Specifically never, however convenient it looks in the moment:
+
+- `Get-Content`, `type`, `dir`, `ls`, `Select-String`, `findstr`, `cat` to inspect the tree.
+  The shell decodes UTF-8 as the console codepage, so every em dash and `·` in this project
+  comes back as `â€"` or `ù` — output that has to be un-mangled before it can be read, and
+  that gets quoted back into code or a commit message wrong. It also truncates and wraps.
+- `python -c "...read, replace, write..."` for a bulk edit or a rename. Use the rename tool,
+  or the edit tool once per occurrence — a sweep of six call sites is six edits, and that is
+  fine. The one-liner version has already silently rewritten a whole file's line endings.
+- `Get-Content | Set-Content`, `echo >`, `sed`, `awk` to write anything (see the last bullet
+  in this section).
+- `mkdir`/`New-Item` for a folder: writing the file creates it.
 - PowerShell. Chain with `;`. No heredocs. `Select-String` has no `-Recurse`.
 - Long lines overwrite earlier console output. To *read* output, redirect to a workspace
   file and read it back, then delete it. Fire-and-forget commands can trust the exit code.
