@@ -499,6 +499,7 @@ class MacroController:
         # so no other mode pays a search or changes behaviour.
         self._exp = self._expedition_state()
         self._exp_next_check = 0.0
+        self._exp_busy = False
 
         while not self._stop_requested:
             if self._checkpoint():
@@ -513,15 +514,7 @@ class MacroController:
 
             # Before the blocks and before parking: Expedition's own screens are what a
             # placement click would otherwise land on.
-            handled = False
-            if self._exp is not None:
-                event = self._expedition_tick()
-                if event == "win":
-                    self._stats.record(won=True)
-                    self._log("  Extracted — Expedition run complete.")
-                    self._send_webhook_result("win")
-                    return
-                handled = event == "handled"
+            handled = self._exp is not None and self._expedition_tick() == "handled"
 
             # `handled` means a panel is up and was clicked, so this tick does nothing else:
             # a block's coordinate and the keep-alive click both land on that panel instead of
@@ -643,21 +636,23 @@ class MacroController:
         return ExpeditionMatch(after)
 
     def _expedition_tick(self) -> str | None:
-        """Handle whatever Expedition screen is up.
+        """Handle whatever Expedition screen is up. "handled" when one is, None when clear.
 
-        "win" once extracted, "handled" when a screen was acted on, None when the screen is
-        clear. "handled" is what stops the run loop running a block in the same tick: a
-        checkpoint is not the moment to place a unit or click the corner, and a placement
-        coordinate lands on the Continue panel instead of the board.
+        "handled" is what stops the run loop running a block in the same tick: a checkpoint is
+        not the moment to place a unit or click the corner, and a placement coordinate lands on
+        the panel instead of the board.
 
-        Throttled: four template searches is ~70ms and this shares a thread with the blocks,
-        so looking every tick would spend a fifth of the run loop on screens that change once
-        a wave. The searches short-circuit in priority order — nothing behind the upgrade
-        card can be clicked, so when it is up nothing else is even looked for.
+        Throttled, because four template searches is ~70ms and this shares a thread with the
+        blocks. **A throttled tick repeats the last answer** rather than reporting a clear
+        screen: answering None in the gaps let a block run 19 ticks out of 20 while a Continue
+        panel was open, which is exactly the interleaving the "handled" flag exists to stop.
+
+        The searches short-circuit in priority order — nothing behind the upgrade card can be
+        clicked, so while it is up nothing else is even looked for.
         """
         now = time.time()
         if now < getattr(self, "_exp_next_check", 0.0):
-            return None
+            return "handled" if self._exp_busy else None
         self._exp_next_check = now + CHECK_INTERVAL
 
         seen: set[str] = set()
@@ -672,6 +667,7 @@ class MacroController:
                 seen.add(CONTINUE)
 
         action, note = self._exp.decide(seen, now)
+        self._exp_busy = action != NOTHING
         if action == NOTHING:
             return None
         self._log(f"  [expedition] {note}")
@@ -700,8 +696,11 @@ class MacroController:
             return "handled"
 
         if action == ACCEPT_EXTRACT:
-            if self._exp_extract():
-                return "win"
+            # No "win" from here: the victory screen that follows is the ground truth, and the
+            # run loop's own outcome poll reads it a tick later. Claiming the win on a click
+            # would record a run that the game might not have ended.
+            if self._exp_click_pair(exp_extract_image(), exp_extract_confirm_image(), "Extract"):
+                return "handled"
             left = self._exp.note_extract_failed()
             self._log(
                 f"  Extraction didn't register — continuing this checkpoint instead "
@@ -716,62 +715,42 @@ class MacroController:
         # for both rather than a template each.
         if action in (DECLINE_EXTRACT, CONTINUE_WAVE):
             label = "Keep going" if action == DECLINE_EXTRACT else "Continue"
-            ok, msg = self._nav.click_until_gone(exp_continue_image(), label)
-            self._log(f"  {label}: {msg}")
-            if ok:
-                self._exp_followup()
+            self._exp_click_pair(exp_continue_image(), exp_continue_2_image(), label)
             return "handled"
 
         return None
 
-    def _exp_followup(self) -> bool:
-        """Click the second Continue, on the panel the first Continue opens.
+    def _exp_click_pair(self, first: str, second: str, label: str) -> bool:
+        """Click a node's button, then the one that pops up on the panel it opens.
 
-        A deadline rather than one look: the panel arrives from the click just made and the
-        game can take a few seconds to draw it. Failing is not fatal — the next tick finds
-        whichever Continue is still up and tries again.
+        **The first button does not go away when clicked** — it is on screen for as long as the
+        node is. So it cannot be verified by watching it disappear: `click_until_gone` fired
+        three clicks into it in under a second, never left time for the panel to draw, and then
+        reported failure, so the second button was never clicked at all.
+
+        The second button appearing is the only proof the first click landed, so that is what
+        this waits for. If it never comes, the first button is still there and the next look
+        tries again — no state to unwind.
         """
-        path = exp_continue_2_image()
+        ok, message = self._nav.click_button(first, label)
+        self._log(f"  {label}: {message}")
+        if not ok:
+            return False
         deadline = time.monotonic() + FOLLOWUP_TIMEOUT
         while time.monotonic() < deadline:
             if self._checkpoint():
                 return False
-            if self._nav.sighted(path):
-                ok, msg = self._nav.click_until_gone(
-                    path, "Second Continue", fade_wait=self._nav.panel_fade_wait
+            if self._nav.sighted(second):
+                # The second one *is* on a panel that closes, so here "gone" is the right
+                # proof and the retry covers a click the client swallowed.
+                ok, message = self._nav.click_until_gone(
+                    second, f"{label} confirm", fade_wait=self._nav.panel_fade_wait
                 )
-                self._log(f"  Second Continue: {msg}")
+                self._log(f"  {label} confirm: {message}")
                 return ok
             time.sleep(self._nav.search_poll)
-        self._log("  No second Continue appeared — the next look will retry.")
+        self._log(f"  {label}: no second button appeared in {FOLLOWUP_TIMEOUT:.0f}s — retrying.")
         return False
-
-    def _exp_extract(self) -> bool:
-        """Take the extraction. True only once the chain is proven to have registered.
-
-        Two screens: Extract, then the second Extract on the "are you sure you'd like to end
-        this run?" panel it opens. The victory screen follows, and the run loop's own outcome
-        poll is what reads it.
-        """
-        ok, msg = self._nav.click_until_gone(exp_extract_image(), "Extract")
-        self._log(f"  Extract: {msg}")
-        if not ok:
-            return False
-        ok, msg = self._nav.click_until_gone(
-            exp_extract_confirm_image(),
-            "End run",
-            timeout=self._nav.search_timeout,
-            fade_wait=self._nav.panel_fade_wait,
-        )
-        self._log(f"  End run: {msg}")
-        if not ok:
-            return False
-        # Proof, not hope: a chain that did not register leaves Extract on screen, and
-        # calling that a win records a run that never ended and strands the cycle.
-        if self._nav.sighted(exp_extract_image()):
-            self._log("  Extract is still on screen after the confirm.")
-            return False
-        return True
 
     def _execute_battle_block(self, block: dict) -> bool:
         """Execute one block in a tick-based context. Returns True when done

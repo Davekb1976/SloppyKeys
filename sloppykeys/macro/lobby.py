@@ -746,6 +746,18 @@ class LobbyNavigator:
         budget = self.search_timeout if timeout is None else float(timeout)
         return self._find_click(path, "Repeat", timeout=budget)
 
+    def click_button(
+        self, path: str, label: str, timeout: float = 0.0, fade_wait: float = 0.0
+    ) -> tuple[bool, str]:
+        """Find a control and click it once, with no check that it went away.
+
+        For a button that stays on screen after being clicked — an Expedition node's first
+        Continue does, and `click_until_gone` reads that as a click that never landed and
+        fires two more into it. Something else has to be the proof; see
+        `MacroController._exp_click_pair`.
+        """
+        return self._find_click(path, label, timeout=timeout, fade_wait=fade_wait)
+
     def sighted(self, path: str) -> bool:
         """One look: is this template on screen right now?
 

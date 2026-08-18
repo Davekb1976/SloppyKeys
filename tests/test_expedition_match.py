@@ -107,6 +107,12 @@ class _StubNav:
     def sighted(self, path: str) -> bool:
         return os.path.basename(path) in self.on_screen
 
+    def click_button(self, path, label, timeout=0.0, fade_wait=0.0):
+        # Deliberately leaves the button on screen: a node's first button does not go away
+        # when clicked, which is the whole reason the pair is verified by the second one.
+        self.clicked.append(os.path.basename(path))
+        return (True, f"{label} clicked")
+
     def click_until_gone(self, path, label, timeout=0.0, fade_wait=0.0, attempts=3):
         name = os.path.basename(path)
         self.clicked.append(name)
@@ -127,6 +133,7 @@ def _controller(on_screen: set[str], task: dict | None = None) -> MacroControlle
     ctrl._current_task = task if task is not None else {"mode": "Expedition"}
     ctrl._nav = _StubNav(on_screen)
     ctrl._exp_next_check = 0.0
+    ctrl._exp_busy = False
     ctrl._exp = ctrl._expedition_state()
     return ctrl
 
@@ -148,29 +155,40 @@ def test_continue_pair_dispatch() -> None:
 
 def test_extract_dispatch() -> None:
     ctrl = _controller({"exp_extract.png", "exp_extract_confirm.png"})
-    # Both Extracts, and only then a win — the last look proves the first one is gone.
-    assert ctrl._expedition_tick() == "win"
+    # No "win" from the click: the victory screen is what the outcome poll records.
+    assert ctrl._expedition_tick() == "handled"
     assert ctrl._nav.clicked == ["exp_extract.png", "exp_extract_confirm.png"]
 
 
 def test_extract_that_never_registers() -> None:
-    class _StickyNav(_StubNav):
-        def click_until_gone(self, path, label, timeout=0.0, fade_wait=0.0, attempts=3):
-            name = os.path.basename(path)
-            self.clicked.append(name)
-            # Extract stays up: the click landed but the game never took it.
-            if name != "exp_extract.png":
-                self.on_screen.discard(name)
-            return (True, f"{label} cleared")
+    import sloppykeys.macro.controller as controller_mod
 
-    ctrl = _controller(set())
-    ctrl._nav = _StickyNav({
-        "exp_extract.png", "exp_extract_confirm.png", "exp_continue.png",
-    })
-    # Not a win, and not a stall either: it declines so the run keeps moving.
+    original = controller_mod.FOLLOWUP_TIMEOUT
+    controller_mod.FOLLOWUP_TIMEOUT = 0.05  # don't sit out the real 12s deadline
+    try:
+        # Extract is up but its confirm panel never draws, so the click never landed.
+        ctrl = _controller({"exp_extract.png", "exp_continue.png", "exp_continue_2.png"})
+        assert ctrl._expedition_tick() == "handled"
+        assert ctrl._exp.failed_extracts == 1
+        # And it declines instead of stalling on the same screen.
+        assert ctrl._nav.clicked == [
+            "exp_extract.png", "exp_continue.png", "exp_continue_2.png",
+        ]
+    finally:
+        controller_mod.FOLLOWUP_TIMEOUT = original
+
+
+def test_throttled_tick_holds_the_blocks() -> None:
+    ctrl = _controller({"exp_continue.png", "exp_continue_2.png"})
     assert ctrl._expedition_tick() == "handled"
-    assert ctrl._exp.failed_extracts == 1
-    assert "exp_continue.png" in ctrl._nav.clicked
+    # Next tick is inside the throttle window. It must repeat "handled", not report a clear
+    # screen — answering None here is what let blocks run while a panel was open.
+    assert ctrl._expedition_tick() == "handled"
+    # Once the throttle lapses and the screen really is clear, blocks are free again.
+    ctrl._exp_next_check = 0.0
+    ctrl._nav.on_screen.clear()
+    assert ctrl._expedition_tick() is None
+    assert ctrl._expedition_tick() is None
 
 
 def test_wave_dispatch() -> None:
@@ -200,6 +218,7 @@ def main() -> None:
     test_continue_pair_dispatch()
     test_extract_dispatch()
     test_extract_that_never_registers()
+    test_throttled_tick_holds_the_blocks()
     test_wave_dispatch()
     test_clear_screen_is_not_handled()
     print("OK: Expedition decisions and dispatch")
