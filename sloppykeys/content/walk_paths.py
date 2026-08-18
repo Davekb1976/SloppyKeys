@@ -27,6 +27,11 @@ DEFAULT_WALK_PATHS: dict[str, str] = {
     # while the event is in rotation — when it rotates out the key stops matching and costs
     # nothing.
     "Events/Villian Invasion/Act 1": "Villian Invasion Act 1",
+    # East Town spawns right of the placement points: back once, then left five times. Keyed
+    # at map level because Story's acts share one playfield (no `per_act_reference`), so every
+    # act including Infinite and Mastery walks the same route. Expedition's East Town is a
+    # different spawn and deliberately has no row.
+    "Story/East Town": "East Town",
 }
 
 

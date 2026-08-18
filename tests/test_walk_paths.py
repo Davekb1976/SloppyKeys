@@ -37,6 +37,11 @@ def main() -> None:
 
     assert default_walk_path("Raid", "Spirit City", "Act 2") == "Spirit City Act 2"
     assert default_walk_path("Raid", "Spirit City", "Act 3") == "Spirit City Act 3"
+    # A map-level row serves every act, including the two icon acts.
+    assert default_walk_path("Story", "East Town", "Act 1") == "East Town"
+    assert default_walk_path("Story", "East Town", "Mastery") == "East Town"
+    # Same map name in another gamemode is a different spawn: no row, no walk.
+    assert default_walk_path("Expedition", "East Town", "") == ""
     # No row, act or map: Auto has nothing and the caller skips.
     assert default_walk_path("Story", "Flower Forest", "Act 1") == ""
     assert default_walk_path("Raid", "Spirit City", "Act 1") == ""
@@ -52,6 +57,7 @@ def main() -> None:
         assert script.startswith("#Requires AutoHotkey v2.0"), name
         # Every key pressed is released: a script that exits holding W walks forever.
         assert script.count("{w up}") >= script.count("{w down}"), name
+        assert script.count("{a up}") >= script.count("{a down}"), name
         assert script.count("{d up}") >= script.count("{d down}"), name
         assert script.count("{s up}") >= script.count("{s down}"), name
 
