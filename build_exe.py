@@ -27,6 +27,9 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 NAME = "SloppyKeys"
+# The pywebview front end: HTML, CSS, JS and the boot font. Data files, so PyInstaller has to
+# be told about them explicitly — see the `--add-data` in `build`.
+UI_DIR = os.path.join(HERE, "sloppykeys", "ui_web")
 DEFAULT_DEST = os.path.join(os.path.dirname(os.path.dirname(HERE)), "SLOPPYKEYS")
 
 # Copied beside the exe. Folders the user's work lives in, plus the route data.
@@ -204,6 +207,12 @@ def build(dest: str, console: bool, onefile: bool) -> None:
         "--console" if console else "--windowed",
         "--onefile" if onefile else "--onedir",
     ]
+    # The front end is data, not modules: PyInstaller's scan collects `bridge.py` and nothing
+    # beside it, so `index.html`, `style.css`, `app.js` and `fonts/` have to be named. Without
+    # this the exe starts, finds no `index.html` next to the frozen `bridge.py`, and shows a
+    # blank window — the app has no UI at all. The whole folder is added rather than four
+    # files so the next asset ships without touching this.
+    command += ["--add-data", f"{UI_DIR}{os.pathsep}sloppykeys/ui_web"]
     for package in COLLECT_ALL:
         command += ["--collect-all", package]
     for module in HIDDEN:
