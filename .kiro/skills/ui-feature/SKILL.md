@@ -10,7 +10,7 @@ The reference implementation is the **Image Manager** (`#im-modal`, `.im-*`,
 file is the generalisation, not a substitute for looking at the working example.
 
 Design vocabulary — colours, density, typography, the panel component, the `.check`
-box — is in `tokens.md` beside this file. Read it before writing any CSS.
+box — is in `references/design-vocabulary.md`. Read it before writing any CSS.
 
 ## The four layers
 
