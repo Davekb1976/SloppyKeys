@@ -38,6 +38,14 @@ assets/**/debug/
 /paths/*
 !/paths/defaults/
 
+# The rest of the user's work, for the same reason and named in `build_exe.py`'s own comment
+# about what a shipped build deliberately has none of: saved block macros, input recordings,
+# and the Detect block's capture folder (its Capture button writes there, and the crops are
+# of whatever was on that user's screen).
+/operations/
+/recordings/
+/assets/detect/
+
 # Multi-root editor workspace: it points at sibling folders that only exist on one
 # machine (`../Anime-Expeditions-Creams-Macro-main`, `../../SLOPPYKEYS`), so committing it
 # hands the next clone a broken workspace.
