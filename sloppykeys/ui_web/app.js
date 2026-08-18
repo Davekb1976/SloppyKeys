@@ -449,11 +449,19 @@
   });
 
   // ---- Challenge per-map macro grid ----
-  const CHALLENGE_MAPS = ["School Grounds", "Flower Forest", "Rose Kingdom", "Fairy King Forest", "King's Tomb"];
+  // From content/gamemodes.py, not a copy of it: this list was hard-coded and had already
+  // gone stale — East Town was added to the table and never appeared here.
+  let CHALLENGE_MAPS = [];
+
+  async function loadChallengeMaps() {
+    if (!window.pywebview || !pywebview.api) return;
+    CHALLENGE_MAPS = (await pywebview.api.get_maps("Challenge")) || [];
+  }
 
   function renderChallengeMapGrid() {
     const grid = document.getElementById("tb-challenge-maps");
     if (!grid) return;
+    if (!CHALLENGE_MAPS.length) { loadChallengeMaps().then(renderChallengeMapGrid); return; }
     const task = tasks.find(t => t.id === selectedTaskId);
     const mapMacros = (task && task.challenge_macros) || {};
     const slots = (task && task.challenge_slots) || [true, true, true];
@@ -495,7 +503,11 @@
   // ---- OCR Region Picker (snapshot + draw box) ----
   let ocrRegionKey = null;
   let ocrRegionRect = null;
-  let ocrCachedSnapshot = null; // cached Roblox screenshot for Set buttons
+  // Cached screenshot, and which group it was taken for. Each group is a different screen,
+  // so reusing a challenge-panel shot to measure an in-match box would have the user
+  // drawing over the wrong picture entirely — switching section forces a fresh capture.
+  let ocrCachedSnapshot = null;
+  let ocrCachedGroup = null;
   let ocrRegionSpecs = [];       // [{key,label,default}] for onion-skin overlays
   let ocrRegionOverrides = {};   // saved region boxes by key
 
@@ -512,7 +524,11 @@
     // Seed with the region's current box so it shows highlighted; redraw to change.
     const savedActive = ocrRegionOverrides[key] || (ocrRegionSpecs.find(s => s.key === key) || {}).default;
     if (savedActive) ocrRegionRect = { x: savedActive[0], y: savedActive[1], w: savedActive[2], h: savedActive[3] };
-    document.getElementById("ocr-region-key").textContent = key;
+    // Name the section and the box rather than the raw storage key, so it is obvious
+    // which screen the shot behind it is supposed to be.
+    const spec = ocrRegionSpecs.find(s => s.key === key) || {};
+    document.getElementById("ocr-region-key").textContent =
+      spec.groupLabel ? `${spec.groupLabel} · ${spec.label}` : key;
     document.getElementById("ocr-region-readout").textContent = ocrRegionRect
       ? `${ocrRegionRect.x}, ${ocrRegionRect.y}, ${ocrRegionRect.w}×${ocrRegionRect.h}` : "Draw a box";
     document.getElementById("ocr-region-apply").disabled = !ocrRegionRect;
@@ -556,9 +572,13 @@
           ctx.fillStyle = color;
           ctx.fillText(text, x + padX, ly - padY);
         }
-        // Onion-skin: every other saved region, dimmed, with its label.
+        // Onion-skin: the other boxes *from the same group only*. A group is one screen,
+        // so drawing the challenge boxes while measuring an in-match one puts outlines
+        // over parts of the HUD they have nothing to do with.
+        const activeGroup = (ocrRegionSpecs.find(s => s.key === ocrRegionKey) || {}).group;
         ocrRegionSpecs.forEach(s => {
           if (s.key === ocrRegionKey) return; // the one being edited is drawn below
+          if (activeGroup && s.group !== activeGroup) return;
           const box = ocrRegionOverrides[s.key] || s.default;
           if (!box) return;
           const bx = box[0] * scale, by = box[1] * scale, bw = box[2] * scale, bh = box[3] * scale;
@@ -655,6 +675,8 @@
     const snap = await pywebview.api.get_roblox_snapshot();
     if (!snap.ok) { window.addLog("[OCR] Recapture failed."); return; }
     ocrCachedSnapshot = snap.data_uri;
+    // The retake belongs to whichever group we're editing, not the one last captured.
+    ocrCachedGroup = (ocrRegionSpecs.find(s => s.key === ocrRegionKey) || {}).group || null;
     openRegionPicker(ocrRegionKey, ocrCachedSnapshot);
   });
 
@@ -720,8 +742,9 @@
       btn.addEventListener("click", async () => {
         if (!window.pywebview || !pywebview.api) return;
         const key = btn.dataset.vrSet;
-        // Use cached snapshot if available, otherwise capture
-        if (ocrCachedSnapshot) {
+        const group = btn.closest(".vr-group")?.querySelector("[data-vr-test-group]")?.dataset.vrTestGroup || null;
+        // Reuse the shot only if it was taken for this same screen.
+        if (ocrCachedSnapshot && ocrCachedGroup === group) {
           openRegionPicker(key, ocrCachedSnapshot);
           return;
         }
@@ -730,6 +753,7 @@
         btn.textContent = "Set";
         if (!snap.ok) { window.addLog("[OCR] Capture failed — is Roblox running?"); return; }
         ocrCachedSnapshot = snap.data_uri;
+        ocrCachedGroup = group;
         openRegionPicker(key, ocrCachedSnapshot);
       });
     });
@@ -771,6 +795,7 @@
     loadQueuePresets();
     loadVisionRegions();
     refreshChallengeInfo();
+    loadChallengeMaps();
   };
 
   // ---- Macro Manager ----
