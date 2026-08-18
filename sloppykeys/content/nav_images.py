@@ -106,10 +106,13 @@ MATCH_PLAY_IMAGE = "match_play.png"
 #   exp_extract         Extract at a checkpoint
 #   exp_extract_confirm the second Extract, on the "end this run?" panel
 #   exp_upgrade_card    the "Select an upgrade!" header
-#   exp_repeat          the victory screen's Repeat, if Expedition's differs from Story's
 #
 # All optional: a missing crop never matches, which leaves that step inert rather than
 # failing a run, and nothing outside an Expedition match searches for them.
+#
+# There is no Expedition Repeat: its victory screen is left through Back to Lobby and its
+# confirmation (`back_lobby` + `return_lobby_confirm`, already captured), after which the
+# next run enters from the lobby's Play like a fresh one.
 #
 # `exp_upgrade_card` is the level-up modal that hands out three cards. Cropped from the
 # *header*, not a card face, because the three faces differ every time. It matters more than
@@ -120,7 +123,6 @@ EXP_CONTINUE_2_IMAGE = "exp_continue_2.png"
 EXP_EXTRACT_IMAGE = "exp_extract.png"
 EXP_EXTRACT_CONFIRM_IMAGE = "exp_extract_confirm.png"
 EXP_UPGRADE_CARD_IMAGE = "exp_upgrade_card.png"
-EXP_REPEAT_IMAGE = "exp_repeat.png"
 
 # # The post-match panel's "change gamemode" control
 # Leaving a finished match lands on a panel showing the mode just played; this is the
@@ -266,20 +268,6 @@ def exp_upgrade_card_image() -> str:
     return os.path.join(IMAGES_DIR, MATCH_DIR, EXP_UPGRADE_CARD_IMAGE)
 
 
-def exp_repeat_image() -> str:
-    """Expedition's own Repeat on the victory screen.
-
-    Optional, and only needed if it does not look like Story's `repeat.png` —
-    `LobbyNavigator.click_repeat` tries both, so capturing this costs nothing elsewhere.
-    """
-    return os.path.join(IMAGES_DIR, MATCH_DIR, EXP_REPEAT_IMAGE)
-
-
-def repeat_images() -> list[str]:
-    """Every crop that could be the victory screen's Repeat, best-known first."""
-    return [repeat_image(), exp_repeat_image()]
-
-
 def expedition_match_paths() -> list[str]:
     """Every template an Expedition match looks for, in the order the run meets them."""
     return [
@@ -288,7 +276,6 @@ def expedition_match_paths() -> list[str]:
         exp_extract_image(),
         exp_extract_confirm_image(),
         exp_upgrade_card_image(),
-        exp_repeat_image(),
     ]
 
 

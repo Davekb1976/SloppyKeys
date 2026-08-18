@@ -15,7 +15,6 @@ in the Macro Tester. Steps return (ok, message).
 
 from __future__ import annotations
 
-import os
 import time
 from typing import Callable
 
@@ -34,11 +33,13 @@ from sloppykeys.content.start_stage import (
     start_coords,
 )
 from sloppykeys.content.nav_images import (
+    back_lobby_image,
     events_image,
     gamemode_image,
     match_play_image,
     play_image,
-    repeat_images,
+    repeat_image,
+    return_lobby_confirm_image,
     select_stage_image,
     stage_image,
     start_game_image,
@@ -458,6 +459,32 @@ class LobbyNavigator:
         """
         return self._find_click(match_play_image(), "Match Play", timeout=self.search_timeout)
 
+    def back_to_lobby(self) -> tuple[bool, str]:
+        """Leave a finished stage the long way: Back to Lobby, then its confirmation.
+
+        `leave_match` continues out through the in-stage Play and lands on the gamemode
+        panel, which suits a task switch. This lands in the **lobby**, so the next run
+        starts from Play like a fresh one — which is what Expedition needs, its victory
+        screen having no Repeat to take.
+
+        The confirmation is a dialog opened by the click before it, so it gets the fade
+        wait: found is not clickable.
+        """
+        ok, message = self._find_click(
+            back_lobby_image(), "Back to Lobby", timeout=self.search_timeout
+        )
+        if not ok:
+            return (False, message)
+        confirm_ok, confirm_message = self._find_click(
+            return_lobby_confirm_image(),
+            "Return to Lobby",
+            timeout=self.search_timeout,
+            fade_wait=self.panel_fade_wait,
+        )
+        if not confirm_ok:
+            return (False, f"Back to Lobby clicked but {confirm_message}")
+        return (True, f"{message} \u2192 {confirm_message}")
+
     def open_challenges(self) -> tuple[bool, str]:
         """Lobby -> Play -> the Challenges card.
 
@@ -713,27 +740,11 @@ class LobbyNavigator:
         for this one (nobody has measured it), and failing the run over an uncaptured file
         would break every gamemode the moment this shipped.
         """
-        candidates = [p for p in repeat_images() if self._engine.template_exists(p)]
-        if not candidates:
-            return (True, "skipped Repeat — no repeat template captured, waiting for Start Game")
+        path = repeat_image()
+        if not self._engine.template_exists(path):
+            return (True, f"skipped Repeat — {path} is missing, waiting for Start Game instead")
         budget = self.search_timeout if timeout is None else float(timeout)
-        # Every candidate on every pass, not one template's full budget then the next: the
-        # crops are alternatives for the same button, and Expedition's victory screen may
-        # only carry its own. Spending 6s on Story's before ever looking at Expedition's
-        # would read as a Repeat that isn't there.
-        deadline = time.monotonic() + max(0.0, budget)
-        while True:
-            for path in candidates:
-                match = self._find(path)
-                if match is not None:
-                    ok, message = self._click(match)
-                    if not ok:
-                        return (False, f"Repeat click failed: {message}")
-                    return (True, f"clicked Repeat ({os.path.basename(path)}, {match.score:.2f})")
-            if self._should_stop() or time.monotonic() >= deadline:
-                break
-            time.sleep(self.search_poll)
-        return (False, self._miss(candidates[0], "Repeat"))
+        return self._find_click(path, "Repeat", timeout=budget)
 
     def sighted(self, path: str) -> bool:
         """One look: is this template on screen right now?

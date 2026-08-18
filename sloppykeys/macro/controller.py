@@ -317,8 +317,16 @@ class MacroController:
 
                     self._cycle += 1
 
-                    # Click Repeat for next match
-                    if rep < repeat - 1:
+                    if mode == "Expedition":
+                        # Expedition's result screen has no Repeat. Leave through Back to
+                        # Lobby and its confirmation, which lands in the lobby proper, so the
+                        # next rep (or the next task) navigates in from Play like a fresh run
+                        # instead of the finished-match handover. Done after the last rep too:
+                        # the queue must not hand the next task a stage still on screen.
+                        ok, msg = self._nav.back_to_lobby()
+                        self._log(f"  Back to lobby: {msg}")
+                    elif rep < repeat - 1:
+                        # Click Repeat for next match
                         ok, msg = self._nav.click_repeat()
                         if not ok:
                             self._log(f"  Repeat: {msg} — falling through.")
