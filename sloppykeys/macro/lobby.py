@@ -718,6 +718,57 @@ class LobbyNavigator:
         budget = self.search_timeout if timeout is None else float(timeout)
         return self._find_click(path, "Repeat", timeout=budget)
 
+    def sighted(self, path: str) -> bool:
+        """One look: is this template on screen right now?
+
+        Same contract as `in_match` and `result_screen_up` — this answers "what is up", not
+        "get there". False when the file is missing, so a template nobody has captured yet
+        leaves its feature inert instead of taking the run down.
+        """
+        if not self._engine.template_exists(path):
+            return False
+        return self._find(path) is not None
+
+    def click_until_gone(
+        self,
+        path: str,
+        label: str,
+        timeout: float = 0.0,
+        fade_wait: float = 0.0,
+        attempts: int = 3,
+    ) -> tuple[bool, str]:
+        """Click a control until it stops being found.
+
+        `_find_click` clicks once, which is right for a lobby button whose disappearance the
+        next step proves anyway. It is not enough for a control the caller will look for
+        again: a laggy client swallows a click without the button going anywhere, and the
+        next poll then re-finds the *same* screen and reads it as a new one. For a counted
+        screen that is not a slow retry, it is a wrong count.
+
+        Not found on the first look is a miss; not found after a click is the success.
+        """
+        budget = max(0.0, float(timeout))
+        trail = ""
+        for attempt in range(1, max(1, int(attempts)) + 1):
+            match = self._find(path, budget if attempt == 1 else 0.0)
+            if match is None:
+                if attempt == 1:
+                    return (False, self._miss(path, label))
+                return (True, f"{label} cleared after {attempt - 1} click(s){trail}")
+            if attempt == 1 and fade_wait > 0:
+                # Same reason as `_find_click`: found is not clickable, and the panel slides
+                # while it fades, so the first centre goes stale.
+                time.sleep(fade_wait)
+                settled = self._find(path, timeout=0.0)
+                if settled is not None:
+                    match = settled
+            ok, message = self._click(match)
+            if not ok:
+                return (False, f"{label} click failed: {message}")
+            trail = f" ({match.score:.2f})"
+            time.sleep(self.click_settle)
+        return (False, f"{label} still on screen after {attempts} clicks{trail}")
+
     def wait_for_match_ready(self, timeout: float | None = None) -> tuple[bool, str]:
         """Block until the in-match Start Game button appears, i.e. the stage has
         finished loading and the player has control.

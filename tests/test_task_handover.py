@@ -130,6 +130,9 @@ def park_run() -> tuple[FakePlacer, list[str]]:
     ctrl._stop_requested = False
     ctrl._checkpoint = lambda: False
     ctrl._placer = FakePlacer()
+    # No task, so `_run_match` builds no Expedition state and this stays the plain
+    # park-and-wait path every other gamemode takes.
+    ctrl._current_task = None
     ctrl._log = logs.append
     ctrl._stats = type("S", (), {"record": lambda *_a, **_k: None})()
     ctrl._send_webhook_result = lambda *_a: None

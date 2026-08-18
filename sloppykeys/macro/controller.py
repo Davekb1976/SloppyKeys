@@ -31,10 +31,37 @@ from sloppykeys.content.start_stage import (
     difficulty_from_task,
     hard_mode_from_task,
 )
+from sloppykeys.content.nav_images import (
+    exp_continue_2_image,
+    exp_continue_image,
+    exp_extract_confirm_image,
+    exp_extract_continue_image,
+    exp_extract_final_image,
+    exp_extract_image,
+    exp_upgrade_card_image,
+    start_game_image,
+)
 from sloppykeys.content.walk_paths import default_walk_path
 from sloppykeys.core.ahk import AhkBridge
 from sloppykeys.core.image_search import ImageSearchEngine
 from sloppykeys.core.win32 import roblox_window as rbx
+from sloppykeys.macro.expedition import (
+    ACCEPT_EXTRACT,
+    CARD,
+    CARD_DISMISS_CLICK,
+    CHECK_INTERVAL,
+    CONTINUE,
+    CONTINUE_WAVE,
+    DECLINE_EXTRACT,
+    DISMISS_CARD,
+    EXTRACT,
+    FOLLOWUP_TIMEOUT,
+    NOTHING,
+    RESTART_ROUND,
+    START_GAME,
+    ExpeditionMatch,
+    extract_after_from_task,
+)
 from sloppykeys.macro.lobby import LobbyNavigator
 from sloppykeys.macro.placement import UnitPlacer, OUTCOME_WON, OUTCOME_LOST
 
@@ -458,6 +485,11 @@ class MacroController:
         match_budget = max(1.0, float(getattr(self._placer, "won_timeout", 900.0)))
         match_deadline = time.monotonic() + match_budget
 
+        # Expedition only, and per match: everything below is None for every other gamemode,
+        # so no other mode pays a search or changes behaviour.
+        self._exp = self._expedition_state()
+        self._exp_next_check = 0.0
+
         while not self._stop_requested:
             if self._checkpoint():
                 return
@@ -468,6 +500,25 @@ class MacroController:
                     f"match and moving on. Check the Won/Lost templates if it really did end."
                 )
                 return
+
+            # Before the blocks and before parking: Expedition's own screens are what a
+            # placement click would otherwise land on, and a checkpoint waiting for a click
+            # is not a match to park through.
+            if self._exp is not None:
+                event = self._expedition_tick()
+                if event == "win":
+                    self._stats.record(won=True)
+                    self._log("  Extracted — Expedition run complete.")
+                    self._send_webhook_result("win")
+                    return
+                if event == "restage":
+                    self._log(
+                        "  The round is re-staging, so the placed units have left the board — "
+                        "replaying Battle once to put them back."
+                    )
+                    battle_idx = 0
+                    parked = False
+                    self._reset_battle_state()
 
             if battle_idx >= len(battle) and not loop_a and not loop_b:
                 now = time.time()
@@ -532,6 +583,169 @@ class MacroController:
         `won 0.57, lost 0.71` misread `_outcome_is_clear` exists to prevent.
         """
         return self._placer.poll_outcome()
+
+    # -- Expedition's mid-match screens --
+
+    def _expedition_state(self) -> ExpeditionMatch | None:
+        """A fresh match state for an Expedition task, None for every other gamemode.
+
+        Built per match, so the extract counter starts at zero for each rep — a shared one
+        would extract the second run of a repeat the instant it offered.
+        """
+        task = self._current_task or {}
+        if task.get("mode") != "Expedition":
+            return None
+        after = extract_after_from_task(task.get("extract_after"))
+        self._log(f"  Expedition: extracting at offer {after}.")
+        return ExpeditionMatch(after)
+
+    def _expedition_tick(self) -> str | None:
+        """Handle whatever Expedition screen is up. "win" once extracted, "restage" when the
+        board was reset, None otherwise.
+
+        Throttled: four template searches is ~70ms and this shares a thread with the blocks,
+        so looking every tick would spend a fifth of the run loop on screens that change once
+        a wave. The searches short-circuit in priority order — nothing behind the upgrade
+        card can be clicked, so when it is up nothing else is even looked for.
+        """
+        now = time.time()
+        if now < getattr(self, "_exp_next_check", 0.0):
+            return None
+        self._exp_next_check = now + CHECK_INTERVAL
+
+        seen: set[str] = set()
+        if self._nav.sighted(exp_upgrade_card_image()):
+            seen.add(CARD)
+        else:
+            if self._nav.sighted(start_game_image()):
+                seen.add(START_GAME)
+            if self._nav.sighted(exp_extract_image()):
+                seen.add(EXTRACT)
+            elif self._nav.sighted(exp_continue_image()):
+                seen.add(CONTINUE)
+
+        action, note = self._exp.decide(seen, now)
+        if action == NOTHING:
+            return None
+        self._log(f"  [expedition] {note}")
+
+        if action == DISMISS_CARD:
+            # No template for the three card faces — they differ every time — so this clicks
+            # the middle of the screen, which is the middle card. Harmless if the modal has
+            # already auto-selected by itself, which it does after about 12s.
+            pos = self._client_to_screen(*CARD_DISMISS_CLICK)
+            if pos is not None:
+                from sloppykeys.macro.input_scripts import nudge_click_script, SPREAD_TIGHT
+
+                # Nudged like every other click: Roblox ignores one that arrives with no
+                # hover. Not parked — in-match the cursor belongs where it clicked.
+                self._ahk.run(
+                    nudge_click_script(pos[0], pos[1], spread=SPREAD_TIGHT), wait=True, timeout=5.0
+                )
+            return None
+
+        if action == RESTART_ROUND:
+            ok, msg = self._nav.click_start_game(timeout=0.0)
+            self._log(f"  Start Game (mid-match): {msg}")
+            if ok and self._exp.note_restage():
+                return "restage"
+            return None
+
+        if action == ACCEPT_EXTRACT:
+            if self._exp_extract():
+                return "win"
+            left = self._exp.note_extract_failed()
+            self._log(
+                f"  Extraction didn't register — continuing this checkpoint instead "
+                f"({left} more {'try' if left == 1 else 'tries'} before the run plays on)."
+            )
+            # Fall through and decline: a failed extract must not leave the run parked on the
+            # same screen, and continuing costs one wave and buys another offer.
+            action = DECLINE_EXTRACT
+
+        if action == DECLINE_EXTRACT:
+            ok, msg = self._nav.click_until_gone(exp_extract_continue_image(), "Keep going")
+            self._log(f"  Keep going: {msg}")
+            if ok:
+                self._exp_followup()
+            return None
+
+        if action == CONTINUE_WAVE:
+            ok, msg = self._nav.click_until_gone(exp_continue_image(), "Continue")
+            self._log(f"  Continue: {msg}")
+            if ok:
+                self._exp_followup()
+            return None
+
+        return None
+
+    def _exp_followup(self) -> bool:
+        """Click the second Continue that follows every checkpoint click.
+
+        Either face can be the one on screen depending on the wave, so both are accepted
+        rather than only the expected one — insisting on `exp_continue_2` reads a wave that
+        showed the checkmarked variant as a step that never happened.
+        """
+        deadline = time.monotonic() + FOLLOWUP_TIMEOUT
+        candidates = (
+            (exp_continue_2_image(), "Second Continue"),
+            (exp_extract_continue_image(), "Second Continue (checkmarked)"),
+        )
+        while time.monotonic() < deadline:
+            if self._checkpoint():
+                return False
+            for path, label in candidates:
+                if self._nav.sighted(path):
+                    ok, msg = self._nav.click_until_gone(
+                        path, label, fade_wait=self._nav.panel_fade_wait
+                    )
+                    self._log(f"  {label}: {msg}")
+                    return ok
+            time.sleep(self._nav.search_poll)
+        self._log("  No second Continue appeared — carrying on, the next look will retry.")
+        return False
+
+    def _exp_extract(self) -> bool:
+        """Take the extraction. True only once the chain is proven to have registered.
+
+        Up to three screens: Extract, the Extract on the panel it opens, and a last
+        "end this run?" confirm that does not always appear.
+        """
+        ok, msg = self._nav.click_until_gone(exp_extract_image(), "Extract")
+        self._log(f"  Extract: {msg}")
+        if not ok:
+            return False
+        ok, msg = self._nav.click_until_gone(
+            exp_extract_confirm_image(),
+            "Extract confirm",
+            timeout=self._nav.search_timeout,
+            fade_wait=self._nav.panel_fade_wait,
+        )
+        self._log(f"  Extract confirm: {msg}")
+        if not ok:
+            return False
+        if self._nav.sighted(exp_extract_final_image()):
+            ok, msg = self._nav.click_until_gone(
+                exp_extract_final_image(), "End run", fade_wait=self._nav.panel_fade_wait
+            )
+            self._log(f"  End run: {msg}")
+        # Proof, not hope: a chain that did not register leaves Extract on screen, and
+        # calling that a win records a run that never ended and strands the cycle.
+        if self._nav.sighted(exp_extract_image()):
+            self._log("  Extract is still on screen after the confirm chain.")
+            return False
+        return True
+
+    def _reset_battle_state(self) -> None:
+        """Forget per-block progress so a phase can run a second time.
+
+        `_tick_upgrade_unit` keeps its remaining count in `_upgrade_state` keyed by
+        `id(block)`, and a replay hands it the same block objects — so without this every
+        upgrade block is already spent and the replay places units it never upgrades.
+        `_wave_check_time` is `wait_wave`'s OCR throttle.
+        """
+        self._upgrade_state = {}
+        self._wave_check_time = 0.0
 
     def _execute_battle_block(self, block: dict) -> bool:
         """Execute one block in a tick-based context. Returns True when done
