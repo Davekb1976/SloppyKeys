@@ -57,6 +57,10 @@ class Gamemode:
     # strip fills both dropdowns from the route store instead, and `has_targets`
     # stays True so the config path keeps its <Map>/<Act> shape.
     custom: bool = False
+    # True when each act of a map is its own playfield, so the placement backdrop has to
+    # be captured per act (`assets/reference/<Mode>/<Map>/<Act>.png`) instead of once per
+    # map. Raid's three acts are separate areas of Spirit City; Story's five share one.
+    per_act_reference: bool = False
     # True for a mode the macro plays but the user never selects as the run target:
     # Challenge, which is entered from inside a match. It is kept out of the
     # Selector page, the full-run tester dialog and the lobby template expectations,
@@ -82,6 +86,7 @@ GAMEMODES: dict[str, Gamemode] = {
         target_label="Act",
         maps=["Spirit City"],
         targets=RAID_ACTS,
+        per_act_reference=True,
     ),
     "Expedition": Gamemode(
         name="Expedition",

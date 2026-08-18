@@ -15,6 +15,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from sloppykeys.content.gamemodes import GAMEMODES  # noqa: E402
+from sloppykeys.content.nav_images import map_reference_image  # noqa: E402
 from sloppykeys.ui_web.bridge import Api  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -39,6 +41,24 @@ def main() -> None:
     assert maps["names"], "no map references found under assets/reference"
     for entry in maps["names"]:
         assert entry["path"].startswith("assets/reference/"), entry["path"]
+
+    # Every backdrop the schema implies gets a card, captured or not: a mode absent from
+    # the listing has nowhere to capture into, which is how Expedition ended up with no
+    # maps at all. Raid is the per-act layout, Expedition the per-map one.
+    listed = {e["path"] for e in maps["names"]}
+    for name, gamemode in GAMEMODES.items():
+        if gamemode.custom:
+            continue
+        for map_name in gamemode.maps:
+            acts = gamemode.targets if gamemode.per_act_reference else [""]
+            for act in acts:
+                want = map_reference_image(name, map_name, act).replace("\\", "/")
+                assert want in listed, f"no card for {want}"
+    assert "assets/reference/Expedition/East Town.png" in listed
+    assert "assets/reference/Raid/Spirit City/Act 2.png" in listed
+    # Grouping the page renders sections from: category-relative subfolder.
+    groups = {e["group"] for e in maps["names"]}
+    assert {"Story", "Expedition", "Raid/Spirit City"} <= groups, groups
 
     # Refusals: traversal, a non-PNG, and no snapshot to save.
     for bad in ("../evil.png", "assets/reference/../../evil.png", "assets/reference/x.txt"):

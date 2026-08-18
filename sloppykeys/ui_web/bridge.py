@@ -1195,11 +1195,15 @@ class Api:
         categories = []
         images_root = os.path.join(self._app_root, "assets")
 
-        # Collect all expected template paths so we can mark missing ones
-        from sloppykeys.content.nav_images import expected_paths
+        # Collect all expected template paths so we can mark missing ones. Map references
+        # come from the same schema: an uncaptured backdrop is only a fallback to a live
+        # capture, but without a card here there is nowhere to capture it — which is why
+        # Expedition had no maps at all.
+        from sloppykeys.content.nav_images import expected_paths, map_reference_paths
         expected = set()
         try:
             expected = set(p.replace("\\", "/") for p in expected_paths())
+            expected |= set(p.replace("\\", "/") for p in map_reference_paths())
         except Exception:
             pass
 

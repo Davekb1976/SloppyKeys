@@ -9,6 +9,7 @@ Layout (under assets/):
     assets/gamemodes/<gamemode>.png             one per gamemode card
     assets/stages/<gamemode>/<stage>.png        one per stage/map
     assets/match/start_game.png                 in-match, proves the stage loaded
+    assets/reference/<gamemode>/<map>.png       placement backdrop, not a template
 
 Filenames are slugs: lowercase, non-alphanumerics collapsed to "_".
   "King's Tomb"        -> kings_tomb.png
@@ -30,6 +31,9 @@ MATCH_DIR = "match"
 # Where route templates live: the event cards in the sidebar, the act cards, and
 # anything else a user-authored Events route needs to confirm.
 EVENTS_DIR = "events"
+# Placement backdrops, not search templates: whole client-area screenshots the position
+# picker draws coordinates on. See assets/reference/README.md.
+REFERENCE_DIR = "reference"
 
 PLAY_IMAGE = "play.png"
 # The lobby's Start button — the last click before the stage loads, on the panel that
@@ -203,6 +207,38 @@ def win_change_image() -> str:
 
 
 
+
+
+def map_reference_image(gamemode: str, map_name: str, act: str = "") -> str:
+    """Placement backdrop for a map — or for one act, where the acts are separate areas.
+
+    Display names, not slugs: these are hand-dropped files and the tree already holds
+    `assets/reference/Story/King's Tomb.png`.
+    """
+    parts = [IMAGES_DIR, REFERENCE_DIR, gamemode, map_name]
+    if act:
+        parts.append(act)
+    return os.path.join(*parts) + ".png"
+
+
+def map_reference_paths() -> list[str]:
+    """Every placement backdrop the schema implies, captured or not.
+
+    Nothing matches against these, so a missing one only means the picker falls back to a
+    live capture — but the Image Manager lists them from here, and a mode absent from this
+    list has no card to capture into. That is why Expedition had no maps.
+    """
+    paths = []
+    for name, gamemode in GAMEMODES.items():
+        # Events' maps are the user's own events, known only to routes.json.
+        if gamemode.custom:
+            continue
+        for map_name in gamemode.maps:
+            if gamemode.per_act_reference:
+                paths.extend(map_reference_image(name, map_name, act) for act in gamemode.targets)
+            else:
+                paths.append(map_reference_image(name, map_name))
+    return paths
 
 
 def expected_paths() -> list[str]:
