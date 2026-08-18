@@ -128,6 +128,16 @@ input:focus, select:focus {
 .clock-label { font-size: 8px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-faint); }
 .clock-value { font-size: 12px; font-weight: 600; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 
+/* Hotkey pills — the binds with no on-screen button, so the key is the only affordance. */
+.hotkey-pills { display: flex; align-items: center; gap: 4px; }
+.hotkey-pill {
+  display: flex; align-items: center; gap: 4px; height: 18px; padding: 0 6px;
+  border: 1px solid var(--border); background: var(--surface-sunken);
+  font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+}
+.hotkey-pill-key { color: var(--accent); font-variant-numeric: tabular-nums; }
+.hotkey-pill-label { color: var(--text-faint); }
+
 /* Window buttons — square, traffic-light style, side by side */
 .win-btns { display: flex; gap: var(--space-1); }
 .titlebar-btn {
@@ -151,11 +161,12 @@ input:focus, select:focus {
 .dash-layout { display: flex; flex: 1; min-height: 0; max-height: 100%; }
 .dash-left { display: flex; flex-direction: column; width: 1152px; flex-shrink: 0; }
 
-/* Compact mode: hide everything except game + a slim status strip */
+/* Compact mode: hide everything except game + a slim status strip. The session clock and
+   the hotkey pills stay — compact mode is the one where the side panel is gone, so they
+   are the only place left showing the run time and the keys that still work. */
 .compact-mode .dash-right,
 .compact-mode .dash-log,
-.compact-mode .titlebar-nav,
-.compact-mode .titlebar-clocks { display: none !important; }
+.compact-mode .titlebar-nav { display: none !important; }
 .compact-mode .dash-left { width: 100%; }
 .compact-mode .compact-strip { display: flex !important; }
 

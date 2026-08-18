@@ -51,6 +51,9 @@
     <div class="titlebar-drag" id="drag-handle"></div>
 
     <div class="titlebar-right no-drag">
+      <!-- Filled by renderHotkeyPills(). Empty here because the binds are rebindable, so
+           the labels have to come from the backend, not from this markup. -->
+      <div class="hotkey-pills" id="hotkey-pills"></div>
       <div class="titlebar-clocks">
         <div class="clock-item">
           <span class="clock-label">Session</span>

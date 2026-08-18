@@ -228,6 +228,25 @@
   setInterval(tickClock, 1000);
   tickClock();
 
+  // ---- Hotkey pills ----
+  // Only the binds with nothing on screen to click. Start, Pause and Stop have buttons on
+  // the control card and in the compact strip, so a pill for them is noise.
+  const PILL_ACTIONS = { reload: "Reload", image_manager: "Images", compact_mode: "Compact" };
+
+  window.renderHotkeyPills = async function () {
+    const host = document.getElementById("hotkey-pills");
+    if (!host || !window.pywebview || !pywebview.api) return;
+    let hk = {};
+    try { hk = (await pywebview.api.get_hotkeys()) || {}; } catch (e) { return; }
+    host.innerHTML = Object.entries(PILL_ACTIONS).map(([action, label]) => {
+      const key = hk[action];
+      if (!key) return "";  // unbound: no key to advertise
+      return `<span class="hotkey-pill" title="${label}: ${key}">
+        <span class="hotkey-pill-key">${key}</span><span class="hotkey-pill-label">${label}</span>
+      </span>`;
+    }).join("");
+  };
+
   // ---- Task Queue ----
   let tasks = [];
   let selectedTaskId = null;
@@ -851,6 +870,7 @@
     loadVisionRegions();
     refreshChallengeInfo();
     loadChallengeMaps();
+    window.renderHotkeyPills();
   };
 
   // ---- Macro Manager ----
@@ -1562,7 +1582,8 @@
               const display = (ctrl ? "Ctrl + " : "") + (shift ? "Shift + " : "") + (alt ? "Alt + " : "") + e.key.toUpperCase();
               btn.textContent = display;
               if (window.pywebview && pywebview.api) {
-                pywebview.api.set_hotkey(btn.dataset.action, vk, ctrl, shift, alt);
+                pywebview.api.set_hotkey(btn.dataset.action, vk, ctrl, shift, alt)
+                  .then(() => window.renderHotkeyPills());
                 pywebview.api.end_hotkey_capture();
               }
             };
@@ -1593,7 +1614,7 @@
   document.getElementById("btn-reset-hotkeys").addEventListener("click", async () => {
     if (!window.pywebview || !pywebview.api) return;
     const r = await pywebview.api.reset_hotkeys();
-    if (r.ok) { loadSettings(); window.addLog("Hotkeys reset to defaults."); }
+    if (r.ok) { loadSettings(); window.renderHotkeyPills(); window.addLog("Hotkeys reset to defaults."); }
   });
 
   // Game keybinds: load + capture
