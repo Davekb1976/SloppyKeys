@@ -1,6 +1,6 @@
 """Runnable checks for how a plan turns into a run: step ordering, priority
-presses, the auto-upgrade press count, and the sell delay round-tripping through a
-config file.
+presses, the auto-upgrade press count, and the sell delay surviving a payload
+round trip.
 
 No framework, no input fired:
 `.venv\\Scripts\\python.exe tests\\test_placement_plan.py`
@@ -10,11 +10,9 @@ from __future__ import annotations
 
 import os
 import sys
-import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from sloppykeys.config.unit_configs import UnitConfigStore  # noqa: E402
 from sloppykeys.content.units import (  # noqa: E402
     AUTOUPGRADE_CYCLE,
     PRIORITY_OPTIONS,
@@ -57,28 +55,26 @@ for index, name in enumerate(PRIORITY_OPTIONS):
 assert priority_presses("") == 0
 assert priority_presses("Nonsense") == 0
 
-# # Sell delay survives a save/load round trip, and old configs still read
-with tempfile.TemporaryDirectory() as root:
-    store = UnitConfigStore(root)
-    plan = UnitPlan.empty()
-    step = plan.steps[0]
-    step.x, step.y, step.slot = "300", "400", "2"
-    step.sell = True
-    step.sell_wait = "5000"
-    step.autoupgrade = 3
-    step.preplacement = True
-    assert store.save("Story", "Flower Forest", "Act 1", plan)
+# # A step survives a payload round trip, and old configs still read
+# This was a save/load through `UnitConfigStore`, which is gone with the `configs/` tree —
+# plans are blocks in `operations/<name>.json` now, keyed by operation name rather than by
+# gamemode/map/act. The payload shape is the half that still has to hold.
+step = UnitPlan.empty().steps[0]
+step.x, step.y, step.slot = "300", "400", "2"
+step.sell = True
+step.sell_wait = "5000"
+step.autoupgrade = 3
+step.preplacement = True
+restored = UnitStep.from_payload(step.as_payload(), 1)
+assert restored.sell_wait == "5000", restored.sell_wait
+assert restored.sell and restored.preplacement
+assert restored.autoupgrade == 3, restored.autoupgrade
 
-    loaded = store.load("Story", "Flower Forest", "Act 1").steps[0]
-    assert loaded.sell_wait == "5000", loaded.sell_wait
-    assert loaded.sell and loaded.preplacement
-    assert loaded.autoupgrade == 3, loaded.autoupgrade
-
-    # A config written before the field existed means "sell immediately".
-    legacy = UnitStep.from_payload(
-        {"Step": 1, "Kind": "unit", "X": "1", "Y": "2", "Slot": "1", "Sell": 1}, 1
-    )
-    assert legacy.sell_wait == "", legacy.sell_wait
+# A config written before the field existed means "sell immediately".
+legacy = UnitStep.from_payload(
+    {"Step": 1, "Kind": "unit", "X": "1", "Y": "2", "Slot": "1", "Sell": 1}, 1
+)
+assert legacy.sell_wait == "", legacy.sell_wait
 
 # # Auto upgrade is a press count, and the old 0/1 flag still means what it meant
 assert autoupgrade_presses(0) == 0

@@ -1,81 +1,72 @@
-"""Runnable check for the placement picker's map reference lookup.
+"""Runnable checks for where a placement backdrop lives.
 
-No framework: `.venv\\Scripts\\python.exe tests\\test_reference_images.py`.
-Writes only into a temp dir; never touches images/reference.
+    .venv\\Scripts\\python.exe tests\\test_reference_images.py
+
+Two layouts (see assets/reference/README.md): one file per map, or one per act where the
+acts are separate areas of it. Getting the shape wrong means the picker shows the wrong
+ground, and every coordinate read off it is wrong in a way that looks like a bad click.
+
+This used to test `sloppykeys.ui.placement_overlay.reference_path` / `load_reference` and
+their QPixmap loading. That module went with the PySide6 front end: the path is
+`content/nav_images.map_reference_image` now and the loading is `Api.get_map_image`. The
+name sanitisation is the part worth keeping either way — a gamemode/map/act reaches the
+filesystem, and for an Events route the user typed all three.
 """
 
 from __future__ import annotations
 
 import os
 import sys
-import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from PySide6.QtGui import QPixmap  # noqa: E402
-from PySide6.QtWidgets import QApplication  # noqa: E402
+from sloppykeys.content.gamemodes import GAMEMODES  # noqa: E402
+from sloppykeys.content.nav_images import (  # noqa: E402
+    map_reference_image,
+    map_reference_paths,
+)
+from sloppykeys.ui_web.bridge import Api  # noqa: E402
 
-from sloppykeys.ui.placement_overlay import load_reference, reference_path  # noqa: E402
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-app = QApplication([])
+# # Per map: Story's five acts share one playfield.
+assert map_reference_image("Story", "Flower Forest") == os.path.join(
+    "assets", "reference", "Story", "Flower Forest.png"
+), map_reference_image("Story", "Flower Forest")
 
-with tempfile.TemporaryDirectory() as images_dir:
-    # An incomplete selection has no path, so nothing can be looked up.
-    assert reference_path(images_dir, "", "") is None
-    assert reference_path(images_dir, "Story", "") is None
-    assert reference_path("", "Story", "Flower Forest") is None
-    assert load_reference(images_dir, "Story", "Flower Forest") is None
+# # Per act: Raid's acts are separate areas of Spirit City, so each needs its own.
+assert map_reference_image("Raid", "Spirit City", "Act 2") == os.path.join(
+    "assets", "reference", "Raid", "Spirit City", "Act 2.png"
+), map_reference_image("Raid", "Spirit City", "Act 2")
 
-    path = reference_path(images_dir, "Story", "Flower Forest")
-    assert path is not None
-    assert path.endswith(os.path.join("reference", "Story", "Flower Forest.png")), path
+# # Nothing escapes assets/reference, whatever the name says. An Events map and act are
+# typed by the user, and this path is what a capture overwrites.
+for dodgy in (
+    map_reference_image("..", "../../evil"),
+    map_reference_image("Raid", "Spirit City", "../../../evil"),
+    map_reference_image("Story", 'bad:name*here?'),
+):
+    assert ".." not in dodgy, dodgy
+    assert dodgy.startswith(os.path.join("assets", "reference") + os.sep), dodgy
+    assert dodgy.count(os.sep) <= 4, dodgy  # assets/reference/<mode>/<map>[/<act>]
 
-    # Names that become a path are sanitised, and traversal can't escape the dir —
-    # including the act, which is now part of the path too.
-    for dodgy in (
-        reference_path(images_dir, "..", "../../evil"),
-        reference_path(images_dir, "Raid", "Spirit City", "../../../evil"),
-    ):
-        assert dodgy is not None
-        assert os.path.commonpath([os.path.abspath(dodgy), os.path.abspath(images_dir)]) == (
-            os.path.abspath(images_dir)
-        ), dodgy
+# # The schema drives the list, so a new map needs no edit here.
+paths = map_reference_paths()
+assert len(paths) == len(set(paths)), "a backdrop is claimed twice"
+for name, gamemode in GAMEMODES.items():
+    want = [p for p in paths if p.startswith(os.path.join("assets", "reference", name) + os.sep)]
+    if gamemode.custom or gamemode.side_task:
+        # Events' maps live in routes.json; Challenge plays Story's maps and reads Story's
+        # backdrops.
+        assert not want, (name, want)
+        continue
+    expected = len(gamemode.maps) * (len(gamemode.targets) if gamemode.per_act_reference else 1)
+    assert len(want) == expected, (name, len(want), expected)
 
-    # A real file at that path loads back at its own size.
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    shot = QPixmap(816, 638)
-    shot.fill()
-    assert shot.save(path, "PNG")
-
-    loaded = load_reference(images_dir, "Story", "Flower Forest")
-    assert loaded is not None
-    assert (loaded.width(), loaded.height()) == (816, 638), (loaded.width(), loaded.height())
-
-    # # Per-act references (Raid: one map, three separate areas)
-    act_path = reference_path(images_dir, "Raid", "Spirit City", "Act 2")
-    assert act_path is not None
-    assert act_path.endswith(
-        os.path.join("reference", "Raid", "Spirit City", "Act 2.png")
-    ), act_path
-
-    # Missing act file falls back to the map file, so Story keeps working as before.
-    assert load_reference(images_dir, "Story", "Flower Forest", "Act 3") is not None
-    # Nothing for Raid yet, so no background at all.
-    assert load_reference(images_dir, "Raid", "Spirit City", "Act 2") is None
-
-    os.makedirs(os.path.dirname(act_path), exist_ok=True)
-    act_shot = QPixmap(816, 638)
-    act_shot.fill()
-    assert act_shot.save(act_path, "PNG")
-    assert load_reference(images_dir, "Raid", "Spirit City", "Act 2") is not None
-    # A different act of the same map still has no image of its own and no map file.
-    assert load_reference(images_dir, "Raid", "Spirit City", "Act 1") is None
-
-    # A file that isn't a readable image is treated as missing, not as a crash.
-    broken = reference_path(images_dir, "Story", "Rose Kingdom")
-    assert broken is not None
-    with open(broken, "wb") as handle:
-        handle.write(b"not a png")
-    assert load_reference(images_dir, "Story", "Rose Kingdom") is None
+# # The bridge refuses to read outside the folder rather than trusting the page.
+api = Api.__new__(Api)  # no window: nothing here touches pywebview
+api._app_root = ROOT
+for cat, name in (("..", "settings"), ("Story", "../../settings"), ("Story", "../../../evil")):
+    assert api.get_map_image(cat, name)["ok"] is False, (cat, name)
 
 print("reference images: OK")

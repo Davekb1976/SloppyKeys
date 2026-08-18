@@ -6,12 +6,13 @@ come back as one. And `_MatchSchedule` is what lets an ability repeat during a m
 run loop advances one step at a time and waits for it, so a repeating step in the chain
 would hold the run and stop anything looking for the result screen.
 
-The last section covers the editor, where turning During match on has to leave the step
-with a usable interval: `Wait` is the repeat interval there, and its floor is one result
-poll, so a step left at 0 would fire as fast as AHK can run.
+A third section used to cover the PySide6 step editor (`DetailEditor`, its During-match
+toggle and its default interval). That editor was deleted with `sloppykeys/ui/` — steps are
+block dicts edited in `ui_web/app.js` now, with no seconds conversion and no toggle — so
+those asserts went with it rather than being re-pointed at something equivalent.
 
 No framework, no capture, no input — the engine's capture is replaced with a synthetic
-frame, and Qt runs offscreen: `.venv\\Scripts\\python.exe tests\\test_find_click.py`
+frame: `.venv\\Scripts\\python.exe tests\\test_find_click.py`
 """
 
 from __future__ import annotations
@@ -249,96 +250,5 @@ assert "Ms" not in gate.as_payload(), gate.as_payload()
 # An unboxed gate says so in the list, since it can only ever fault at run time.
 assert "no region" in StepAction(type="wave", wave=3).summary()
 assert "no region" not in gate.summary(), gate.summary()
-
-# # The editor: the toggle has to leave the step in a state that works
-os.environ["QT_QPA_PLATFORM"] = "offscreen"
-os.environ["QT_ENABLE_HIGHDPI_SCALING"] = "0"
-os.environ["QT_SCALE_FACTOR"] = "1"
-
-from PySide6.QtWidgets import QApplication  # noqa: E402
-
-from sloppykeys.content.units import KIND_SEQUENCE  # noqa: E402
-from sloppykeys.ui.pages.units_page import (  # noqa: E402
-    DURING_MATCH_DEFAULT_MS,
-    DetailEditor,
-)
-
-app = QApplication([])
-detail = DetailEditor()
-
-# Find + Click is offered, and its fields replace the coordinate fields.
-labels = [
-    detail._sequence._type_picker.itemText(index)
-    for index in range(detail._sequence._type_picker.count())
-]
-assert "Find + Click" in labels, labels
-assert "Wait for Wave" in labels, labels
-detail._sequence._apply_field_visibility(ACTION_FIND_CLICK)
-for widget in (
-    detail._sequence._image,
-    detail._sequence._capture,
-    detail._sequence._region,
-    detail._sequence._click_all,
-):
-    assert not widget.isHidden(), widget
-for widget in (detail._sequence._x, detail._sequence._y, detail._sequence._key):
-    assert widget.isHidden(), widget
-
-# Click-all writes through to the action being edited.
-ability = UnitStep(step=1, kind=KIND_SEQUENCE)
-ability.actions = [StepAction(type=ACTION_FIND_CLICK, image="images/actions/a.png")]
-detail.load(ability)
-detail._sequence._list.setCurrentRow(0)
-detail._sequence._click_all.setChecked(True)
-assert ability.actions[0].click_all is True
-assert detail._sequence._image.text() == "images/actions/a.png"
-
-# Turning During match on gives an interval instead of leaving 0, which the schedule would
-# floor to one poll and fire as fast as AHK allows.
-assert ability.wait == "", repr(ability.wait)
-detail._during_match.setChecked(True)
-assert ability.during_match is True
-assert ability.wait == str(DURING_MATCH_DEFAULT_MS), repr(ability.wait)
-assert detail._wait.ms() == DURING_MATCH_DEFAULT_MS, detail._wait.ms()
-
-# An interval the user already set is left alone.
-chosen = UnitStep(step=2, kind=KIND_SEQUENCE, wait="5000")
-chosen.actions = [StepAction(type=ACTION_FIND_CLICK, image="images/actions/b.png")]
-detail.load(chosen)
-detail._during_match.setChecked(True)
-assert chosen.wait == "5000", repr(chosen.wait)
-
-# Pre-placement is cleared with it: that phase ends when the wave starts, so a step cannot
-# be both, and leaving both set would run it once *and* schedule it.
-both = UnitStep(step=3, x="10", y="20", slot="1", preplacement=True)
-detail.load(both)
-detail._during_match.setChecked(True)
-assert both.during_match and not both.preplacement, (both.during_match, both.preplacement)
-assert not detail._preplacement.isChecked()
-
-# A Wave action shows its own fields and nothing else's, and a fresh one is not left on the
-# wave number the gate refuses.
-detail._sequence._apply_field_visibility("wave")
-for widget in (
-    detail._sequence._wave,
-    detail._sequence._max_wave,
-    detail._sequence._wave_region,
-):
-    assert not widget.isHidden(), widget
-for widget in (
-    detail._sequence._image, detail._sequence._click_all,
-    detail._sequence._x, detail._sequence._wait,
-):
-    assert widget.isHidden(), widget
-
-waved = UnitStep(step=4, kind=KIND_SEQUENCE)
-waved.actions = [StepAction(type=ACTION_FIND_CLICK, image="images/actions/c.png")]
-detail.load(waved)
-detail._sequence._list.setCurrentRow(0)
-detail._sequence._type_picker.setCurrentIndex(
-    detail._sequence._type_picker.findData("wave")
-)
-assert waved.actions[0].type == "wave", waved.actions[0].type
-assert waved.actions[0].wave == 1, waved.actions[0].wave
 
 print("find click: OK")

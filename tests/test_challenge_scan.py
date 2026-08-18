@@ -26,6 +26,7 @@ from sloppykeys.content.challenge import (  # noqa: E402
     next_daily_reset_at,
     next_interval_at,
 )
+from sloppykeys.content.gamemodes import STORY_MAPS  # noqa: E402
 from sloppykeys.macro.challenge import (  # noqa: E402
     MAP_MATCH_MIN,
     STATE_EXHAUSTED,
@@ -37,12 +38,12 @@ from sloppykeys.macro.challenge import (  # noqa: E402
     parse_limit,
 )
 
-# Read from theme rather than hardcoded: the viewport size changed once (816x638 -> 800x599,
-# Roblox's own minimum, which is what stops it interpolating its UI) and a hardcoded copy here
-# would have kept passing while every box was out of bounds.
-from sloppykeys.ui import theme  # noqa: E402
+# Read from the app rather than hardcoded: the viewport size has changed twice (816x638 ->
+# 800x599 -> 1152x756) and a hardcoded copy here would have kept passing while every box was
+# out of bounds. It lives in the bridge now; `sloppykeys.ui.theme` was the PySide6 front end.
+from sloppykeys.ui_web.bridge import VIEWPORT_H, VIEWPORT_W  # noqa: E402
 
-VIEWPORT = (theme.VIEWPORT_WIDTH, theme.VIEWPORT_HEIGHT)
+VIEWPORT = (VIEWPORT_W, VIEWPORT_H)
 
 # # Coordinates stay inside the pinned viewport, or they'd read someone else's pixels
 for name, table in (("star", STAR_REGIONS), ("limit", LIMIT_REGIONS), ("map", MAP_REGIONS)):
@@ -58,13 +59,9 @@ for table in (STAR_REGIONS, LIMIT_REGIONS, MAP_REGIONS):
     assert tops == sorted(tops), tops
 
 # # No templates at all: the scan is pure OCR, and no per-map crops were ever wanted.
-assert challenge_maps() == [
-    "School Grounds",
-    "Flower Forest",
-    "Rose Kingdom",
-    "Fairy King Forest",
-    "King's Tomb",
-], challenge_maps()
+# Compared against the table rather than a copy of it: Challenge draws from Story's maps, so
+# a map added to Story has to appear here too. The copy went stale when East Town landed.
+assert challenge_maps() == STORY_MAPS, challenge_maps()
 assert expected_templates() == [], expected_templates()
 # The greyed-star threshold sits in the measured gap: greyed reads 6, active reads 242.
 assert 20 < STAR_SATURATION_MIN < 150, STAR_SATURATION_MIN

@@ -1,1 +1,1 @@
-"""SloppyKeys — Anime Expedition macro (Windows-only, PySide6)."""
+"""SloppyKeys — Anime Expedition macro (Windows-only, pywebview + WebView2)."""

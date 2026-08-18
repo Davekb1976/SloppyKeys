@@ -187,12 +187,13 @@ Versions are `MAJOR.MINOR.PATCH` with a **single-digit patch**: `0.1.9` is follo
 ```
 sloppykeys/
   content/   the tables — gamemodes, act coordinates, nav images, routes
-  config/    readers and writers for settings.json, configs/, routes.json
+  config/    readers and writers for settings.json, operations/, routes.json
   core/      Win32 (ctypes), image search, OCR, the AHK bridge, the webhook
   macro/     what to play next, the lobby walk, camera, unit placement, the runner
-  ui/        PySide6 — pages, editors, the viewport that hosts the Roblox window
-configs/     unit placement plans, per gamemode and map
-images/      the templates it matches against
+  ui_web/    pywebview + HTML/CSS/JS over WebView2; bridge.py is the js_api surface
+assets/      the templates it matches against, and the placement backdrops
+operations/  the block macros — pre-start, battle and the two loops
+paths/       walk recordings
 tests/       assert scripts, no framework
 ```
 
