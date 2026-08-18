@@ -21,23 +21,28 @@ been offered by a build (see `merge_shipped`).
 
 A map always carries at least one act (`DEFAULT_ACT`) so the rest of the app sees
 the same Gamemode / Map / Act shape it already handles — an event with no act
-divisions is just one act called Main. That keeps `configs/Events/<Map>/<Act>.json`
-identical in shape to Story and Raid, with no special case in `UnitConfigStore`.
+divisions is just one act called Main. That is what lets a task name an event and an
+act the same way it names a Story map and act, with no special case anywhere else.
 
 Names are validated through `safe_component` on the way in because they become
-path segments for the unit config and the reference image.
+path segments: `assets/events/<Event>/` for the step templates and
+`assets/reference/Events/<Event>/` for the placement backdrop.
 """
 
 from __future__ import annotations
 
 import os
 
+from sloppykeys.content.nav_images import events_templates_dir
 from sloppykeys.content.nav_route import NavStep
 
 from .store import read_json, update_json
 from .unit_configs import safe_component
 
 ROUTES_FILE = "routes.json"
+# Where a route's own captured templates live, as a relative path with forward slashes —
+# `assets/events/`. Taken from `nav_images` so this file cannot drift from it again.
+EVENTS_PREFIX = events_templates_dir().replace("\\", "/") + "/"
 # The build's own copy of ROUTES_FILE, written beside it by `build_exe.py`. The installer
 # replaces this one on every upgrade and leaves `routes.json` alone, which is what makes
 # `merge_shipped` possible: `routes.json` *is* the user's file the moment they have one, so
@@ -56,15 +61,20 @@ def clean_name(value: str) -> str:
 def step_image(map_name: str, act: str, index: int) -> str:
     """Where a route step's captured template lives. One shape, used by the capture, the
     rename and the deletion sweep — three spellings of this was how a renamed event kept
-    pointing at files under the old folder."""
-    return f"images/events/{clean_name(map_name)}/{clean_name(act)}_{int(index)}.png"
+    pointing at files under the old folder.
+
+    The folder comes from `nav_images` rather than being spelled again: this said `images/`
+    long after every template moved to `assets/`, which would have sent a capture to a tree
+    nothing else reads.
+    """
+    return f"{EVENTS_PREFIX}{clean_name(map_name)}/{clean_name(act)}_{int(index)}.png"
 
 
 def _reimage(step: dict, old_map: str, new_map: str, old_act: str, new_act: str) -> dict:
     """A step payload with its `Image` path moved to the new event/act folder.
 
     Only rewrites a path that actually sits under the old event's own folder. A step
-    pointing at a shared or hand-placed template elsewhere in `images/` is left alone —
+    pointing at a shared or hand-placed template elsewhere in `assets/` is left alone —
     renaming an event is not a licence to rewrite a path it does not own.
     """
     if not isinstance(step, dict):
@@ -72,7 +82,7 @@ def _reimage(step: dict, old_map: str, new_map: str, old_act: str, new_act: str)
     image = str(step.get("Image") or "")
     if not image:
         return step
-    prefix = f"images/events/{clean_name(old_map)}/"
+    prefix = f"{EVENTS_PREFIX}{clean_name(old_map)}/"
     spelled = image.replace("\\", "/")
     if not spelled.startswith(prefix):
         return step
@@ -80,9 +90,9 @@ def _reimage(step: dict, old_map: str, new_map: str, old_act: str, new_act: str)
     stem = f"{clean_name(old_act)}_"
     if not tail.startswith(stem):
         # Same event folder, another act's file: the folder moves, the name does not.
-        moved = f"images/events/{clean_name(new_map)}/{tail}"
+        moved = f"{EVENTS_PREFIX}{clean_name(new_map)}/{tail}"
     else:
-        moved = f"images/events/{clean_name(new_map)}/{clean_name(new_act)}_{tail[len(stem):]}"
+        moved = f"{EVENTS_PREFIX}{clean_name(new_map)}/{clean_name(new_act)}_{tail[len(stem):]}"
     step = dict(step)
     step["Image"] = moved
     return step
@@ -308,8 +318,11 @@ class RouteStore:
         a mistake worth reporting rather than resolving.
 
         Rewrites each step's `Image` path, because a step's template lives under
-        `images/events/<Event>/`. The files are moved by `route_paths.rename_event`; this is
-        only the record of where they now are, so the two have to be run together.
+        `assets/events/<Event>/`. **This is only the record.** The file mover that went with
+        it (`config/route_paths.rename_event`) was deleted with the PySide6 UI and nothing
+        replaced it, so a rename here leaves the PNGs under the old folder name and the
+        route's steps pointing at files that are not there. There is no rename in the web UI
+        yet, which is the only reason that is not biting.
         """
         name = clean_name(new)
         maps = self._maps()
