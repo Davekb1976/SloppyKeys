@@ -1,9 +1,13 @@
 """Camera setup step.
 
 Sets a consistent top-down-ish camera before matching:
-  1. hold I to zoom in   (~zoom_ms)
-  2. right-click drag downward to pitch the camera down (in-person view)
-  3. hold O to zoom out   (~zoom_ms)
+  1. right-click drag downward to pitch the camera down
+  2. hold O to zoom out   (~zoom_ms)
+
+There used to be a hold-I zoom-in in front of the drag, which cost a second full
+`zoom_ms` — half the sequence — to reach first person before pitching. The pitch is a
+rotation and the zoom-out that follows goes to the same extreme either way, so the
+camera should land in the same place without it.
 
 Produces an AutoHotkey v2 script; AHK performs the actual input. The script
 focuses Roblox itself (WinActivate) so it doesn't depend on Python having
@@ -54,21 +58,13 @@ if !WinWaitActive("{ROBLOX_AHK_TARGET}", , 3)
     ExitApp(2)
 Sleep(300)
 
-; 0) Centre the cursor BEFORE zooming, while the mouse is still a free pointer.
-; Zooming fully in puts Roblox in first person and locks the mouse; after that
-; ANY cursor movement rotates the camera, so a jump to centre here would land as
-; one instant diagonal snap (pitch + yaw) whose size depends on wherever the
-; previous step left the cursor. Glide, don't teleport.
+; 0) Centre the cursor so the drag starts over the world rather than over a HUD
+; element, and glide rather than teleport: Roblox acts on the last mouse move it
+; rendered, and a jump can be read as one instant rotation.
 MouseMove({center_x}, {center_y}, 10)
 Sleep(150)
 
-; 1) Zoom in — hold I
-Send("{{i down}}")
-Sleep({zoom_ms})
-Send("{{i up}}")
-Sleep(200)
-
-; 2) Right-drag down to pitch the camera down (raw relative mouse deltas).
+; 1) Right-drag down to pitch the camera down (raw relative mouse deltas).
 ; No cursor move first: it is already centred and the mouse may be locked.
 DllCall("mouse_event", "UInt", {_RIGHTDOWN}, "Int", 0, "Int", 0, "UInt", 0, "UPtr", 0)
 Sleep(150)
@@ -80,7 +76,7 @@ Sleep(150)
 DllCall("mouse_event", "UInt", {_RIGHTUP}, "Int", 0, "Int", 0, "UInt", 0, "UPtr", 0)
 Sleep(300)
 
-; 3) Zoom out — hold O
+; 2) Zoom out — hold O
 Send("{{o down}}")
 Sleep({zoom_ms})
 Send("{{o up}}")

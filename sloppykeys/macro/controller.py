@@ -300,7 +300,7 @@ class MacroController:
         # Check if already in match
         if self._nav.in_match():
             self._log("  Already in a match — skipping lobby.")
-            self._run_camera()
+            self.run_camera()
             return True
 
         # Events use route navigation
@@ -333,7 +333,7 @@ class MacroController:
                 return False
             time.sleep(self._nav.click_settle)
 
-        self._run_camera()
+        self.run_camera()
         return True
 
     def _navigate_route(self, map_name: str, act: str) -> bool:
@@ -353,11 +353,12 @@ class MacroController:
         self._log(f"  Stage loaded: {msg or ('ok' if ok else 'failed')}")
         if not ok:
             return False
-        self._run_camera()
+        self.run_camera()
         return True
 
-    def _run_camera(self) -> None:
-        """Camera setup — zoom in, pitch down, zoom out."""
+    def run_camera(self) -> None:
+        """Camera setup — pitch down, then zoom out. Public because the Image Manager runs
+        it on its own to set the camera before a map reference is captured."""
         from sloppykeys.macro.camera import camera_setup_script
 
         rect = self._rect()
@@ -370,7 +371,10 @@ class MacroController:
         center_x = vx + vw // 2
         center_y = vy + vh // 2
 
-        script = camera_setup_script(center_x, center_y)
+        # The delay existed in DELAY_SPEC but nothing read it, so the O hold was always
+        # the 3s default no matter what the Delays tab said.
+        zoom_ms = int(float(self._delays.get("camera_zoom", 3.0)) * 1000)
+        script = camera_setup_script(center_x, center_y, zoom_ms=zoom_ms)
         ok, msg = self._ahk.run(script, wait=True, timeout=15.0)
         self._log(f"  Camera: {msg or ('ok' if ok else 'failed')}")
 
@@ -1016,7 +1020,7 @@ class MacroController:
                 self._log(f"  Challenge: stage didn't load — {msg}")
                 return
 
-            self._run_camera()
+            self.run_camera()
 
             # Load and run the macro operation
             op = load_operation(self._app_root, macro_name)

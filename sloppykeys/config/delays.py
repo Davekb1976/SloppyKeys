@@ -37,14 +37,13 @@ DELAY_SPEC: dict[str, tuple[str, float]] = {
     # slide/fade in: too low and the macro gives up (or scrolls) before the screen
     # has finished animating.
     "search_timeout": ("Image search wait", 6.0),
-    # How long the camera step holds I (zoom right in) and then O (zoom right out). It is
-    # **two** holds, so this is the single biggest cost in a run's startup: 3.0s here is ~6s
-    # of the ~8s sequence. It has to be long enough to reach each extreme — Roblox zooms at
-    # a fixed rate, so "long enough" is a property of that rate, not of this machine, and a
-    # value that stops short leaves the camera at the wrong pitch and every stored placement
-    # coordinate pointing at the wrong ground. Lower it in steps and watch the camera; if
-    # placements start drifting, it is too low.
-    "camera_zoom": ("Camera zoom hold (each way)", 3.0),
+    # How long the camera step holds O to zoom right out — the single biggest cost in a
+    # run's startup now that the hold-I zoom-in is gone. It has to be long enough to reach
+    # the far extreme: Roblox zooms at a fixed rate, so "long enough" is a property of that
+    # rate, not of this machine, and a value that stops short leaves the camera at the wrong
+    # distance with every stored placement coordinate pointing at the wrong ground. Lower it
+    # in steps and watch the camera; if placements start drifting, it is too low.
+    "camera_zoom": ("Camera zoom-out hold", 3.0),
     # Pause after each placement click/keypress before the next one. Too low and
     # the unit panel hasn't reacted yet when the following key arrives. A placement
     # step pays this four to six times, so it is the biggest single lever on how
