@@ -13,7 +13,7 @@ A **Windows-only** desktop macro for the Roblox game *Anime Expedition*. It show
 Roblox window inside its own UI, image-matches that view, and drives the game. Win32
 throughout: there is no cross-platform path to keep in sync.
 
-**Python 3.14 + PySide6** UI · **ctypes** to Win32 (`core/win32/`) · **OpenCV headless +
+**Python 3.14 + pywebview** UI (`ui_web/`, WebView2) · **ctypes** to Win32 (`core/win32/`) · **OpenCV headless +
 mss** for template matching · **RapidOCR + onnxruntime** for the few strings no template can
 cover · **AutoHotkey v2** for all output. Python decides *what* to do and hands AHK a v2
 script to click/press/scroll (`core/ahk.py`). Every entry in `requirements.txt` carries a
@@ -54,16 +54,18 @@ Win32 lands.
 Three constants hold the macro together, and breaking one fails *plausibly* rather than
 loudly:
 
-- **Viewport pinned 1152×756** (`ui/theme.py::VIEWPORT_WIDTH/HEIGHT`). Every coordinate in
+- **Viewport pinned 1152×756** (`ui_web/bridge.py::VIEWPORT_W/VIEWPORT_H`). Every coordinate in
   `content/`, every box in `settings.json`, every PNG in `assets/`, every block coord in
   `operations/` and `routes.json` was captured at that size; changing it invalidates all of
-  them. Keep
-  `WINDOW_WIDTH/HEIGHT` equal to the layout's measured `minimumSizeHint`. Re-capture through
-  Settings > Vision.
-- **DPI off, display scaling 100%** — `QT_ENABLE_HIGHDPI_SCALING=0`, `QT_SCALE_FACTOR=1`, set
-  before `QApplication`. At 125% a template cropped at 100% scores as a different image
-  (measured best match **0.80×**), and Roblox is separately blurry above 100% — a known
-  Roblox regression, so the fix is environmental. `core/win32/display.py` warns.
+  them. The window is sized from Win32 *after* the frame comes off, clamped to the work area
+  — pywebview sizes the form while it still has a frame, so the client area lands short and
+  the log gets clipped. OCR boxes are re-measured through Settings > OCR.
+- **Display scaling must be 100%.** At 125% a template cropped at 100% scores as a different
+  image (measured best match **0.80×**), and Roblox is separately blurry above 100% — a known
+  Roblox regression, so the fix is environmental, not code.
+  `core/win32/display.py::scaling_percent` reads the monitor's real DPI with
+  `GetDpiForMonitor` (not `GetDpiForWindow`, which answers 96 for a DPI-unaware caller and
+  would hide the exact case worth warning about) and warns.
 - **Input timing is a frame count wearing milliseconds.** Roblox acts on the last mouse-move
   it *processed*, one per rendered frame, so a settle tuned at 165Hz covers 2.75× fewer
   frames at 60Hz and the click lands on a stale position. Timings scale from
@@ -90,7 +92,9 @@ and the task queue's validation all derive from them, so one edit ripples consis
   click, find, expect, scroll, wait), authored by the user into `routes.json`.
 - **Delays** → `config/delays.py` (`DELAY_SPEC`). One entry is the whole change: the Delays
   tab builds itself from the spec and both `apply_delays` implementations read it by key.
-- **Keybinds** → `config/keybinds.py`, polled in `MainWindow._poll_hotkeys`.
+- **Keybinds** → `config/keybinds.py`, polled in `ui_web/bridge.py::_hotkey_loop`. `ACTIONS`
+  are ours and are polled; `GAME_ACTIONS` are keys the macro *presses* and must never make
+  the app react.
 
 **Read the accessor, never the table.** Measured numbers are user-overridable at runtime —
 `settings.json` holds `points`, `regions` and `confidence`, applied at startup and on every
@@ -123,25 +127,31 @@ has already touched that field. Say that instead of claiming the run got faster.
 
 ## Roblox window embedding (hard-won)
 
-Roblox stays its **own top-level window** — never reparented. Our window is frameless +
-always-on-top and opaque; we punch a **hole** with `QWidget.setMask` (rounded window rect
-minus the viewport) so rendering and hit-testing fall through, and move Roblox behind it with
-`SetWindowPos` (`roblox_window.py::position_window_to_client_rect`).
+Roblox stays its **own top-level window** — never reparented. The layering is inverted:
+Roblox rides the **topmost** band with its frame stripped, positioned on the game slot,
+*above* our normal-band window. Visually it sits inside the UI, but nothing is parented, so
+quitting cannot take the game down. The frame is restored on the way out
+(`roblox_window.py::position_window_to_client_rect`, kept in step by
+`bridge.py::_follow_loop`).
 
-- Guard every position/mask sync with `IsIconic`: a minimized window reports coords near
+- **Guard every position sync with `IsIconic`**: a minimized window reports coords near
   −32000 and flings Roblox off-screen.
-- Resolve the client origin with `ClientToScreen`, not Qt geometry.
-- Punch the hole only while the viewport is shown and Roblox attached, or it exposes the
-  desktop.
+- **Resolve the client origin with `ClientToScreen`**, never by arithmetic on window rects.
+- **The slot position comes from the page**, which reports its placeholder's
+  `getBoundingClientRect()` — not from a constant that can drift from the stylesheet.
+- **Off the Dashboard the game is covered, not hidden.** `set_topmost(False)` alone is not
+  enough (`HWND_NOTOPMOST` lands it at the top of the normal band, still above the page), so
+  it is tucked directly beneath our window with `set_window_below`. `SW_HIDE` works but
+  removes its taskbar button, which reads as the game vanishing.
+- **A capture must reveal the game first**, and that happens inside the bridge
+  (`_game_revealed`), not at each call site. mss grabs the screen rectangle, so a covered
+  window yields our own pixels.
 - The window opens centred on the **primary** screen; a shorter secondary would clip it.
 
-**The hole is a Qt-only technique.** The pywebview window (`ui_web/`) cannot use it:
-`SetWindowRgn` is accepted — `GetWindowRgnBox` reports the hole — but WebView2 composites
-through DirectComposition, which ignores GDI window regions, so the page keeps painting over
-the slot. That window inverts the layering instead: Roblox rides the **topmost** band,
-frame stripped, positioned on the slot, above our normal-band window. Nothing is parented,
-so quitting can't take the game down; the frame is restored on the way out, and a screen
-switch only demotes the game out of the topmost band so our content covers it.
+**The cut-out hole is dead.** The old Qt window punched one with `QWidget.setMask` and put
+Roblox behind. On WebView2 `SetWindowRgn` is accepted — `GetWindowRgnBox` reports the hole —
+but it composites through DirectComposition, which ignores GDI window regions, so the page
+keeps painting over the slot. Hence the inversion above.
 
 **Dead ends — measured, do not retry:** reparenting via `SetParent` (DPI/focus flakiness,
 child dies with parent) · colour-key transparency `LWA_COLORKEY` · `SetWindowRgn` over
@@ -169,16 +179,18 @@ no auto-calibrate).
 - **Never press a key at a screen you haven't verified.** `UnitPlacer` matches
   `assets/match/unit_ui.png` before acting on a placed unit; without it a missed click sends
   `r`/`t`/`x` into the world and still looks like a working macro.
-- **Never block the UI thread.** AHK `wait=True`, sleeps, capture and OCR go on a worker
-  (`QThreadPool`). Marshal results and *all* widget/dialog work back with a queued signal;
-  keep a reference to a running `QRunnable` or its signal is lost to GC. No
-  `QTimer.singleShot` on a pool worker — no event loop there, so it never fires. Never put
-  `runner.tick()` in `_poll_hotkeys`; that 40ms timer is the UI thread.
+- **Never block on a `js_api` call.** AHK `wait=True`, sleeps, capture and OCR go on a
+  `threading.Thread`; the call returns as soon as the *ordering* is safe and the result is
+  pushed back with `window.evaluate_js` into a `window.on*` handler. Return early only when
+  nothing after it depends on the work — a capture must be taken before the call returns, or
+  the page switches screens and hides the game first.
+- **Cross the bridge as JSON.** `json.dumps` the payload; an f-string put Python's `False`
+  into JS and crashed the run loop with `False is not defined`.
 - **Stopping is cooperative.** F1/F2 set `request_stop()`; poll loops abandon their wait, the
   driver ends the run between steps. **Never kill an AHK process** — the camera script holds
   `i` and the right button down and a kill never releases them.
 - **Keep decision logic pure.** `macro/tasks.py` decides what to play next with no capture,
-  no clicking, no Qt. New rules go there, not into the runner.
+  no clicking, no UI. New rules go there, not into the runner.
 - **Win32 behind typed helpers** in `core/win32/`, never raw `ctypes` in UI/macro code.
   Declare argtypes/restypes in `bindings.py` so a wrong pointer type fails loudly (the
   `LP_POINT` lesson). Read state back where a call can silently no-op.
@@ -190,26 +202,14 @@ no auto-calibrate).
 - `image_search.to_absolute_path` passes an absolute path through **on purpose** (the Macro
   Tester's file dialog). Don't "harden" it.
 
-## Qt UI
+## UI
 
-- Pages in `ui/pages/`, reusable widgets and editors in `ui/`. One class per concern.
-- **Qt layouts**, not absolute placement. Fixed sizes only where a real constraint demands
-  it (the viewport, the window).
-- **Centralised QSS** in `theme.py`; prefer `objectName` + a rule over inline
-  `setStyleSheet`, which is for one-off dynamic state (a status colour).
-- **Control widths are measured, not guessed** — a widget in a narrow row clips silently. For
-  a `QPushButton`/`QComboBox`, `sizeHint().width() > width()` is a real clipping test. For a
-  `QLineEdit`/`QSpinBox` the hint is a meaningless ~110px default: measure
-  `fontMetrics().horizontalAdvance(text)` against the field. Spin arrows cost ~16px, so hide
-  them on a narrow field.
-- **Widget visibility can't answer a data question**: everything on a non-current
-  `QStackedWidget` page reports not-visible. Track it as data.
-- Feedback in a scrolled panel belongs at the **top**, or it sits below the fold.
-- **Icons**: rail icons are vector-drawn (`RailIcon`); other glyphs use **Segoe Fluent
-  Icons** (`ui/icons.py`), which ships with Windows. No emoji as interactive affordances.
-- Coordinates are **picked, not typed** — `RegionOverlay` is translucent, so the user clicks
-  through to the live window and it returns client-space numbers. Reuse it.
-- External and deep links go through `QDesktopServices.openUrl`.
+The front end is `ui_web/` — pywebview + HTML/CSS/JS over WebView2, with `bridge.py` as the
+`js_api` surface. The old PySide6 `ui/` package is gone, so anything about QSS,
+`QThreadPool`, `sizeHint` or `RailIcon` no longer applies.
+
+**How to build one is the `ui-feature` skill** — the four-layer split, the component
+checklist, the design vocabulary. Load it before touching `ui_web/`; it is not repeated here.
 
 ## Naming
 
@@ -219,8 +219,11 @@ no auto-calibrate).
 | class | PascalCase | `LobbyNavigator` |
 | constant | SCREAMING_SNAKE | `VIEWPORT_WIDTH` |
 | module | snake_case | `nav_images.py` |
-| Qt signal | camelCase | `gamemodeChosen` |
-| Qt objectName / QSS | camelCase / kebab | `stepChip`, `--color-violet` |
+| JS function / var | camelCase | `renderImGrid` |
+| CSS class | kebab-case, feature prefix | `.im-card`, `.chal-slot` |
+| DOM id | kebab-case, feature prefix | `#im-grid`, `#btn-chal-scan` |
+| CSS custom property | kebab-case | `--text-muted` |
+| page callback from Python | `on` + PascalCase on `window` | `window.onChallengeScan` |
 | JSON | PascalCase inside records, snake_case top-level keys | `{"Kind": "target"}`, `start_position` |
 
 ## Parallel surfaces
@@ -232,7 +235,7 @@ Change one, the others usually need it too:
 | **Gamemode schema** | `content/gamemodes.py` ↔ Run/selector UI ↔ `nav_images.py` ↔ Tasks validation ↔ the Task Builder's mode fields |
 | **Measured numbers** | a `content/` table ↔ its `*_key`/accessor/`*_specs` ↔ `config/regions.py` ↔ the Vision row |
 | **Config formats** | `config/` readers/writers ↔ JSON in `operations/`, `paths/`, `recordings/`, `routes.json`, `settings.json` |
-| **Settings** | store + a Settings control + `MainWindow` wire-up + where it's read |
+| **Settings** | `config/unified.py` default + a `[data-key]` control in `index.html` + where it's read |
 | **Delays** | one `DELAY_SPEC` entry ↔ `LobbyNavigator.apply_delays` ↔ `UnitPlacer.apply_delays` |
 | **Viewport size** | invalidates every coordinate, template, `operations/` block coord and route |
 | **Threading** | anything that clicks, sleeps, captures or OCRs runs off the UI thread |
@@ -245,7 +248,8 @@ Change one, the others usually need it too:
 - **Reject, don't repair.** A box the app silently reshaped reads the wrong pixels and looks
   like an OCR fault — the exact failure the feature exists to prevent
   (`config/regions.py::clean_box`). Drop invalid entries rather than refusing to start.
-- **Validate anything that becomes a path or a script**: `unit_configs.safe_component`,
+- **Validate anything that becomes a path or a script**: `bridge._template_path`,
+  `unit_configs.safe_component`,
   `nav_routes.clean_name`, `nav_route.safe_rel_path`, `keybinds.sanitize_game_key`,
   `start_position.MOVE_KEYS`. Whitelists and rejections, not escapes — an AHK string is code.
 - **No secret in the tree or the log.** The private-server link and webhook URL live in the

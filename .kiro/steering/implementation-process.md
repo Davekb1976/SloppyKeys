@@ -8,6 +8,10 @@ Scale to the change. A typo or one-liner: climb the `ponytail.md` ladder, fix it
 Anything touching a parallel surface (a page, a macro step, a setting, windowing) runs the
 whole list. In doubt, treat it as non-trivial.
 
+**Load the matching skill first.** Touching `ui_web/` → `ui-feature`. Writing a commit
+message or cutting a release → `git-workflow`. They hold the detail this file deliberately
+does not repeat; see `kiro-conventions.md` for why the split exists.
+
 ## Before writing code
 
 1. **Restate the goal** in a sentence. If the request rests on a wrong assumption, say so
@@ -15,7 +19,7 @@ whole list. In doubt, treat it as non-trivial.
    be inferred.
 2. **Read the lines you're about to change.** Already correct? Say "already handled at
    `file:function`" and stop.
-3. **Separate confirmed from inferred.** Unsure of a PySide6/Qt API, a ctypes signature, an
+3. **Separate confirmed from inferred.** Unsure of a pywebview API, a ctypes signature, an
    AHK v2 command, an OpenCV/mss detail? Check the docs and the installed version
    (`requirements.txt`, the `.venv`). Never present a guess as a solution.
 4. **Measure, don't infer.** For window geometry, Win32/DWM state, pixel output or DPI:
@@ -35,15 +39,16 @@ whole list. In doubt, treat it as non-trivial.
 ## Validating — only what you touched
 
 - `python -m compileall sloppykeys` — always. It does **not** execute code.
-- One headless probe exercising **the changed path**, constructing `MainWindow` if `ui/` was
-  touched. That is the only thing that catches a missing import or a bad signal wiring.
+- One headless probe exercising **the changed path**. For `ui_web/`, import the bridge and
+  call the method you added with `Api.__new__(Api)` — no window needed. That is the only
+  thing that catches a missing import or a bad wiring.
 - Moved or inserted a `def`? Assert the methods still resolve (`getattr(Class, name)`). A
   module-level def dropped inside a class body turns every method after it into a nested
   function: it compiles, it imports, and it fails only when called.
 - **Probes fire no input** — it lands on the user's live game. Delete them after.
-- **Never print widget text wholesale in a probe.** The Main tab holds the private-server
-  link and the webhook URL in `QLineEdit`s; a width audit that dumped field contents leaked
-  both. Print lengths.
+- **Never dump settings or field contents wholesale in a probe.** `settings.json` holds the
+  private-server link and the Discord webhook; an audit that printed field contents leaked
+  both. Print lengths and key names, never values.
 - Windowing/visual change: numeric geometry from a probe, plus tell the user what to eyeball.
 
 **`tests/` is the durable half.** Framework-free assert scripts, one per logic area, run
