@@ -84,6 +84,75 @@
     reportJsError("unhandled promise: " + ((r && (r.message || r)) || "unknown"));
   });
 
+  // ---- Tooltips ----
+  // One `#tooltip` on <body>, placed here rather than drawn as a `::after` on the trigger:
+  // a hovered `.btn` has a transform, which makes it a stacking context and trapped the
+  // tooltip under later siblings, and every panel in this app scrolls, which clipped it.
+  // style.css's Tooltips block has the detail.
+  const tipEl = document.getElementById("tooltip");
+  const TIP_DELAY = 250;
+  const TIP_GAP = 6;
+  const TIP_EDGE = 4;
+  let tipTimer = null;
+
+  function hideTip() {
+    if (tipTimer) { clearTimeout(tipTimer); tipTimer = null; }
+    if (tipEl) tipEl.classList.remove("on");
+  }
+
+  function showTip(el) {
+    const text = el.getAttribute("data-tip");
+    if (!tipEl || !text || !el.isConnected) return;
+    tipEl.textContent = text;
+    // Measured while still invisible (visibility, not display), so it is placed before the
+    // first frame it is seen in — otherwise it flashes at the previous trigger's spot.
+    const r = el.getBoundingClientRect();
+    const w = tipEl.offsetWidth;
+    const h = tipEl.offsetHeight;
+    // Preference. The titlebar's own tooltips go sideways: the game window rides above the
+    // DOM directly under the bar, so anything dropped below renders inside Roblox.
+    let side = "below";
+    if (el.closest("#titlebar")) side = el.closest(".titlebar-right") ? "left" : "right";
+    else if (el.classList.contains("tip-left")) side = "left";
+    else if (el.classList.contains("tip-above")) side = "above";
+    // Flip instead of spilling off screen.
+    if (side === "below" && r.bottom + TIP_GAP + h > window.innerHeight - TIP_EDGE) side = "above";
+    else if (side === "above" && r.top - TIP_GAP - h < TIP_EDGE) side = "below";
+    else if (side === "left" && r.left - TIP_GAP - w < TIP_EDGE) side = "right";
+    else if (side === "right" && r.right + TIP_GAP + w > window.innerWidth - TIP_EDGE) side = "left";
+    let x, y;
+    if (side === "below" || side === "above") {
+      x = r.left + r.width / 2 - w / 2;
+      y = side === "below" ? r.bottom + TIP_GAP : r.top - TIP_GAP - h;
+    } else {
+      x = side === "left" ? r.left - TIP_GAP - w : r.right + TIP_GAP;
+      y = r.top + r.height / 2 - h / 2;
+    }
+    tipEl.style.left = Math.round(Math.max(TIP_EDGE, Math.min(x, window.innerWidth - w - TIP_EDGE))) + "px";
+    tipEl.style.top = Math.round(Math.max(TIP_EDGE, Math.min(y, window.innerHeight - h - TIP_EDGE))) + "px";
+    tipEl.classList.add("on");
+  }
+
+  // Delegated, because the block rows, region rows and image cards are all rebuilt by their
+  // render functions — per-element listeners would need re-wiring after every render.
+  function tipTrigger(e) {
+    const t = e.target;
+    return t && t.closest ? t.closest("[data-tip]") : null;
+  }
+  document.addEventListener("mouseover", (e) => {
+    const el = tipTrigger(e);
+    if (!el) return;
+    hideTip();
+    tipTimer = setTimeout(() => showTip(el), TIP_DELAY);
+  });
+  document.addEventListener("mouseout", (e) => { if (tipTrigger(e)) hideTip(); });
+  document.addEventListener("focusin", (e) => { const el = tipTrigger(e); if (el) showTip(el); });
+  document.addEventListener("focusout", hideTip);
+  document.addEventListener("mousedown", hideTip);
+  // Capture phase: what scrolls is a panel div, and a scroll event on it does not bubble.
+  document.addEventListener("scroll", hideTip, true);
+  window.addEventListener("blur", hideTip);
+
 
   // ---- Macro controls ----
   const btnStart = document.getElementById("btn-start");

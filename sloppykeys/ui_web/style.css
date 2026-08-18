@@ -162,32 +162,30 @@ input:focus, select:focus {
    font, and never at all on some frameless-window paths. This one is ours, so it can carry
    several lines (`\n` in the attribute) and an accent bar down its leading edge.
    Not for anything the user must read — hover is not discoverable.
-   **The tooltip owns ::after on anything with a `data-tip`.** A decorative marker on the
-   same element goes in ::before — there is only one of each, and the two rules merge into
-   a textless blob (see `.nav-btn.active::before`). */
-[data-tip] { position: relative; }
-[data-tip]::after {
-  content: attr(data-tip);
-  position: absolute; z-index: 200;
-  top: calc(100% + 6px); left: 50%; transform: translateX(-50%);
-  width: max-content; max-width: 260px; text-align: left;
+
+   **One element, on <body>, positioned by JS** (`showTip` in app.js). It was a
+   `[data-tip]::after` on the trigger, which cannot work here for two separate reasons:
+     - `.btn:hover` sets a transform, and a transform makes the element a stacking context.
+       The tooltip's `z-index: 200` then only ranked *inside the button*, so the next row's
+       Set button painted straight over it.
+     - every list in this app scrolls (`.phases-container`, `.settings-content`,
+       `.panel-body`, `.im-grid`, `.modal-body`) and a scroll container clips its
+       descendants, so a tooltip near an edge was cut in half.
+   Both are structural: no z-index or overflow tweak fixes them while the tooltip is a
+   descendant of the thing it describes. Anything else that has to escape a scrolling
+   panel — a dropdown, a popover — needs the same treatment. */
+#tooltip {
+  position: fixed; top: 0; left: 0; z-index: 3000;
+  max-width: 260px; text-align: left;
   padding: 5px 8px; white-space: pre-line; line-height: 1.45;
   font-size: 10px; font-weight: 600; color: var(--text);
   background: var(--surface-panel);
   border: 1px solid var(--border); border-left: 2px solid var(--accent);
-  opacity: 0; pointer-events: none; transition: opacity 0.1s ease 0.25s;
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transition: opacity 0.1s ease;
 }
-[data-tip]:hover::after,
-[data-tip]:focus-visible::after { opacity: 1; }
-/* Placement variants. A tooltip below a control deep in a block row lands on the next row
-   and reads as part of it, so those take .tip-left. */
-.tip-left[data-tip]::after { top: 50%; bottom: auto; left: auto; right: calc(100% + 6px); transform: translateY(-50%); }
-.tip-above[data-tip]::after { top: auto; bottom: calc(100% + 6px); }
-/* The titlebar sits directly on top of the game window, and the game paints over any DOM it
-   overlaps — a tooltip dropped below a nav button renders inside Roblox, not over it. Keep
-   titlebar tooltips inside the bar by putting them beside the trigger. */
-#titlebar [data-tip]::after { top: 50%; bottom: auto; left: calc(100% + 6px); right: auto; transform: translateY(-50%); }
-#titlebar .titlebar-right [data-tip]::after { left: auto; right: calc(100% + 6px); }
+/* Kept visible to layout while hidden, so `showTip` can measure it before placing it. */
+#tooltip.on { opacity: 1; visibility: visible; }
 
 /* Walk paths an Auto target wants but nobody has recorded, offered while naming one. */
 .walk-missing { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
@@ -620,6 +618,9 @@ input:focus, select:focus {
   display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
   font-size: 10px; color: var(--text-dim); align-self: center;
   -webkit-user-select: none; user-select: none;
+  /* Contains the real input below, which is taken out of the flow rather than hidden so it
+     stays focusable. This used to come from `[data-tip] { position: relative }`. */
+  position: relative;
 }
 .check input { position: absolute; opacity: 0; width: 0; height: 0; }
 .check-box {

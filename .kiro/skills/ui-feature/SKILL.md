@@ -70,6 +70,21 @@ following rather than a style preference.
    nothing is an error, not a file called `-.png`. Everything from the page is untrusted:
    validate anything that becomes a path (`_template_path`) or an AHK string.
 
+8. **Anything that has to escape its container goes on `<body>`, positioned by JS.**
+   Tooltips, and any dropdown or popover added later. A `::after` on the trigger is
+   clipped and out-ranked, and neither is fixable from CSS:
+   - **Every panel here scrolls** (`.phases-container`, `.settings-content`, `.panel-body`,
+     `.im-grid`, `.modal-body`). A scroll container clips its descendants, so a tooltip
+     near an edge is cut in half. `overflow: visible` is not available — the panel has to
+     scroll.
+   - **A transform creates a stacking context**, and `.btn:hover` has one. Inside it the
+     tooltip's `z-index: 200` only ranks against the button's own children, so the *next*
+     row's button painted over it. Raising the z-index does nothing.
+   The live implementation is `#tooltip` + `showTip()` (delegated `mouseover`, flips at
+   the viewport edge). Reuse it; do not write a second floating layer. Placement still
+   has to dodge the game window, which paints over any DOM it overlaps — that is why
+   titlebar tooltips go sideways instead of down.
+
 ## The game window sits on top of the page
 
 Not a detail — it dictates modal behaviour. Roblox is its own top-level window in the
