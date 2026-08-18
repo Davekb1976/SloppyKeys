@@ -120,12 +120,30 @@ def difficulty_clicks(target: int) -> int:
 def difficulty_options(gamemode: str) -> list[str]:
     """What a task's Difficulty field offers for this gamemode.
 
-    A gamemode with a cycling button counts 1..3; the rest get the Normal/Hard toggle. One
-    field, two meanings, because the game itself has two different controls there.
+    A gamemode with a cycling button counts 1..3; the rest get Easy/Hard, which is what the
+    game calls Story's pair. One field, two meanings, because the game itself has two
+    different controls there — and a mode with neither (Raid) still shows Easy/Hard but has
+    no `hard_mode` point, so nothing is clicked either way.
     """
     if difficulty_coord(gamemode) is None:
-        return ["Normal", "Hard"]
+        return ["Easy", "Hard"]
     return [str(n) for n in range(DIFFICULTY_MIN, DIFFICULTY_MAX + 1)]
+
+
+def hard_mode_from_task(raw: object, default: bool = False) -> bool:
+    """Does this task ask for Hard? For a gamemode with no cycling difficulty.
+
+    The field is a plain string shared with the 1-3 cycle, so anything unrecognised — a task
+    authored before the field existed, or `"2"` left over from an Expedition task — means the
+    Settings default rather than a silent Easy. "Normal" is accepted because that is what the
+    field offered before it was named after the game's own labels.
+    """
+    text = str(raw or "").strip().lower()
+    if text == "hard":
+        return True
+    if text in ("easy", "normal"):
+        return False
+    return bool(default)
 
 
 def difficulty_from_task(raw: object) -> int:

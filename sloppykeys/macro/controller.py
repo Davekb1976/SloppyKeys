@@ -26,7 +26,11 @@ from sloppykeys.config.stats import StatsTracker
 from sloppykeys.config.unified import UnifiedSettings
 from sloppykeys.content.acts import act_coord
 from sloppykeys.content.gamemodes import is_custom, selection_complete
-from sloppykeys.content.start_stage import difficulty_coord, difficulty_from_task
+from sloppykeys.content.start_stage import (
+    difficulty_coord,
+    difficulty_from_task,
+    hard_mode_from_task,
+)
 from sloppykeys.content.walk_paths import default_walk_path
 from sloppykeys.core.ahk import AhkBridge
 from sloppykeys.core.image_search import ImageSearchEngine
@@ -317,14 +321,20 @@ class MacroController:
         if stage and act_coord(mode, stage) is not None:
             steps.append((f"Select {stage}", lambda s=stage: self._nav.select_act(mode, s)))
 
+        # One field, two controls: a mode with the cycling button gets 1-3 clicks on the way
+        # in, and every other mode reads it as Story's Easy/Hard pair, which `start_stage`
+        # applies. Per task rather than global for both — two Expedition tasks in one queue
+        # can want different difficulties, and the queue is where the rest of the run is
+        # chosen. Settings' Hard Mode is the default for a task that never said.
+        asked = (self._current_task or {}).get("difficulty")
+        hard = False
         if difficulty_coord(mode) is not None:
-            # Per task, not a global setting: two Expedition tasks in one queue can want
-            # different difficulties, and the queue is where the rest of the run is chosen.
-            diff = difficulty_from_task((self._current_task or {}).get("difficulty"))
+            diff = difficulty_from_task(asked)
             steps.append((f"Difficulty {diff}", lambda: self._nav.set_difficulty(mode, diff)))
+        else:
+            hard = hard_mode_from_task(asked, self._settings.get_hard_mode())
 
-        hard = self._settings.get_hard_mode()
-        steps.append(("Start stage", lambda: self._nav.start_stage(mode, hard)))
+        steps.append((f"Start stage{' (hard)' if hard else ''}", lambda: self._nav.start_stage(mode, hard)))
         steps.append(("Stage loaded", lambda: self._nav.wait_for_match_ready()))
 
         for name, action in steps:
