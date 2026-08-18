@@ -450,9 +450,23 @@ class MacroController:
         park_interval = max(1.0, float(getattr(self._placer, "won_poll_click", 5.0)))
         parked = False
         last_park_click = 0.0
+        # A ceiling, because neither banner appearing is a real state: a missed crop, a
+        # result screen dismissed by another player, or an Expedition node that parks the
+        # client somewhere no result can come from. Without it this loop spun forever,
+        # clicking the corner every 5s, and the task queue never advanced. The same 900s the
+        # placer's own wait uses. Timing out records nothing — nobody knows how it ended.
+        match_budget = max(1.0, float(getattr(self._placer, "won_timeout", 900.0)))
+        match_deadline = time.monotonic() + match_budget
 
         while not self._stop_requested:
             if self._checkpoint():
+                return
+
+            if time.monotonic() >= match_deadline:
+                self._log(
+                    f"  No result screen in {match_budget / 60:.0f} min — giving up on this "
+                    f"match and moving on. Check the Won/Lost templates if it really did end."
+                )
                 return
 
             if battle_idx >= len(battle) and not loop_a and not loop_b:
@@ -509,32 +523,15 @@ class MacroController:
             time.sleep(TICK_SLEEP)
 
     def _check_outcome(self) -> tuple[str, str] | None:
-        """Non-blocking check for win/loss. Returns (outcome, msg) or None."""
-        from sloppykeys.core.image_search import ImageProfile
-        rect = self._rect()
-        if rect is None:
-            return None
+        """Non-blocking check for win/loss. Returns (outcome, msg) or None.
 
-        win_path = os.path.join(self._app_root, "assets", "match", "game_won.png")
-        loss_path = os.path.join(self._app_root, "assets", "match", "game_lost.png")
-
-        profiles = []
-        if os.path.isfile(win_path):
-            profiles.append(ImageProfile(name="win", image_path=win_path, confidence=0.70))
-        if os.path.isfile(loss_path):
-            profiles.append(ImageProfile(name="loss", image_path=loss_path, confidence=0.70))
-
-        if not profiles:
-            return None
-
-        match = self._engine.find_first(profiles, rect)
-        if match is None:
-            return None
-
-        if match.profile_name == "win":
-            return (OUTCOME_WON, f"matched at {match.score:.2f}")
-        else:
-            return (OUTCOME_LOST, f"matched at {match.score:.2f}")
+        Delegates to the placer rather than building its own profiles: this used to read
+        `assets/match/game_won.png` and `game_lost.png` from hardcoded paths at a hardcoded
+        0.70, which bypassed both the `nav_images` accessors and the per-template threshold
+        from Settings > Vision, and had no margin between the two templates — the exact
+        `won 0.57, lost 0.71` misread `_outcome_is_clear` exists to prevent.
+        """
+        return self._placer.poll_outcome()
 
     def _execute_battle_block(self, block: dict) -> bool:
         """Execute one block in a tick-based context. Returns True when done

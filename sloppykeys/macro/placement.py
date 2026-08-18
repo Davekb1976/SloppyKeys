@@ -711,6 +711,28 @@ class UnitPlacer:
         self._log(f"During match step {step.step}: {message}")
         return True
 
+    def poll_outcome(self) -> tuple[str, str] | None:
+        """One look for the end of the match. None while it is undecided.
+
+        The non-blocking half of `wait_for_outcome`, for a caller that owns its own tick
+        loop and interleaves this with other work. Sharing `_outcome_profiles` and
+        `_outcome_is_clear` is the entire point: the run loop used to carry its own copy of
+        this that built profiles from hardcoded paths at a fixed 0.70, so Settings > Vision
+        changed what the tester reported and nothing about a run, and the `won 0.57,
+        lost 0.71` misread had no margin to catch it.
+
+        Never clicks and never sleeps, so the caller decides the poll rate and owns the
+        keep-alive.
+        """
+        match = self._find_outcome()
+        if match is None or not self._outcome_is_clear(match):
+            return None
+        lost = match.profile_name == game_lost_image()
+        return (
+            OUTCOME_LOST if lost else OUTCOME_WON,
+            f"{'defeat' if lost else 'win'} screen ({match.score:.2f}) — {self._outcome_scores()}",
+        )
+
     def _find_outcome(self):
         """One look for either end-of-match screen. Returns the better match, or None.
 
