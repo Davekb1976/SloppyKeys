@@ -1113,6 +1113,60 @@ class Api:
 
     # ---- Image Manager ----
 
+    # Widest a grid thumbnail is drawn, so anything bigger is shrunk before it crosses the
+    # bridge. The map references are full 1152x756 client shots: sending them whole made one
+    # Image Manager open a 19.6 MB payload, 19.5 MB of which was the ten maps.
+    THUMB_MAX_W = 320
+    # Below this, encoding is skipped entirely and the file is passed through byte for byte.
+    # Every template crop is a few KB, so they never pay for a decode.
+    THUMB_PASSTHROUGH_BYTES = 64 * 1024
+
+    def _thumb_data_uri(self, path: str) -> str:
+        """Data URI for a grid thumbnail, downscaled if the file is large.
+
+        Cached on mtime, so reopening the manager costs nothing until a capture rewrites the
+        file. Downscaled thumbs go out as JPEG: a screenshot is photographic, and PNG of one
+        is ~7x the bytes for a picture drawn 320px wide.
+        """
+        import base64
+
+        try:
+            stamp = os.path.getmtime(path)
+        except OSError:
+            return ""
+        cache = getattr(self, "_thumb_cache", None)
+        if cache is None:
+            cache = self._thumb_cache = {}
+        hit = cache.get(path)
+        if hit and hit[0] == stamp:
+            return hit[1]
+
+        with open(path, "rb") as f:
+            raw = f.read()
+        uri = ""
+        if len(raw) > self.THUMB_PASSTHROUGH_BYTES:
+            try:
+                import cv2
+                import numpy as np
+
+                img = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
+                if img is not None and img.shape[1] > self.THUMB_MAX_W:
+                    scale = self.THUMB_MAX_W / img.shape[1]
+                    small = cv2.resize(
+                        img, (self.THUMB_MAX_W, max(1, round(img.shape[0] * scale))),
+                        interpolation=cv2.INTER_AREA,
+                    )
+                    ok, buf = cv2.imencode(".jpg", small, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                    if ok:
+                        b64 = base64.b64encode(buf.tobytes()).decode("ascii")
+                        uri = f"data:image/jpeg;base64,{b64}"
+            except ImportError:
+                pass
+        if not uri:
+            uri = "data:image/png;base64," + base64.b64encode(raw).decode("ascii")
+        cache[path] = (stamp, uri)
+        return uri
+
     def list_vision_templates(self) -> dict:
         """All searchable image names organized by category, with thumbnails and thresholds."""
         if not self._app_root:
@@ -1171,8 +1225,6 @@ class Api:
                         group = os.path.relpath(dirpath, folder).replace("\\", "/")
                         group = "" if group == "." else group
                         try:
-                            with open(path, "rb") as f:
-                                b64 = base64.b64encode(f.read()).decode("ascii")
                             names.append({
                                 "name": name,
                                 "group": group,
@@ -1180,7 +1232,7 @@ class Api:
                                 # The template's identity everywhere: the threshold key the
                                 # search engine looks up, and the file a crop overwrites.
                                 "path": rel,
-                                "data_uri": f"data:image/png;base64,{b64}",
+                                "data_uri": self._thumb_data_uri(path),
                                 "threshold": float(thresholds.get(rel, default_threshold)),
                                 "missing": False,
                             })
