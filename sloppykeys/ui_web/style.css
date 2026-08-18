@@ -587,8 +587,7 @@ input:focus, select:focus {
 .block-row[data-type="walk"],
 .block-row[data-type="walk_path"] { --blk-color: var(--teal); }
 .block-row[data-type="wait_ms"],
-.block-row[data-type="wait_wave"],
-.block-row[data-type="leave_at_minute"] { --blk-color: var(--amber); }
+.block-row[data-type="wait_wave"] { --blk-color: var(--amber); }
 .block-row[data-type="click"],
 .block-row[data-type="send_key"] { --blk-color: var(--rose); }
 .block-row[data-type="detect"],

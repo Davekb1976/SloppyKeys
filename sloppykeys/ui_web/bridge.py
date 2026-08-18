@@ -256,6 +256,14 @@ class Api:
             return RouteStore(self._app_root).acts(map_name)
         return targets_for(gamemode, map_name)
 
+    def get_priority_options(self) -> list:
+        """Targeting priorities **in the game's cycle order**, so the planner's dropdown
+        and the runner's press count come from one list. A dropdown that omitted an entry
+        would make every option after it press the wrong number of times."""
+        from sloppykeys.content.units import PRIORITY_OPTIONS
+
+        return list(PRIORITY_OPTIONS)
+
     # ---- Detect block templates (assets/detect) ----
 
     def list_detect_images(self) -> list:

@@ -391,7 +391,6 @@ class MacroController:
         means Victory/Defeat detection runs between every block execution.
         """
         self._battle_started_at = time.time()
-        self._battle_leave_requested = False
 
         # Flatten into indexable lists with per-loop state
         battle_idx = 0
@@ -402,11 +401,6 @@ class MacroController:
 
         while not self._stop_requested:
             if self._checkpoint():
-                return
-
-            # Check for leave-at-minute (scans all phases for a leave block)
-            if self._battle_leave_requested:
-                self._log("  Left match (Leave at Minute).")
                 return
 
             # Advance Battle by one block (if not exhausted)
@@ -490,8 +484,6 @@ class MacroController:
             return self._tick_target_priority(block)
         elif btype == "wait_wave":
             return self._tick_wait_wave(block)
-        elif btype == "leave_at_minute":
-            return self._tick_leave_at_minute(block)
         else:
             # All other blocks are one-shot (execute and move on)
             self._execute_block(block)
@@ -548,6 +540,21 @@ class MacroController:
         defaults = {"upgrade": "t", "sell": "x", "priority": "r", "autograde": "v"}
         return gk.get(action, defaults.get(action, ""))
 
+    def _safe_game_key(self, action: str) -> str:
+        """The keybind for an action, reduced to one key safe to put in an AHK Send().
+        "" when unusable, which callers must treat as "don't press anything"."""
+        from sloppykeys.config.keybinds import sanitize_game_key
+
+        return sanitize_game_key(self._game_keybind(action))
+
+    @staticmethod
+    def _safe_key(raw: object) -> str:
+        """Sanitise a key that came from a saved block. A generated AHK script *is*
+        code, so a block field can never reach `Send()` unchecked."""
+        from sloppykeys.config.keybinds import sanitize_game_key
+
+        return sanitize_game_key(raw)
+
     def _tick_upgrade_unit(self, block: dict) -> bool:
         """Click the unit, press upgrade key. Repeats up to `times`. If autograde is on, press autograde key after."""
         params = block.get("params", {})
@@ -564,16 +571,35 @@ class MacroController:
             return True
 
         from sloppykeys.macro.input_scripts import nudge_click_script, key_script, SPREAD_TIGHT
+
+        # With Auto on, `times` is the auto-upgrade *level*: the key steps through the
+        # levels, so pressing it N times selects level N. It replaces the manual presses
+        # rather than following them — one interaction, not both.
+        if autograde:
+            key = self._safe_game_key("autograde")
+            if not key:
+                self._log("    [block] upgrade: no usable autograde keybind — skipping")
+                del self._upgrade_state[id(block)]
+                return True
+            self._ahk.run(nudge_click_script(pos[0], pos[1], spread=SPREAD_TIGHT), wait=True, timeout=5.0)
+            time.sleep(0.4)
+            self._ahk.run(key_script(key, count=times), wait=True, timeout=3.0 + times)
+            self._log(f"    [block] auto upgrade → level {times} ({times}× {key.upper()})")
+            del self._upgrade_state[id(block)]
+            return True
+
+        key = self._safe_game_key("upgrade")
+        if not key:
+            self._log("    [block] upgrade: no usable upgrade keybind — skipping")
+            del self._upgrade_state[id(block)]
+            return True
         self._ahk.run(nudge_click_script(pos[0], pos[1], spread=SPREAD_TIGHT), wait=True, timeout=5.0)
         time.sleep(0.4)
-        self._ahk.run(key_script(self._game_keybind("upgrade")), wait=True, timeout=3.0)
+        self._ahk.run(key_script(key), wait=True, timeout=3.0)
         time.sleep(0.3)
 
         state["remaining"] -= 1
         if state["remaining"] <= 0:
-            if autograde:
-                time.sleep(0.2)
-                self._ahk.run(key_script(self._game_keybind("autograde")), wait=True, timeout=3.0)
             del self._upgrade_state[id(block)]
             return True
         return False
@@ -585,33 +611,53 @@ class MacroController:
             self._log("    [block] sell: no unit position — skipping")
             return True
 
+        key = self._safe_game_key("sell")
+        if not key:
+            self._log("    [block] sell: no usable sell keybind — skipping")
+            return True
         from sloppykeys.macro.input_scripts import nudge_click_script, key_script, SPREAD_TIGHT
         self._ahk.run(nudge_click_script(pos[0], pos[1], spread=SPREAD_TIGHT), wait=True, timeout=5.0)
         time.sleep(0.4)
-        self._ahk.run(key_script(self._game_keybind("sell")), wait=True, timeout=3.0)
+        self._ahk.run(key_script(key), wait=True, timeout=3.0)
         return True
 
     def _tick_target_priority(self, block: dict) -> bool:
-        """Click the unit, press the priority key. One-shot.
+        """Click the unit, then cycle its targeting to the chosen priority.
 
-        ponytail: the game cycles targeting with one keypress and exposes no
-        readable current state, so we press once per invocation. Reaching a
-        specific priority reliably would need OCR of the unit's target label —
-        the dropdown value is stored for that upgrade path.
+        The key steps through `PRIORITY_OPTIONS` in order, and a freshly placed unit
+        starts on the first entry, so the number of presses is the option's index —
+        `First` needs none, `Last` one, and so on.
+
+        ponytail: that only holds while the unit is still on the default. Nothing on
+        screen reports the current target, so running this block twice on one unit
+        cycles past where it was. Reading it back would need OCR of the unit panel.
         """
         pos = self._unit_click_position(block)
         if pos is None:
             self._log("    [block] target priority: no unit position — skipping")
             return True
 
-        priority = block.get("params", {}).get("priority", "")
+        from sloppykeys.content.units import PRIORITY_OPTIONS
+
+        wanted = str(block.get("params", {}).get("priority", "") or "")
+        if wanted not in PRIORITY_OPTIONS:
+            self._log(f"    [block] target priority: '{wanted}' is not a targeting option — skipping")
+            return True
+        presses = PRIORITY_OPTIONS.index(wanted)
+        if presses == 0:
+            self._log(f"    [block] target priority already {wanted} on a fresh unit — no press")
+            return True
+
         from sloppykeys.macro.input_scripts import nudge_click_script, key_script, SPREAD_TIGHT
         self._ahk.run(nudge_click_script(pos[0], pos[1], spread=SPREAD_TIGHT), wait=True, timeout=5.0)
         time.sleep(0.4)
-        self._ahk.run(key_script(self._game_keybind("priority")), wait=True, timeout=3.0)
+        key = self._safe_game_key("priority")
+        if not key:
+            self._log("    [block] target priority: no usable priority keybind — skipping")
+            return True
+        self._ahk.run(key_script(key, count=presses), wait=True, timeout=3.0 + presses)
         time.sleep(0.2)
-        if priority:
-            self._log(f"    [block] target priority → {priority}")
+        self._log(f"    [block] target priority → {wanted} ({presses}× {key.upper()})")
         return True
 
     def _tick_wait_wave(self, block: dict) -> bool:
@@ -676,27 +722,6 @@ class MacroController:
 
         return False
 
-    def _tick_leave_at_minute(self, block: dict) -> bool:
-        """Check if elapsed stage time exceeds the threshold. If so, leave."""
-        params = block.get("params", {})
-        minutes = max(0, float(params.get("minutes", 10) or 10))
-
-        started = getattr(self, '_battle_started_at', None) or time.time()
-        elapsed_min = (time.time() - started) / 60.0
-
-        if elapsed_min < minutes:
-            # False = "not done, look again next tick". Returning True here marked the
-            # block finished on its first tick, so in the Battle phase — which runs once
-            # through — the deadline was checked once, immediately, and never again.
-            return False
-
-        self._log(f"    [block] leave at minute {minutes:.1f} — elapsed {elapsed_min:.1f}min, leaving")
-        # ponytail: only raises the flag; `_run_match` ends the match loop on it. Nothing
-        # clicks a Leave button yet, so the run relies on the lobby navigator recovering.
-        # Needs the real in-match leave sequence measured before it can do more.
-        self._battle_leave_requested = True
-        return True
-
     def _send_webhook_result(self, result: str) -> None:
         """Send a Discord webhook notification for a match result with screenshot."""
         unified = UnifiedSettings(self._app_root)
@@ -748,7 +773,7 @@ class MacroController:
         if btype == "place_unit":
             x = int(params.get("x", 0))
             y = int(params.get("y", 0))
-            hotkey = block.get("hotkey", "")
+            hotkey = self._safe_key(block.get("hotkey", ""))
             if x and y:
                 from sloppykeys.macro.input_scripts import nudge_click_script, key_script, SPREAD_TIGHT
                 # Convert client-space coords to screen coords
@@ -779,14 +804,11 @@ class MacroController:
             time.sleep(ms / 1000.0)
 
         elif btype == "wait_wave":
-            wave = int(params.get("wave", 1))
-            # ponytail: wave OCR gate — one look per tick, not implemented yet
-            self._log(f"    [block] wait for wave {wave}")
-
-        elif btype == "leave_at_minute":
-            minutes = int(params.get("minutes", 10))
-            # ponytail: checked per tick against stage clock
-            self._log(f"    [block] leave at minute {minutes}")
+            # In a linear phase there is no tick loop, so poll until it clears.
+            while not self._tick_wait_wave(block):
+                if self._checkpoint():
+                    break
+                time.sleep(TICK_SLEEP)
 
         elif btype == "click":
             x = int(params.get("x", 0))
@@ -798,11 +820,20 @@ class MacroController:
                     self._ahk.run(nudge_click_script(screen_pos[0], screen_pos[1]), wait=True, timeout=5.0)
 
         elif btype == "send_key":
-            key = block.get("key", "")
-            hold_ms = int(params.get("hold_ms", 0))
-            if key:
-                from sloppykeys.macro.input_scripts import key_script
-                self._ahk.run(key_script(key, hold_ms=hold_ms), wait=True, timeout=5.0)
+            key = self._safe_key(block.get("key", ""))
+            # Hold is opt-in: the checkbox gates the duration, so an unticked block taps
+            # even if a stale hold_ms is still saved on it.
+            hold_ms = max(0, int(params.get("hold_ms", 0) or 0)) if block.get("hold") else 0
+            count = max(1, int(params.get("count", 1) or 1))
+            if not key:
+                self._log(f"    [block] send key: '{block.get('key', '')}' is not a usable key")
+                return
+            from sloppykeys.macro.input_scripts import key_script
+            self._ahk.run(
+                key_script(key, count=count, hold_ms=hold_ms),
+                wait=True,
+                timeout=8.0 + count * (hold_ms / 1000.0),
+            )
 
         elif btype == "walk":
             # Replay a recorded walk path

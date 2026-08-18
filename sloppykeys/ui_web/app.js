@@ -778,6 +778,130 @@
     return `<span class="blk-field"><span class="blk-field-label">${label}</span>${inner}</span>`;
   }
 
+  // One place that decides a new block's shape, so a block dropped into a detect branch
+  // starts out the same as one dropped into a phase. The nested path used to create a
+  // bare {type, params:{}}, which left send_key with no count and detect with no branches.
+  function newBlock(type) {
+    const b = { type, params: {} };
+    if (type === "place_unit") b.params = { name: "", x: 0, y: 0 };
+    else if (type === "wait_ms") b.params = { ms: 500 };
+    else if (type === "wait_wave") b.params = { wave: 1 };
+    else if (type === "click") b.params = { x: 0, y: 0 };
+    else if (type === "send_key") { b.key = ""; b.hold = false; b.params = { count: 1, hold_ms: 500 }; }
+    // Unit actions carry no coordinates of their own: `index` names which placed unit
+    // they act on and the runner reads that block's x/y.
+    else if (type === "upgrade_unit") { b.autograde = false; b.params = { times: 1 }; }
+    else if (type === "walk") { b.pathName = ""; b.sprint = false; }
+    else if (type === "record") b.recordingName = "";
+    else if (type === "detect") {
+      b.image = ""; b.threshold = 0.8; b.loop = false; b.loopAttempts = 5;
+      b.then = []; b.else = [];
+    }
+    return b;
+  }
+
+  // Locate the block an element belongs to from its row's data attributes. Handlers used
+  // to parse this out of the element id, which only worked while every id was
+  // `<phase>-<idx>` — a nested block's key broke the split silently.
+  function rowInfo(el) {
+    const row = el.closest(".block-row");
+    if (!row) return null;
+    const ph = row.dataset.phase;
+    const idx = parseInt(row.dataset.idx);
+    const parent = row.dataset.parent !== undefined ? parseInt(row.dataset.parent) : null;
+    const branch = row.dataset.branch || null;
+    const block = (parent !== null && branch)
+      ? opPhases[ph]?.[parent]?.[branch]?.[idx]
+      : opPhases[ph]?.[idx];
+    return block ? { ph, idx, parent, branch, block } : null;
+  }
+
+  // A block inside a detect branch. Same fields as a top-level row — it only showed a
+  // type name and an ✕ before, so a nested block could never be configured. The id key
+  // encodes the nesting so it stays unique against the outer rows.
+  function nestedRow(b, phase, parentIdx, branch, idx) {
+    const key = `${phase}-n${parentIdx}${branch === "then" ? "t" : "e"}${idx}`;
+    const fields = b.type === "detect"
+      ? `<span class="blk-field-label">nested detect is not supported</span>`
+      : buildBlockFields(b, key, phase, idx);
+    return `<div class="block-row" data-phase="${phase}" data-parent="${parentIdx}" data-branch="${branch}" data-idx="${idx}" data-type="${b.type}" draggable="true">
+      <span class="block-type">${b.type.replace(/_/g, " ")}</span>
+      <span class="block-fields">${fields}</span>
+      <span class="block-actions">
+        <span class="block-remove" data-phase="${phase}" data-parent="${parentIdx}" data-branch="${branch}" data-idx="${idx}">&times;</span>
+      </span>
+    </div>`;
+  }
+
+  // The controls for one block, for every type except detect (which owns its whole row).
+  // `key` only has to be unique on the page — the handlers read the owning row's data
+  // attributes rather than parsing it, so a nested block gets working fields for free.
+  function buildBlockFields(b, key, phase, i) {
+    const t = b.type;
+    if (t === "walk_path") {
+      let f = `<svg class="pinned-walk-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4m-10-10h4m12 0h4"/></svg>
+        <button class="btn btn--sm${b.mode === "auto" ? " btn--primary" : ""}" onclick="setWalkPathMode('${phase}',${i},'auto')">Auto</button>
+        <button class="btn btn--sm${b.mode === "custom" ? " btn--primary" : ""}" onclick="setWalkPathMode('${phase}',${i},'custom')">Custom</button>
+        <label class="check"><input type="checkbox" ${b.sprint ? "checked" : ""} data-field="sprint"><span class="check-box"></span>Sprint</label>`;
+      if (b.mode === "custom") {
+        f += `<select class="setting-select" data-field="pathName" style="width:90px;height:22px;font-size:10px;" id="sel-walkpath-${key}"><option value="">Pick path...</option></select>
+          <button class="btn btn--sm" id="btn-walkrec-${key}">Rec</button>
+          <button class="btn btn--sm" id="btn-walktest-${key}">Test</button>
+          <button class="btn btn--sm btn--danger" id="btn-walkdel-${key}" title="Delete walk path">✕</button>`;
+      }
+      return f + `<span class="block-once-badge">RUNS ONCE</span>`;
+    }
+    if (t === "place_unit") {
+      const hk = b.hotkey || "";
+      let ord = 0, found = false;
+      for (const ph of PHASES) {
+        for (const bb of (opPhases[ph] || [])) {
+          if (bb.type === "place_unit") { ord++; if (bb === b) { found = true; break; } }
+        }
+        if (found) break;
+      }
+      return `<span class="unit-ord">#${ord}</span>`
+        + blkField("Key", `<button class="btn btn--sm hotkey-capture" id="hk-${key}" title="Unit slot hotkey">${hk ? hk.toUpperCase() : "Key"}</button>`)
+        + blkField("X", `<input value="${b.params?.x || 0}" data-field="params.x" type="number">`)
+        + blkField("Y", `<input value="${b.params?.y || 0}" data-field="params.y" type="number">`)
+        + blkField("Position", `<button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button>`)
+        + blkField("Name", `<input value="${b.params?.name || ""}" data-field="params.name" style="width:80px;">`);
+    }
+    if (t === "upgrade_unit") {
+      // With Auto on, Times is the auto-upgrade level, not a repeat count.
+      return unitIndexSelect(b)
+        + blkField(b.autograde ? "Level" : "Times", `<input value="${b.params?.times || 1}" data-field="params.times" type="number" min="1" style="width:44px;">`)
+        + `<label class="check" title="Set auto-upgrade to the level in Times instead of pressing upgrade"><input type="checkbox" ${b.autograde ? "checked" : ""} data-field="autograde"><span class="check-box"></span>Auto</label>`;
+    }
+    if (t === "sell_unit") return unitIndexSelect(b);
+    if (t === "target_priority") {
+      // Options come from content/units.py so the order matches the in-game cycle the
+      // runner counts presses against. Filled in by populatePrioritySelect.
+      return unitIndexSelect(b)
+        + blkField("Target", `<select class="blk-select" data-field="params.priority" id="sel-prio-${key}"></select>`);
+    }
+    if (t === "wait_ms") return blkField("Milliseconds", `<input value="${b.params?.ms || 500}" data-field="params.ms" type="number">`);
+    if (t === "wait_wave") return blkField("Wave", `<input value="${b.params?.wave || 1}" data-field="params.wave" type="number">`);
+    if (t === "click") {
+      return blkField("X", `<input value="${b.params?.x || 0}" data-field="params.x" type="number">`)
+        + blkField("Y", `<input value="${b.params?.y || 0}" data-field="params.y" type="number">`)
+        + blkField("Position", `<button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button>`);
+    }
+    if (t === "send_key") {
+      return blkField("Key", `<input value="${b.key || ""}" data-field="key" style="width:50px;">`)
+        + blkField("Times", `<input value="${b.params?.count || 1}" data-field="params.count" type="number" min="1" style="width:44px;">`)
+        + `<label class="check" title="Hold the key down instead of tapping it"><input type="checkbox" ${b.hold ? "checked" : ""} data-field="hold"><span class="check-box"></span>Hold</label>`
+        + (b.hold ? blkField("Hold (ms)", `<input value="${b.params?.hold_ms || 500}" data-field="params.hold_ms" type="number" min="1" style="width:60px;">`) : "");
+    }
+    if (t === "walk") {
+      return `<button class="btn btn--sm" id="btn-walk-rec-${key}">Rec</button><button class="btn btn--sm" id="btn-walktest-${key}">Test</button><button class="btn btn--sm btn--danger" id="btn-walkdel-${key}" title="Delete walk path">✕</button><select class="setting-select" data-field="pathName" style="width:100px;height:22px;font-size:10px;" id="sel-walk-${key}"><option value="">Pick path...</option></select><label class="check"><input type="checkbox" ${b.sprint ? "checked" : ""} data-field="sprint"><span class="check-box"></span>Sprint</label>`;
+    }
+    if (t === "record") {
+      return `<select class="setting-select" data-field="recordingName" style="width:110px;height:22px;font-size:10px;" id="sel-rec-${key}"><option value="">Select...</option></select><button class="btn btn--sm" id="btn-record-${key}">Rec</button><button class="btn btn--sm" id="btn-test-rec-${key}">Test</button><button class="btn btn--sm btn--danger" id="btn-del-rec-${key}" title="Delete recording">✕</button>`;
+    }
+    return "";
+  }
+
   function renderPhases() {
     PHASES.forEach((phase) => {
       const zone = document.getElementById("zone-" + phase);
@@ -792,48 +916,9 @@
         const isPinned = b.type === "walk_path";
         let fields = "";
         let removable = !isPinned;
-        if (b.type === "walk_path") {
-          // Pinned walk path: icon + Auto/Custom toggle + Sprint + Record
-          fields = `<svg class="pinned-walk-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4m-10-10h4m12 0h4"/></svg>
-            <button class="btn btn--sm${b.mode === "auto" ? " btn--primary" : ""}" onclick="setWalkPathMode('${phase}',${i},'auto')">Auto</button>
-            <button class="btn btn--sm${b.mode === "custom" ? " btn--primary" : ""}" onclick="setWalkPathMode('${phase}',${i},'custom')">Custom</button>
-            <label class="check"><input type="checkbox" ${b.sprint ? "checked" : ""} data-field="sprint"><span class="check-box"></span>Sprint</label>`;
-          if (b.mode === "custom") {
-            fields += `<select class="setting-select" data-field="pathName" style="width:90px;height:22px;font-size:10px;" id="sel-walkpath-${phase}-${i}"><option value="">Pick path...</option></select>
-              <button class="btn btn--sm" id="btn-walkrec-${phase}-${i}">Rec</button>
-              <button class="btn btn--sm" id="btn-walktest-${phase}-${i}">Test</button>
-              <button class="btn btn--sm btn--danger" id="btn-walkdel-${phase}-${i}" title="Delete walk path">✕</button>`;
-          }
-          fields += `<span class="block-once-badge">RUNS ONCE</span>`;
-        } else if (b.type === "place_unit") {
-          const hk = b.hotkey || "";
-          // Compute this block's #N ordinal among place_unit blocks
-          let ord = 0; for (const ph of PHASES) { for (const bb of (opPhases[ph]||[])) { if (bb.type === "place_unit") { ord++; if (bb === b) break; } } if (opPhases[ph].includes(b)) break; }
-          fields = `<span class="unit-ord">#${ord}</span>`
-            + blkField("Key", `<button class="btn btn--sm hotkey-capture" id="hk-${phase}-${i}" title="Unit slot hotkey">${hk ? hk.toUpperCase() : "Key"}</button>`)
-            + blkField("X", `<input value="${b.params?.x || 0}" data-field="params.x" type="number">`)
-            + blkField("Y", `<input value="${b.params?.y || 0}" data-field="params.y" type="number">`)
-            + blkField("Position", `<button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button>`)
-            + blkField("Name", `<input value="${b.params?.name || ""}" data-field="params.name" style="width:80px;">`);
-        } else if (b.type === "upgrade_unit") {
-          fields = unitIndexSelect(b)
-            + blkField("Times", `<input value="${b.params?.times || 1}" data-field="params.times" type="number" style="width:40px;">`)
-            + `<label class="check"><input type="checkbox" ${b.autograde ? "checked" : ""} data-field="autograde"><span class="check-box"></span>Auto</label>`;
-        } else if (b.type === "sell_unit") {
-          fields = unitIndexSelect(b);
-        } else if (b.type === "target_priority") {
-          const prio = String(b.params?.priority || "Boss");
-          const opts = ["First","Last","Strongest","Boss","Weakest","Shielded","Fastest","None"].map(p => `<option value="${p}"${p === prio ? " selected" : ""}>${p}</option>`).join("");
-          fields = unitIndexSelect(b)
-            + blkField("Target", `<select class="blk-select" data-field="params.priority">${opts}</select>`);
-        } else if (b.type === "wait_ms") fields = blkField("Milliseconds", `<input value="${b.params?.ms || 500}" data-field="params.ms" type="number">`);
-        else if (b.type === "wait_wave") fields = blkField("Wave", `<input value="${b.params?.wave || 1}" data-field="params.wave" type="number">`);
-        else if (b.type === "leave_at_minute") fields = blkField("Minutes", `<input value="${b.params?.minutes || 10}" data-field="params.minutes" type="number">`);
-        else if (b.type === "click") fields = blkField("X", `<input value="${b.params?.x || 0}" data-field="params.x" type="number">`) + blkField("Y", `<input value="${b.params?.y || 0}" data-field="params.y" type="number">`) + blkField("Position", `<button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button>`);
-        else if (b.type === "send_key") fields = blkField("Key", `<input value="${b.key || ""}" data-field="key" style="width:50px;">`) + blkField("Hold (ms)", `<input value="${b.params?.hold_ms || 0}" data-field="params.hold_ms" type="number" style="width:60px;">`);
-        else if (b.type === "walk") fields = `<button class="btn btn--sm" id="btn-walk-rec-${phase}-${i}">Rec</button><button class="btn btn--sm" id="btn-walktest-${phase}-${i}">Test</button><button class="btn btn--sm btn--danger" id="btn-walkdel-${phase}-${i}" title="Delete walk path">✕</button><select class="setting-select" data-field="pathName" style="width:100px;height:22px;font-size:10px;" id="sel-walk-${phase}-${i}"><option value="">Pick path...</option></select><label class="check"><input type="checkbox" ${b.sprint ? "checked" : ""} data-field="sprint"><span class="check-box"></span>Sprint</label>`;
-        else if (b.type === "record") fields = `<select class="setting-select" data-field="recordingName" style="width:110px;height:22px;font-size:10px;" id="sel-rec-${phase}-${i}"><option value="">Select...</option></select><button class="btn btn--sm" id="btn-record-${phase}-${i}">Rec</button><button class="btn btn--sm" id="btn-test-rec-${phase}-${i}">Test</button><button class="btn btn--sm btn--danger" id="btn-del-rec-${phase}-${i}" title="Delete recording">✕</button>`;
-        else if (b.type === "detect") {
+        if (b.type !== "detect") {
+          fields = buildBlockFields(b, `${phase}-${i}`, phase, i);
+        } else {
           const thenBlocks = (b.then || []);
           const elseBlocks = (b.else || []);
           return `<div class="block-row block-detect" data-phase="${phase}" data-idx="${i}" data-type="detect">
@@ -843,8 +928,10 @@
               ${blkField("Image", `<select class="blk-select" data-field="image" id="sel-detect-${phase}-${i}" style="width:110px;"><option value="">Pick image...</option></select>`)}
               <button class="btn btn--sm" id="btn-detect-cap-${phase}-${i}" title="Capture a new image from the game">Capture</button>
               <button class="btn btn--sm btn--danger" id="btn-detect-del-${phase}-${i}" title="Delete the selected image">✕</button>
+              <button class="btn btn--sm" id="btn-detect-test-${phase}-${i}" title="Search for this image on screen now">Test</button>
               ${blkField("Match", `<input value="${b.threshold || 0.8}" data-field="threshold" type="number" step="0.05" min="0.5" max="0.99" style="width:55px;">`)}
-              <label class="check"><input type="checkbox" ${b.loop ? "checked" : ""} data-field="loop"><span class="check-box"></span>Loop</label>
+              <label class="check" title="Keep looking for a few attempts before taking the Else branch"><input type="checkbox" ${b.loop ? "checked" : ""} data-field="loop"><span class="check-box"></span>Loop</label>
+              ${b.loop ? blkField("Attempts", `<input value="${b.loopAttempts || 5}" data-field="loopAttempts" type="number" min="1" style="width:46px;">`) : ""}
               <span class="block-actions">
                 <span class="block-once${b.once ? " on" : ""}" data-phase="${phase}" data-idx="${i}" title="Run Once">1×</span>
                 <span class="block-clone" data-phase="${phase}" data-idx="${i}" title="Clone">⊕</span>
@@ -855,13 +942,13 @@
               <div class="detect-branch">
                 <span class="detect-branch-label then-label">Then (found)</span>
                 <div class="detect-dropzone" data-phase="${phase}" data-parent="${i}" data-branch="then">
-                  ${thenBlocks.length ? thenBlocks.map((tb, ti) => `<div class="block-row" data-phase="${phase}" data-parent="${i}" data-branch="then" data-idx="${ti}" data-type="${tb.type}" draggable="true"><span class="block-type">${tb.type.replace(/_/g," ")}</span><span class="block-remove" data-phase="${phase}" data-parent="${i}" data-branch="then" data-idx="${ti}">&times;</span></div>`).join("") : '<div class="phase-placeholder" style="padding:6px;">Drop here</div>'}
+                  ${thenBlocks.length ? thenBlocks.map((tb, ti) => nestedRow(tb, phase, i, "then", ti)).join("") : '<div class="phase-placeholder" style="padding:6px;">Drop here</div>'}
                 </div>
               </div>
               <div class="detect-branch">
                 <span class="detect-branch-label else-label">Else (not found)</span>
                 <div class="detect-dropzone" data-phase="${phase}" data-parent="${i}" data-branch="else">
-                  ${elseBlocks.length ? elseBlocks.map((eb, ei) => `<div class="block-row" data-phase="${phase}" data-parent="${i}" data-branch="else" data-idx="${ei}" data-type="${eb.type}" draggable="true"><span class="block-type">${eb.type.replace(/_/g," ")}</span><span class="block-remove" data-phase="${phase}" data-parent="${i}" data-branch="else" data-idx="${ei}">&times;</span></div>`).join("") : '<div class="phase-placeholder" style="padding:6px;">Drop here</div>'}
+                  ${elseBlocks.length ? elseBlocks.map((eb, ei) => nestedRow(eb, phase, i, "else", ei)).join("") : '<div class="phase-placeholder" style="padding:6px;">Drop here</div>'}
                 </div>
               </div>
             </div>
@@ -910,8 +997,11 @@
             targetBlock[field] = val;
           }
           opDirty = true;
-          // Re-render if mode changed (walk_path shows/hides path name input)
-          if (field === "mode") renderPhases();
+          // These fields change which other controls exist, so the row has to rebuild:
+          // walk_path's path picker, detect's attempts, send_key's duration, and
+          // upgrade_unit's Times caption (which reads "Level" once Auto is on).
+          if (["mode", "loop", "hold", "autograde"].includes(field)) renderPhases();
+          else if (field === "image") refreshDetectPreview(e.target);
         });
       });
 
@@ -975,12 +1065,8 @@
             if (window.pywebview && pywebview.api) pywebview.api.end_hotkey_capture();
             const key = ev.key.length === 1 ? ev.key : ev.key;
             btn.textContent = key.toUpperCase();
-            // Parse phase/idx from btn id: hk-<phase>-<idx>
-            const parts = btn.id.replace("hk-", "").split("-");
-            const ph = parts[0];
-            const idx = parseInt(parts[1]);
-            opPhases[ph][idx].hotkey = key.toLowerCase();
-            opDirty = true;
+            const info = rowInfo(btn);
+            if (info) { info.block.hotkey = key.toLowerCase(); opDirty = true; }
           };
           document.addEventListener("keydown", handler, true);
         });
@@ -1067,110 +1153,88 @@
           const parentIdx = parseInt(dz.dataset.parent);
           const branch = dz.dataset.branch;
           const ph = dz.dataset.phase;
-          const block = { type, params: {} };
           if (!opPhases[ph][parentIdx][branch]) opPhases[ph][parentIdx][branch] = [];
-          opPhases[ph][parentIdx][branch].push(block);
+          opPhases[ph][parentIdx][branch].push(newBlock(type));
           opDirty = true;
           renderPhases();
         });
       });
 
-      // Wire walk recording buttons (both walk blocks and walk_path custom)
+      // Walk: record / test / delete. All of these resolve their block from the row,
+      // so they work the same on a nested block as on a top-level one.
       zone.querySelectorAll("[id^='btn-walk-rec-'], [id^='btn-walkrec-']").forEach((btn) => {
         btn.addEventListener("click", () => {
-          const id = btn.id;
-          let ph, idx;
-          if (id.startsWith("btn-walkrec-")) {
-            const parts = id.replace("btn-walkrec-", "").split("-");
-            ph = parts[0]; idx = parseInt(parts[1]);
-          } else {
-            const parts = id.replace("btn-walk-rec-", "").split("-");
-            ph = parts[0]; idx = parseInt(parts[1]);
-          }
-          startWalkRecording(ph, idx);
+          const info = rowInfo(btn);
+          if (info) startWalkRecording(info);
         });
       });
-      // Wire walk test buttons
       zone.querySelectorAll("[id^='btn-walktest-']").forEach((btn) => {
         btn.addEventListener("click", () => {
-          const parts = btn.id.replace("btn-walktest-", "").split("-");
-          const ph = parts[0];
-          const idx = parseInt(parts[1]);
-          testWalkPath(ph, idx);
+          const info = rowInfo(btn);
+          if (info) testWalkPath(info.block);
         });
       });
-      // Wire walk delete buttons
       zone.querySelectorAll("[id^='btn-walkdel-']").forEach((btn) => {
         btn.addEventListener("click", () => {
-          const parts = btn.id.replace("btn-walkdel-", "").split("-");
-          deleteWalkPath(parts[0], parseInt(parts[1]));
+          const info = rowInfo(btn);
+          if (info) deleteWalkPath(info.block);
         });
       });
-      // Detect blocks: fill the image dropdown, show the preview, wire capture/delete
+      // Detect: fill the image dropdown, show the preview, wire capture/test/delete
       zone.querySelectorAll("[id^='sel-detect-']").forEach((sel) => {
-        const parts = sel.id.replace("sel-detect-", "").split("-");
-        const ph = parts[0], idx = parseInt(parts[1]);
-        populateDetectSelect(sel, opPhases[ph]?.[idx]?.image || "");
+        const info = rowInfo(sel);
+        populateDetectSelect(sel, info ? (info.block.image || "") : "");
       });
       zone.querySelectorAll("[id^='btn-detect-cap-']").forEach((btn) => {
         btn.addEventListener("click", () => {
-          const parts = btn.id.replace("btn-detect-cap-", "").split("-");
-          captureDetectImage(parts[0], parseInt(parts[1]));
+          const info = rowInfo(btn);
+          if (info) captureDetectImage(info.block);
         });
       });
       zone.querySelectorAll("[id^='btn-detect-del-']").forEach((btn) => {
         btn.addEventListener("click", () => {
-          const parts = btn.id.replace("btn-detect-del-", "").split("-");
-          deleteDetectImage(parts[0], parseInt(parts[1]));
+          const info = rowInfo(btn);
+          if (info) deleteDetectImage(info.block);
         });
       });
-      // Wire input recording buttons
+      zone.querySelectorAll("[id^='btn-detect-test-']").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const info = rowInfo(btn);
+          if (info) testDetectImage(info.block, btn);
+        });
+      });
+      // Targeting priority dropdowns, ordered by the in-game cycle.
+      zone.querySelectorAll("[id^='sel-prio-']").forEach((sel) => {
+        const info = rowInfo(sel);
+        populatePrioritySelect(sel, info ? (info.block.params?.priority || "") : "");
+      });
+      // Input recording: record / test / delete
       zone.querySelectorAll("[id^='btn-record-']").forEach((btn) => {
         btn.addEventListener("click", () => {
-          const parts = btn.id.split("-");
-          const ph = parts[2];
-          const idx = parseInt(parts[3]);
-          startInputRecording(ph, idx);
+          const info = rowInfo(btn);
+          if (info) startInputRecording(info);
         });
       });
-      // Wire test recording buttons
       zone.querySelectorAll("[id^='btn-test-rec-']").forEach((btn) => {
         btn.addEventListener("click", () => {
-          const parts = btn.id.split("-");
-          const ph = parts[3];
-          const idx = parseInt(parts[4]);
-          testRecording(ph, idx);
+          const info = rowInfo(btn);
+          if (info) testRecording(info.block);
         });
       });
-      // Wire delete recording buttons
       zone.querySelectorAll("[id^='btn-del-rec-']").forEach((btn) => {
         btn.addEventListener("click", () => {
-          const parts = btn.id.split("-");
-          const ph = parts[3];
-          const idx = parseInt(parts[4]);
-          deleteRecording(ph, idx);
+          const info = rowInfo(btn);
+          if (info) deleteRecording(info.block);
         });
       });
-      // Populate recording dropdowns
       zone.querySelectorAll("[id^='sel-rec-']").forEach((sel) => {
-        const parts = sel.id.split("-");
-        const ph = parts[2];
-        const idx = parseInt(parts[3]);
-        const current = opPhases[ph][idx].recordingName || "";
-        populateRecordingSelect(sel, current);
+        const info = rowInfo(sel);
+        populateRecordingSelect(sel, info ? (info.block.recordingName || "") : "");
       });
-      // Populate walk path dropdowns (both walk_path custom and walk blocks)
+      // Walk path dropdowns — both the pinned walk_path and the walk block
       zone.querySelectorAll("[id^='sel-walkpath-'], [id^='sel-walk-']").forEach((sel) => {
-        const parts = sel.id.split("-");
-        const ph = parts[1] === "walkpath" ? parts[2] : parts[2];
-        const idx = parseInt(parts[1] === "walkpath" ? parts[3] : parts[3]);
-        // For sel-walkpath-<phase>-<idx> and sel-walk-<phase>-<idx>
-        const idParts = sel.id.replace("sel-", "").split("-");
-        const prefix = idParts[0]; // "walkpath" or "walk"
-        const phKey = idParts[1];
-        const idxNum = parseInt(idParts[2]);
-        const current = opPhases[phKey]?.[idxNum]?.pathName || "";
-        populateWalkPathSelect(sel, current);
+        const info = rowInfo(sel);
+        populateWalkPathSelect(sel, info ? (info.block.pathName || "") : "");
       });
     });
   }
@@ -1219,18 +1283,7 @@
       // New block from palette
       const type = e.dataTransfer.getData("text/plain");
       if (!type) return;
-      const block = { type, params: {} };
-      if (type === "place_unit") block.params = { name: "", x: 0, y: 0 };
-      else if (type === "wait_ms") block.params = { ms: 500 };
-      else if (type === "wait_wave") block.params = { wave: 1 };
-      else if (type === "leave_at_minute") block.params = { minutes: 10 };
-      else if (type === "click") block.params = { x: 0, y: 0 };
-      else if (type === "send_key") { block.key = ""; block.params = { hold_ms: 0 }; }
-      else if (type === "upgrade_unit" || type === "sell_unit" || type === "target_priority") block.params = { x: 0, y: 0, times: 1 };
-      else if (type === "walk") { block.pathName = ""; block.params = {}; }
-      else if (type === "record") { block.recordingName = ""; block.params = {}; }
-      else if (type === "detect") { block.image = ""; block.threshold = 0.8; block.loop = false; block.then = []; block.else = []; }
-      opPhases[phase].push(block);
+      opPhases[phase].push(newBlock(type));
       opDirty = true;
       renderPhases();
     });
@@ -2023,9 +2076,11 @@
 
   // ---- Walk Path Recording ----
   let walkRecording = false;
-  let walkRecPhase = null, walkRecIdx = null;
+  // Held by reference, not by (phase, index): a nested block has no top-level index,
+  // and an index goes stale the moment a block above it is removed.
+  let walkRecBlock = null;
 
-  async function startWalkRecording(phase, idx) {
+  async function startWalkRecording(info) {
     if (!window.pywebview || !pywebview.api) return;
     if (walkRecording) {
       // Stop recording — don't save yet, show name modal
@@ -2040,8 +2095,7 @@
       setTimeout(() => input.focus(), 50);
     } else {
       // Start recording: switch to dashboard
-      walkRecPhase = phase;
-      walkRecIdx = idx;
+      walkRecBlock = info ? info.block : null;
       switchScreen("dashboard");
       await new Promise(r => setTimeout(r, 300));
       const name = `walk_${Date.now()}`; // temp name, will be renamed on save
@@ -2066,15 +2120,14 @@
     // Rename the saved walk path to the user's chosen name
     const r = await pywebview.api.rename_walk_path(name);
     if (r.ok) {
-      if (walkRecPhase !== null && walkRecIdx !== null) {
-        opPhases[walkRecPhase][walkRecIdx].pathName = r.name;
+      if (walkRecBlock) {
+        walkRecBlock.pathName = r.name;
         opDirty = true;
       }
       _cachedWalkPaths = null;
       window.addLog("Walk path saved: " + r.name);
     }
-    walkRecPhase = null;
-    walkRecIdx = null;
+    walkRecBlock = null;
     renderPhases();
   });
 
@@ -2086,8 +2139,7 @@
     document.getElementById("walk-name-modal").style.display = "none";
     if (window.pywebview && pywebview.api) await pywebview.api.discard_walk_path();
     window.addLog("[Walk] Recording discarded.");
-    walkRecPhase = null;
-    walkRecIdx = null;
+    walkRecBlock = null;
     renderPhases();
   });
 
@@ -2123,8 +2175,8 @@
     ).join("");
   }
 
-  async function testRecording(phase, idx) {
-    const name = opPhases[phase][idx].recordingName || "";
+  async function testRecording(block) {
+    const name = block.recordingName || "";
     if (!name) { window.addLog("[Record] No recording selected to test."); return; }
     if (!window.pywebview || !pywebview.api) return;
     switchScreen("dashboard");
@@ -2136,8 +2188,8 @@
     switchScreen("planner");
   }
 
-  async function testWalkPath(phase, idx) {
-    const name = opPhases[phase][idx].pathName || "";
+  async function testWalkPath(block) {
+    const name = block.pathName || "";
     if (!name) { window.addLog("[Walk] No path selected to test."); return; }
     if (!window.pywebview || !pywebview.api) return;
     switchScreen("dashboard");
@@ -2149,13 +2201,13 @@
     switchScreen("planner");
   }
 
-  async function deleteRecording(phase, idx) {
-    const name = opPhases[phase][idx].recordingName || "";
+  async function deleteRecording(block) {
+    const name = block.recordingName || "";
     if (!name) { window.addLog("[Record] No recording selected to delete."); return; }
     if (!window.pywebview || !pywebview.api) return;
     const r = await pywebview.api.delete_recording(name);
     if (r.ok) {
-      opPhases[phase][idx].recordingName = "";
+      block.recordingName = "";
       opDirty = true;
       _cachedRecordings = null;
       window.addLog("[Record] Deleted: " + name);
@@ -2167,7 +2219,30 @@
 
   // ---- Detect block images ----
   let _cachedDetectImages = null;
-  let detectCapPhase = null, detectCapIdx = null, detectCapRect = null;
+  let _cachedPriorities = null;
+  // The block that started a capture, held by reference so a nested block works too.
+  let detectCapBlock = null, detectCapRect = null;
+
+  // Targeting priorities in the game's cycle order, from content/units.py.
+  async function populatePrioritySelect(sel, current) {
+    if (!window.pywebview || !pywebview.api) return;
+    if (!_cachedPriorities) {
+      _cachedPriorities = (await pywebview.api.get_priority_options()) || [];
+    }
+    sel.innerHTML = _cachedPriorities.map(p =>
+      `<option value="${p}"${p === current ? " selected" : ""}>${p}</option>`
+    ).join("");
+    // No blank option: a fresh unit is already on the first entry, so that is the
+    // honest default and it costs no keypresses.
+    if (!current && _cachedPriorities.length) {
+      sel.value = _cachedPriorities[0];
+      const info = rowInfo(sel);
+      if (info) {
+        info.block.params = info.block.params || {};
+        info.block.params.priority = _cachedPriorities[0];
+      }
+    }
+  }
 
   async function detectImages() {
     if (!window.pywebview || !pywebview.api) return [];
@@ -2187,11 +2262,12 @@
     if (current && !imgs.some(im => im.name === current)) {
       sel.insertAdjacentHTML("beforeend", `<option value="${current}" selected>${current} (missing)</option>`);
     }
-    showDetectPreview(sel);
-    sel.addEventListener("change", () => showDetectPreview(sel));
+    refreshDetectPreview(sel);
   }
 
-  async function showDetectPreview(sel) {
+  // The thumbnail lives next to the dropdown; both ids share the row key.
+  async function refreshDetectPreview(sel) {
+    if (!sel || !sel.id.startsWith("sel-detect-")) return;
     const prev = document.getElementById(sel.id.replace("sel-detect-", "detect-prev-"));
     if (!prev) return;
     const imgs = await detectImages();
@@ -2200,9 +2276,9 @@
     prev.style.display = hit ? "" : "none";
   }
 
-  async function captureDetectImage(phase, idx) {
+  async function captureDetectImage(block) {
     if (!window.pywebview || !pywebview.api) return;
-    detectCapPhase = phase; detectCapIdx = idx;
+    detectCapBlock = block;
     // The backend reveals the game for the grab, so no screen switch is needed.
     const snap = await pywebview.api.get_roblox_snapshot();
     if (!snap.ok) { window.addLog("[Detect] Capture failed: " + (snap.reason || "error")); return; }
@@ -2210,7 +2286,7 @@
       label: "New detect image",
       backLabel: "Cancel",
       onBack: () => { imModal.style.display = "none"; restoreGameIfDashboard(); },
-      onRetake: () => captureDetectImage(phase, idx),
+      onRetake: () => captureDetectImage(block),
       onSave: (rect) => {
         detectCapRect = rect;
         imModal.style.display = "none";
@@ -2221,13 +2297,34 @@
     });
   }
 
-  async function deleteDetectImage(phase, idx) {
-    const name = opPhases[phase][idx].image || "";
+  async function testDetectImage(block, btn) {
+    const name = block.image || "";
+    if (!name) { window.addLog("[Detect] No image selected to test."); return; }
+    if (!window.pywebview || !pywebview.api) return;
+    btn.disabled = true;
+    const label = btn.textContent;
+    btn.textContent = "...";
+    window.addLog(`[Detect] Searching for "${name}"...`);
+    const r = await pywebview.api.test_image_search(`assets/detect/${name}.png`);
+    btn.disabled = false;
+    btn.textContent = label;
+    if (r.ok) {
+      window.addLog(`[Detect] Found "${name}" at ${r.score.toFixed(3)} (${r.x}, ${r.y})`);
+    } else {
+      // The best score is the useful part of a miss: it says whether the threshold is
+      // slightly too high or the template is simply not on screen.
+      const best = typeof r.best === "number" ? r.best.toFixed(3) : "?";
+      window.addLog(`[Detect] Not found — best ${best} vs threshold ${r.threshold ?? block.threshold ?? 0.8}${r.reason ? " (" + r.reason + ")" : ""}`);
+    }
+  }
+
+  async function deleteDetectImage(block) {
+    const name = block.image || "";
     if (!name) { window.addLog("[Detect] No image selected to delete."); return; }
     if (!window.pywebview || !pywebview.api) return;
     const r = await pywebview.api.delete_detect_image(name);
     if (r.ok) {
-      opPhases[phase][idx].image = "";
+      block.image = "";
       opDirty = true;
       _cachedDetectImages = null;
       window.addLog("[Detect] Deleted: " + name);
@@ -2240,6 +2337,7 @@
   function closeDetectNameModal() {
     document.getElementById("detect-name-modal").style.display = "none";
     detectCapRect = null;
+    detectCapBlock = null;
     restoreGameIfDashboard();
   }
   document.getElementById("detect-name-cancel").addEventListener("click", closeDetectNameModal);
@@ -2254,9 +2352,11 @@
       name, detectCapRect.x, detectCapRect.y, detectCapRect.w, detectCapRect.h);
     if (!r.ok) { window.addLog("[Detect] Save failed: " + (r.reason || "error")); return; }
     _cachedDetectImages = null;
-    // Point the block that started the capture at what it just made.
-    if (detectCapPhase !== null && opPhases[detectCapPhase]?.[detectCapIdx]) {
-      opPhases[detectCapPhase][detectCapIdx].image = name;
+    // Point the block that started the capture at what it just made. `save_detect_image`
+    // sanitises the name, so read it back from the path rather than trusting the input.
+    if (detectCapBlock) {
+      const saved = String(r.path || "").replace(/\\/g, "/").split("/").pop().replace(/\.png$/i, "");
+      detectCapBlock.image = saved || name;
       opDirty = true;
     }
     window.addLog("[Detect] Saved image: " + name);
@@ -2264,13 +2364,13 @@
     renderPhases();
   });
 
-  async function deleteWalkPath(phase, idx) {
-    const name = opPhases[phase][idx].pathName || "";
+  async function deleteWalkPath(block) {
+    const name = block.pathName || "";
     if (!name) { window.addLog("[Walk] No path selected to delete."); return; }
     if (!window.pywebview || !pywebview.api) return;
     const r = await pywebview.api.delete_walk_path(name);
     if (r.ok) {
-      opPhases[phase][idx].pathName = "";
+      block.pathName = "";
       opDirty = true;
       _cachedWalkPaths = null;
       window.addLog("[Walk] Deleted: " + name);
@@ -2282,10 +2382,9 @@
 
   // ---- Input Recording (Record block) ----
   let inputRecording = false;
-  let recordingBlockPhase = null;
-  let recordingBlockIdx = null;
+  let recordingBlock = null;
 
-  async function startInputRecording(phase, idx) {
+  async function startInputRecording(info) {
     if (!window.pywebview || !pywebview.api) return;
 
     if (inputRecording) {
@@ -2297,8 +2396,7 @@
       if (!result.ok || !result.count) {
         window.addLog("[Record] Nothing captured — no input detected.");
         await pywebview.api.discard_pending_recording();
-        recordingBlockPhase = null;
-        recordingBlockIdx = null;
+        recordingBlock = null;
         // Switch back to planner
         switchScreen("planner");
         renderPhases();
@@ -2315,8 +2413,7 @@
     }
 
     // Start recording: switch to dashboard so game is visible
-    recordingBlockPhase = phase;
-    recordingBlockIdx = idx;
+    recordingBlock = info ? info.block : null;
     switchScreen("dashboard");
     await new Promise(r => setTimeout(r, 300)); // let game become visible
 
@@ -2333,10 +2430,11 @@
 
   // Stop button in the recording popout (handles both input recording and walk recording)
   document.getElementById("rec-stop-btn").addEventListener("click", () => {
-    if (inputRecording && recordingBlockPhase !== null) {
-      startInputRecording(recordingBlockPhase, recordingBlockIdx);
-    } else if (walkRecording && walkRecPhase !== null) {
-      startWalkRecording(walkRecPhase, walkRecIdx);
+    // Re-entering the same function is how Stop is expressed — it toggles.
+    if (inputRecording) {
+      startInputRecording({ block: recordingBlock });
+    } else if (walkRecording) {
+      startWalkRecording({ block: walkRecBlock });
     }
   });
 
@@ -2350,16 +2448,15 @@
     if (result.ok) {
       _cachedRecordings = null; // refresh dropdown list
       // Wire the name back to the block
-      if (recordingBlockPhase !== null && recordingBlockIdx !== null) {
-        opPhases[recordingBlockPhase][recordingBlockIdx].recordingName = result.name;
+      if (recordingBlock) {
+        recordingBlock.recordingName = result.name;
         opDirty = true;
       }
       window.addLog("[Record] Saved: " + result.name);
     } else {
       window.addLog("[Record] Save failed: " + (result.reason || "error"));
     }
-    recordingBlockPhase = null;
-    recordingBlockIdx = null;
+    recordingBlock = null;
     renderPhases();
   });
 
@@ -2373,8 +2470,7 @@
     document.getElementById("rec-name-modal").style.display = "none";
     if (window.pywebview && pywebview.api) await pywebview.api.discard_pending_recording();
     window.addLog("[Record] Recording discarded.");
-    recordingBlockPhase = null;
-    recordingBlockIdx = null;
+    recordingBlock = null;
     renderPhases();
   });
   document.getElementById("rec-name-cancel").addEventListener("click", () => {
