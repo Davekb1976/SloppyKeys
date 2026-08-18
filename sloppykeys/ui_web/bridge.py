@@ -2133,6 +2133,23 @@ class Api:
             time.sleep(FOLLOW_INTERVAL)
 
 
+def resolve_app_root() -> str:
+    """The folder holding `assets/`, `settings.json`, `routes.json`, `operations/`, `paths/`.
+
+    **Frozen: the exe's own directory.** `build_exe.py` copies the editable data *next to*
+    the exe, not into `_internal/`, because the app writes to all of it. Walking up from
+    `__file__` lands in `_internal/` in a frozen build — one folder too deep — so every
+    template lookup, every saved operation and the whole of `settings.json` would point at a
+    tree the build never populates, and the shipped app would come up with no templates.
+
+    From source, `__file__` is `<root>/sloppykeys/ui_web/bridge.py`, so three levels up is the
+    repo root.
+    """
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(os.path.abspath(sys.executable))
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
 def main() -> None:
     ui_dir = os.path.dirname(os.path.abspath(__file__))
     html_path = os.path.join(ui_dir, "index.html")
@@ -2170,9 +2187,7 @@ def main() -> None:
             set_topmost(rbx, False)
 
         # Init the macro controller.
-        api._app_root = os.path.dirname(os.path.dirname(os.path.dirname(
-            os.path.abspath(__file__)
-        )))
+        api._app_root = resolve_app_root()
         api._ctrl = MacroController(
             api._app_root,
             log=api._log_to_ui,
