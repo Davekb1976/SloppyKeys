@@ -26,6 +26,7 @@ import os
 import sys
 import threading
 import time
+from datetime import datetime
 
 import webview  # type: ignore[import-untyped]
 
@@ -86,12 +87,27 @@ DRAG_INTERVAL = 0.008  # ~125Hz, so a drag never misses a displayed frame.
 HOTKEY_INTERVAL = 0.04  # ~25Hz, same cadence as the PySide6 window's 40ms timer.
 # How long a just-revealed game window needs before mss sees a painted frame.
 GAME_REVEAL_SETTLE = 0.4
-# The game is covered for this long after startup, because the boot loader is a fullscreen
+# The game is left alone for this long after startup, because the boot loader is a fullscreen
 # DOM overlay and the game paints over all DOM content — docked on the slot it would punch a
-# rectangle of Roblox through the middle of the loading screen. Kept in step with the loader
-# in `index.html`, whose hard cap is the same 5s; longer here would leave the Dashboard
-# briefly gameless, shorter would show the game through the tail of the fade.
+# rectangle of Roblox through the middle of the loading screen. `_follow_loop` does not dock
+# at all while it holds, it only pushes the game under our window: docking early also stripped
+# Roblox's frame before the UI was up, so a session closed during the loader left it borderless
+# and looking permanently fullscreen. Kept in step with the loader in `index.html`, whose hard
+# cap is the same 5s; longer here would leave the Dashboard briefly gameless, shorter would
+# show the game through the tail of the fade.
 BOOT_COVER_SECONDS = 5.0
+
+# The run log, back on disk. It had become UI-only when the Qt window went, so the log panel
+# was the whole record: a finished session left nothing to read, and a run that misbehaved
+# over a hundred cycles could not be diagnosed afterwards at all. Rotated once at startup
+# rather than by size, so each file is exactly one session — this run in `log.txt`, the one
+# before it in `log.prev.txt`. Both are gitignored.
+LOG_NAME = "log.txt"
+LOG_PREV_NAME = "log.prev.txt"
+# The macro worker, the hotkey loop and the UI thread all log, and a torn line is worse than
+# a slow one. `ponytail:` one lock for the whole file — fine at a few lines a second; if the
+# log ever becomes chatty enough to matter, hand the writes to a queue and one writer thread.
+_LOG_LOCK = threading.Lock()
 
 
 class Api:
@@ -1893,11 +1909,40 @@ class Api:
             )
 
     def _log_to_ui(self, msg: str) -> None:
-        """Push a log line to the frontend."""
+        """Push a log line to the frontend, and keep a copy on disk.
+
+        The file is written first and outside the window guard on purpose: a line logged
+        before the page is up, or after it has gone, is exactly the kind worth having.
+        """
+        self._write_log(msg)
         if self._window is None:
             return
         safe = msg.replace("\\", "\\\\").replace('"', '\\"').replace("\n", " ")
         self._window.evaluate_js(f'window.addLog && window.addLog("{safe}");')
+
+    def _write_log(self, msg: str) -> None:
+        """Append one timestamped line. Never raises: losing the log must not stop a run."""
+        if self._app_root is None:
+            return
+        stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        try:
+            with _LOG_LOCK, open(
+                os.path.join(self._app_root, LOG_NAME), "a", encoding="utf-8"
+            ) as handle:
+                handle.write(f"[{stamp}] {msg}\n")
+        except OSError as exc:
+            print(f"Failed to write the log: {exc}", file=sys.stderr)
+
+    def _rotate_log(self) -> None:
+        """Move the previous session's log aside. Called once, after `_app_root` resolves."""
+        if self._app_root is None:
+            return
+        current = os.path.join(self._app_root, LOG_NAME)
+        try:
+            if os.path.exists(current):
+                os.replace(current, os.path.join(self._app_root, LOG_PREV_NAME))
+        except OSError as exc:
+            print(f"Failed to rotate the log: {exc}", file=sys.stderr)
 
     # ---- Hotkey polling ----
 
@@ -2046,9 +2091,8 @@ class Api:
 
         SW_SHOWNOACTIVATE = 4
         user32.ShowWindow(game_hwnd, SW_SHOWNOACTIVATE)
-        # `_booting` counts as covered: the game is positioned on the slot from the first tick,
-        # but the boot loader is on top of that slot in the DOM and the game would paint
-        # straight through it.
+        # `_booting` still counts as covered, though `_follow_loop` no longer docks while it
+        # is set: a stray dock during boot must not raise the game over the loading screen.
         if self._game_visible and not self._booting:
             set_topmost(game_hwnd, True)
         else:
@@ -2124,12 +2168,14 @@ class Api:
         """
         while self._running:
             try:
-                # The boot cover expiring has to *do* something: a game docked while booting
-                # was docked covered, and this loop only re-docks when the window moves, so
-                # without re-asserting here it would stay under the page for the whole session.
+                # The boot window expiring has to *do* something: nothing is docked while
+                # booting, and the dock below only fires when the host moved or we are
+                # undocked, so without clearing the cached rect the game would never come
+                # up over the slot for the rest of the session. `_dock` applies the
+                # z-order itself, so there is nothing to re-assert here.
                 if self._booting and time.monotonic() >= self._boot_until:
                     self._booting = False
-                    self.set_game_visible(self._game_visible)
+                    self._last_rect = None
 
                 if self._dragging:
                     # The drag loop is moving both windows; two threads calling
@@ -2153,6 +2199,18 @@ class Api:
                         self._release_game()
                     self._last_rect = None
                     time.sleep(SEARCH_INTERVAL)
+                    continue
+
+                # Booting: the loader is a fullscreen DOM overlay and the game paints over
+                # all DOM content, so it must not be docked yet. Docking it here stripped
+                # its frame and positioned it onto the slot behind the loading screen, and
+                # `_dock`'s own ShowWindow raised it back over the page on every tick — the
+                # loader flickering behind a Roblox rectangle. Only push it under our
+                # window; the dock happens once the loader is gone.
+                if self._booting:
+                    set_topmost(self._game_hwnd, False)
+                    set_window_below(self._game_hwnd, host)
+                    time.sleep(FOLLOW_INTERVAL)
                     continue
 
                 rect = window_rect(host)
@@ -2226,6 +2284,9 @@ def main() -> None:
 
         # Init the macro controller.
         api._app_root = resolve_app_root()
+        # Before the first line is logged, so this session starts a clean file.
+        api._rotate_log()
+        api._write_log(f"SloppyKeys {api.get_version()} started.")
         api._ctrl = MacroController(
             api._app_root,
             log=api._log_to_ui,
