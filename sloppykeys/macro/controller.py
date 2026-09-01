@@ -152,6 +152,7 @@ class MacroController:
         self._running = True
         self._cycle = 0
         self._log("Macro started — running the task queue.")
+        self._send_webhook_started()
         return None
 
     def stop(self) -> None:
@@ -160,18 +161,30 @@ class MacroController:
         self._log("Stop requested.")
 
     def pause(self) -> None:
+        # Guarded so a second Pause doesn't post a second notification.
+        if self._paused:
+            return
         self._paused = True
+        self._send_webhook_paused(True)
 
     def resume(self) -> None:
+        if not self._paused:
+            return
         self._paused = False
+        self._send_webhook_paused(False)
 
     def run_loop(self) -> tuple[bool, str]:
         """Block until finished or stopped. Call from a worker thread."""
+        # Pre-set so the `finally` still reports something if `_run` raises: an unhandled
+        # exception is exactly the ending nobody is watching for.
+        reason = "stopped unexpectedly"
         try:
-            return self._run()
+            ok, reason = self._run()
+            return (ok, reason)
         finally:
             self._running = False
             self._current_task = None
+            self._send_webhook_ended(reason)
 
     # -- Internal --
 
@@ -1029,27 +1042,106 @@ class MacroController:
 
         return False
 
-    def _send_webhook_result(self, result: str) -> None:
-        """Send a Discord webhook notification for a match result with screenshot."""
+    def _webhook(self):
+        """The configured hook, or None when notifications are off.
+
+        Built per send rather than held on the instance, so editing the URL or the user ID in
+        Settings takes effect on the next event instead of at the next restart.
+        """
+        from sloppykeys.core.webhook import DiscordWebhook
+
         unified = UnifiedSettings(self._app_root)
-        webhook_url = unified.get("discord_webhook", "")
-        if not webhook_url:
-            return
-
-        from sloppykeys.core.webhook import DiscordWebhook, COLOR_WIN, COLOR_LOSS
-
+        url = unified.get("discord_webhook", "")
+        if not url:
+            return None
         hook = DiscordWebhook(
-            url_provider=lambda: webhook_url,
+            url_provider=lambda: url,
             log=self._log,
             user_id_provider=lambda: unified.get("discord_user_id", ""),
         )
-        if not hook.enabled:
-            return
+        return hook if hook.enabled else None
 
+    def _task_label(self) -> str:
         task = self._current_task or {}
         mode = task.get("mode", "—")
         map_name = task.get("map", "—")
         stage = task.get("stage", "—")
+        return f"{mode} / {map_name} / {stage}"
+
+    def _session_field(self) -> tuple[str, str]:
+        snap = self._stats.snapshot()
+        return ("Session", f"{snap.wins}W – {snap.losses}L ({snap.win_rate})")
+
+    def _send_lifecycle(
+        self, title: str, color: int, extra: list[tuple[str, str]], ping: bool = False
+    ) -> None:
+        """One run-lifecycle notification: started, paused, resumed, ended.
+
+        Sent from the controller rather than the bridge because the hotkeys and the buttons
+        both come through here — notifying at the js_api methods would miss F1/F2 entirely.
+        """
+        hook = self._webhook()
+        if hook is None:
+            return
+        hook.send(title=title, fields=extra, color=color, ping=ping)
+
+    def _send_webhook_started(self) -> None:
+        from sloppykeys.core.webhook import COLOR_START
+
+        tasks = UnifiedSettings(self._app_root).get_tasks()
+        first = tasks[0] if tasks else {}
+        queued = ", ".join(
+            f"{t.get('mode', '?')} / {t.get('map', '?')}" for t in tasks[:3]
+        ) or "—"
+        if len(tasks) > 3:
+            queued += f", +{len(tasks) - 3} more"
+        self._send_lifecycle(
+            "Macro Started",
+            COLOR_START,
+            [
+                ("Queue", f"{len(tasks)} task(s)"),
+                ("Up first", f"{first.get('mode', '—')} / {first.get('map', '—')}"),
+                ("Queued", queued),
+            ],
+        )
+
+    def _send_webhook_paused(self, paused: bool) -> None:
+        from sloppykeys.core.webhook import COLOR_PAUSE, COLOR_START
+
+        # Both are user-initiated, from a keyboard the user is sitting at, so neither pings.
+        self._send_lifecycle(
+            "Macro Paused" if paused else "Macro Resumed",
+            COLOR_PAUSE if paused else COLOR_START,
+            [("Stage", self._task_label()), ("Cycle", str(self._cycle)), self._session_field()],
+        )
+
+    def _send_webhook_ended(self, reason: str) -> None:
+        from sloppykeys.core.webhook import COLOR_END
+
+        snap = self._stats.snapshot()
+        # Pinged only when the run ended on its own. A user who pressed Stop is already at the
+        # machine; a queue that emptied, a Roblox that vanished or a crash is the case worth
+        # pulling someone back for.
+        self._send_lifecycle(
+            "Macro Ended",
+            COLOR_END,
+            [
+                ("Reason", reason or "—"),
+                ("Cycles", str(self._cycle)),
+                self._session_field(),
+                ("Uptime", snap.macro_time),
+            ],
+            ping=not self._stop_requested,
+        )
+
+    def _send_webhook_result(self, result: str) -> None:
+        """Send a Discord webhook notification for a match result with screenshot."""
+        from sloppykeys.core.webhook import COLOR_WIN, COLOR_LOSS
+
+        hook = self._webhook()
+        if hook is None:
+            return
+
         wins = self._stats.wins
         losses = self._stats.losses
         total = wins + losses
@@ -1058,7 +1150,7 @@ class MacroController:
         title = "Stage Won" if result == "win" else "Stage Lost"
         color = COLOR_WIN if result == "win" else COLOR_LOSS
         fields = [
-            ("Stage", f"{mode} / {map_name} / {stage}"),
+            ("Stage", self._task_label()),
             ("Cycle", str(self._cycle + 1)),
             ("Session", f"{wins}W – {losses}L ({rate})"),
         ]

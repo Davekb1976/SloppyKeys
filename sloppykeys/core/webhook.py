@@ -49,6 +49,7 @@ COLOR_START = 0x8B5CF6   # violet
 COLOR_WIN = 0x22C55E     # green
 COLOR_LOSS = 0xEF4444    # red
 COLOR_END = 0x64748B     # slate
+COLOR_PAUSE = 0xE8A23A   # amber, the same role it has in the UI's own palette
 
 
 def validate_webhook_url(url: str) -> tuple[str, str]:
