@@ -22,6 +22,7 @@ Two other layouts were measured and rejected on this stack:
 from __future__ import annotations
 
 import contextlib
+import json
 import os
 import sys
 import threading
@@ -65,6 +66,17 @@ from sloppykeys.config.settings import (
     parse_private_server_link,
 )
 from sloppykeys.config.unified import UnifiedSettings
+from sloppykeys.core.updates import (
+    RELEASES_URL,
+    Release,
+    clear_downloads,
+    download,
+    expected_sha,
+    installed_by_setup,
+    latest_release,
+    launch_installer,
+    update_dir,
+)
 from sloppykeys.macro.controller import MacroController
 
 WINDOW_TITLE = "SloppyKeys"
@@ -134,6 +146,10 @@ class Api:
         self._running = True
         self._dragging = False
         self._last_rect: tuple[int, int, int, int] | None = None
+        # The release the update check found, held so Install doesn't have to ask again.
+        self._pending_release: Release | None = None
+        # Megabytes already pushed to the page, so the download reports once per MB.
+        self._update_mb = -1
         # Macro controller — created lazily in on_loaded once app_root is known.
         self._ctrl: MacroController | None = None
         self._app_root: str | None = None
@@ -493,6 +509,131 @@ class Api:
             return {"ok": False, "reason": f"Failed to launch Roblox: {exc}"}
         self._log_to_ui("Joining the private server...")
         return {"ok": True}
+
+    # ---- Updates ----
+    #
+    # `core/updates.py` has done the work since before the Qt window was deleted; what went
+    # with that window was every caller. The setting stayed, so "Check for updates on
+    # startup" was a checkbox that saved a value nothing read.
+    #
+    # Courtesy feature rules, from that module's own docstring: the check runs on a worker,
+    # never blocks the page, never runs during a macro run, and a failure is a line in the
+    # log rather than a dialog.
+
+    def check_for_update(self, manual: bool = False) -> dict:
+        """Ask GitHub whether there is a newer release. Answers through `window.on*`.
+
+        An automatic check that finds nothing says nothing — the point is to be silent when
+        there is no news. A manual one always answers, or the button looks broken.
+        """
+        if not self._app_root:
+            return {"ok": False, "reason": "still starting up"}
+        threading.Thread(
+            target=self._update_check, args=(bool(manual),), daemon=True
+        ).start()
+        return {"ok": True}
+
+    def _update_check(self, manual: bool) -> None:
+        # Anything a previous update left in %TEMP% goes now. The app quits the moment it
+        # hands over to the installer, so on the way in is the only chance it gets.
+        clear_downloads()
+        release, reason = latest_release()
+        if release is None:
+            if manual:
+                self._push_js(
+                    "window.onUpdateStatus",
+                    {"ok": not reason, "message": reason or "SloppyKeys is up to date."},
+                )
+            elif reason:
+                self._log_to_ui(f"Update check: {reason}")
+            return
+        self._pending_release = release
+        self._push_js(
+            "window.onUpdateAvailable",
+            {
+                "version": release.version,
+                "page_url": release.page_url,
+                # Only a copy this installer installed is offered an in-place update. A
+                # portable-zip or dev copy running it would land a second install in
+                # %LOCALAPPDATA% and go on launching the old one, so it gets the page.
+                "can_install": bool(release.setup_url)
+                and installed_by_setup(self._app_root or ""),
+            },
+        )
+
+    def install_update(self) -> dict:
+        """Download the pending release, verify it, run it, and quit so it can replace us."""
+        release = self._pending_release
+        if release is None:
+            return {"ok": False, "reason": "nothing to install — check for an update first"}
+        if not release.setup_url:
+            return {"ok": False, "reason": "that release publishes no installer"}
+        if self._ctrl is not None and self._ctrl.is_running:
+            return {"ok": False, "reason": "stop the macro before installing an update"}
+        self._update_mb = -1
+        threading.Thread(target=self._run_update, args=(release,), daemon=True).start()
+        return {"ok": True}
+
+    def _run_update(self, release: Release) -> None:
+        digest, reason = expected_sha(release)
+        if not digest:
+            # No published hash means no automatic install. Running an unverified exe to be
+            # helpful is not a trade worth making; the release page is the honest fallback.
+            self._push_js(
+                "window.onUpdateStatus",
+                {"ok": False, "message": f"Can't verify the download: {reason}"},
+            )
+            return
+        dest = os.path.join(update_dir(), release.setup_name)
+        ok, message = download(release.setup_url, dest, digest, self._push_update_progress)
+        if not ok:
+            self._push_js("window.onUpdateStatus", {"ok": False, "message": message})
+            return
+        ok, message = launch_installer(dest)
+        if not ok:
+            self._push_js("window.onUpdateStatus", {"ok": False, "message": message})
+            return
+        # Inno's restart manager needs this exe gone before it can replace it, and the
+        # installer is already running. Hand the game its frame back first — quitting while
+        # Roblox is still stripped is what leaves it looking permanently fullscreen.
+        self._push_js(
+            "window.onUpdateStatus", {"ok": True, "message": "Installing — SloppyKeys will close."}
+        )
+        self._running = False
+        self._release_game()
+        if self._window:
+            self._window.destroy()
+
+    def _push_update_progress(self, got: int) -> None:
+        """One push per megabyte.
+
+        `download` calls back every 256KB, which is ~400 bridge round trips for a 100MB
+        installer. A megabyte is fine for a progress line and costs about 100.
+        """
+        megabytes = got // (1024 * 1024)
+        if megabytes == self._update_mb:
+            return
+        self._update_mb = megabytes
+        self._push_js("window.onUpdateProgress", {"mb": megabytes})
+
+    def open_release_page(self) -> dict:
+        """Open the release in the browser — the fallback for a portable or dev copy."""
+        release = self._pending_release
+        try:
+            os.startfile(release.page_url if release else RELEASES_URL)
+        except OSError as exc:
+            return {"ok": False, "reason": f"Failed to open the release page: {exc}"}
+        return {"ok": True}
+
+    def _push_js(self, handler: str, payload) -> None:
+        """Call a `window.on*` handler with one JSON argument.
+
+        `json.dumps`, never an f-string: Python's `False` interpolated straight into JS
+        crashed the run loop once with `False is not defined`.
+        """
+        if self._window is None:
+            return
+        self._window.evaluate_js(f"{handler} && {handler}({json.dumps(payload)});")
 
     def set_setting(self, key: str, value) -> dict:
         """Write one setting immediately. No save button needed."""
@@ -2339,6 +2480,12 @@ def main() -> None:
         window.evaluate_js("window.onBackendReady && window.onBackendReady();")
         threading.Thread(target=api._follow_loop, daemon=True).start()
         threading.Thread(target=api._hotkey_loop, daemon=True).start()
+
+        # The startup update check. Default on (`config/settings.py::AUTO_UPDATE_KEY`), on its
+        # own worker, and silent unless there is something to say. Last in on_loaded so a
+        # slow or unreachable GitHub cannot delay the window coming up.
+        if UnifiedSettings(api._app_root).get("auto_update", True):
+            api.check_for_update()
 
     def on_closing() -> None:
         # The X button is ours, but an OS-initiated close bypasses it.

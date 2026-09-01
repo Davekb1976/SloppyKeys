@@ -402,10 +402,24 @@ input:focus, select:focus {
 .btn--sm { height: var(--control-md); padding: 0 var(--space-3); font-size: 12px; }
 .btn--lg { height: var(--control-lg); padding: 0 var(--space-4); font-size: 13px; }
 
+/* ---- Update modal ---- */
+.upd-version { font-size: 14px; font-weight: 700; color: var(--text); }
+.upd-note { font-size: 11px; color: var(--text-muted); line-height: 1.5; }
+/* The download reports megabytes, not a percentage: the release API carries an asset size
+   but `updates.Release` does not, and a mono line that counts up is honest without teaching
+   a tested module a new field. */
+.upd-progress {
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--teal); border: 1px solid var(--border);
+  background: var(--surface-sunken); padding: var(--space-2);
+}
+
 /* Icon-only plate: a square the width of its own height, so it keeps its footprint in a row
    where the labelled buttons stretch. `.btn` already centres its SVG and sets min-width. */
 .btn--icon { width: var(--control-md); padding: 0; }
-.btn--icon svg { color: var(--sky); }
+/* `--sky` and `--lilac` are named in the design notes but were never declared in `:root`,
+   so `var(--sky)` here resolved to nothing and the glyph silently inherited `--text`. */
+.btn--icon svg { color: var(--accent); }
 .btn--icon:hover svg { color: var(--text); }
 
 /* Controls row (Dashboard) */

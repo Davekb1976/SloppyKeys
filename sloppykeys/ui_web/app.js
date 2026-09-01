@@ -3049,4 +3049,104 @@
   document.getElementById("rec-name-cancel").addEventListener("click", () => {
     document.getElementById("rec-name-discard").click();
   });
+
+  // ---- Updates ----
+  // Raised by Python, never by a nav button: `window.onUpdateAvailable` is the only way in.
+  // The backend does the deciding — whether this copy can install in place, and whether the
+  // download matched its published hash — so this is presentation plus three calls.
+  const updModal = document.getElementById("upd-modal");
+  const updVersion = document.getElementById("upd-version");
+  const updNote = document.getElementById("upd-note");
+  const updProgress = document.getElementById("upd-progress");
+  const updInstall = document.getElementById("upd-install");
+  const updPage = document.getElementById("upd-page");
+
+  function closeUpdateModal() {
+    updModal.style.display = "none";
+    restoreGameIfDashboard();
+  }
+
+  window.onUpdateAvailable = function (info) {
+    if (!info || !updModal) return;
+    updVersion.textContent = "SloppyKeys " + info.version;
+    updProgress.hidden = true;
+    updInstall.disabled = false;
+    updInstall.textContent = "Install update";
+    // A portable-zip or dev copy is not offered an in-place install: running the installer
+    // from there leaves a second copy in %LOCALAPPDATA% and keeps launching the old one.
+    updInstall.style.display = info.can_install ? "" : "none";
+    updNote.textContent = info.can_install
+      ? "Your settings, templates and macros are kept. SloppyKeys closes while it installs."
+      : "This copy wasn't installed by the setup program, so update it from the release page.";
+    setGameVisible(false);
+    updModal.style.display = "flex";
+    window.addLog("Update available: " + info.version);
+  };
+
+  window.onUpdateProgress = function (p) {
+    if (!p || !updProgress) return;
+    updProgress.hidden = false;
+    updProgress.textContent = "Downloading... " + p.mb + "MB";
+  };
+
+  // Every refusal and every failure lands here — no published hash, a hash mismatch, a dead
+  // network, or the plain "up to date" answer to a manual check.
+  window.onUpdateStatus = function (s) {
+    if (!s) return;
+    window.addLog("Update: " + s.message);
+    if (updProgress && !updProgress.hidden) updProgress.textContent = s.message;
+    if (updInstall) {
+      updInstall.disabled = false;
+      updInstall.textContent = "Install update";
+    }
+  };
+
+  if (updInstall) {
+    updInstall.addEventListener("click", async () => {
+      if (!window.pywebview || !pywebview.api || !pywebview.api.install_update) return;
+      updInstall.disabled = true;
+      updInstall.textContent = "Installing...";
+      updProgress.hidden = false;
+      updProgress.textContent = "Verifying...";
+      const r = await pywebview.api.install_update();
+      // Only a refusal comes back here. Success ends with the app closing, so there is
+      // nothing to re-enable on that path.
+      if (r && !r.ok) {
+        window.addLog("Update: " + (r.reason || "install failed"));
+        updProgress.textContent = r.reason || "install failed";
+        updInstall.disabled = false;
+        updInstall.textContent = "Install update";
+      }
+    });
+  }
+
+  if (updPage) {
+    updPage.addEventListener("click", () => {
+      if (window.pywebview && pywebview.api && pywebview.api.open_release_page) {
+        pywebview.api.open_release_page();
+      }
+    });
+  }
+
+  document.getElementById("upd-later").addEventListener("click", closeUpdateModal);
+  document.getElementById("upd-close").addEventListener("click", closeUpdateModal);
+
+  // Manual check, from Settings. Without it the only trigger is a launch that happens to
+  // find a newer release, which is untestable on the copy that just published it.
+  const btnCheckUpdate = document.getElementById("btn-check-update");
+  if (btnCheckUpdate) {
+    btnCheckUpdate.addEventListener("click", async () => {
+      if (!window.pywebview || !pywebview.api || !pywebview.api.check_for_update) return;
+      btnCheckUpdate.disabled = true;
+      btnCheckUpdate.textContent = "Checking...";
+      try {
+        await pywebview.api.check_for_update(true);
+      } finally {
+        setTimeout(() => {
+          btnCheckUpdate.disabled = false;
+          btnCheckUpdate.textContent = "Check now";
+        }, 1200);
+      }
+    });
+  }
 })();

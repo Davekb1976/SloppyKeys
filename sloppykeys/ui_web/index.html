@@ -460,8 +460,12 @@
             <div class="setting-row">
               <div class="setting-info">
                 <span class="setting-name">Check for updates on startup</span>
+                <span class="setting-desc">Asks GitHub once per launch. Never downloads on its own.</span>
               </div>
-              <label class="check check--lg"><input type="checkbox" id="s-auto-update" data-key="auto_update"><span class="check-box"></span></label>
+              <div style="display:flex; gap:6px; align-items:center;">
+                <button class="btn btn--sm tip-left" id="btn-check-update" data-tip="Ask GitHub now.">Check now</button>
+                <label class="check check--lg"><input type="checkbox" id="s-auto-update" data-key="auto_update"><span class="check-box"></span></label>
+              </div>
             </div>
             <div class="setting-row">
               <div class="setting-info">
@@ -629,6 +633,26 @@
       <div style="display:flex; gap:8px; justify-content:flex-end;">
         <button class="btn btn--sm" id="rec-name-discard">Discard</button>
         <button class="btn btn--sm btn--primary" id="rec-name-save">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Update available. Raised by window.onUpdateAvailable, never opened by a nav button. -->
+<div class="modal-overlay" id="upd-modal" style="display:none;">
+  <div class="modal-box" style="width:420px; display:flex; flex-direction:column;">
+    <div class="modal-header">
+      <span class="modal-title">Update available</span>
+      <button class="modal-close" id="upd-close">&times;</button>
+    </div>
+    <div class="modal-body" style="padding:16px; display:flex; flex-direction:column; gap:12px;">
+      <div class="upd-version" id="upd-version">SloppyKeys —</div>
+      <div class="upd-note" id="upd-note">Your settings, templates and macros are kept.</div>
+      <div class="upd-progress" id="upd-progress" hidden></div>
+      <div style="display:flex; gap:8px; justify-content:flex-end;">
+        <button class="btn btn--sm" id="upd-later">Later</button>
+        <button class="btn btn--sm" id="upd-page">Release notes</button>
+        <button class="btn btn--sm btn--primary" id="upd-install">Install update</button>
       </div>
     </div>
   </div>
