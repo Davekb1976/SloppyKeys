@@ -25,20 +25,41 @@ from build_exe import (  # noqa: E402
 
 
 def test_local_only_folders_are_skipped() -> None:
-    """`assets/regions` and `assets/detect` hold crops of whatever was on one user's screen.
+    """`assets/detect` holds arbitrary crops of whatever was on one user's screen.
 
-    Both are gitignored, so a clean-runner build never saw them, but a build from a working
-    tree copied them straight into the payload.
+    `assets/regions` is the deliberate exception: those crops are what each OCR box reads at
+    the pinned viewport, so they ship as reference (see `assets/regions/README.md`).
     """
-    for folder in ("debug", "__pycache__", "regions", "detect"):
+    for folder in ("debug", "__pycache__", "detect"):
         assert folder in SKIP_DIRS, f"{folder} must not be copied into a build"
+    assert "regions" not in SKIP_DIRS, "the OCR box previews are meant to ship"
 
     names = ["match", "lobby", "gamemodes", "regions", "detect", "debug", "images.json"]
     dropped = _ignore("assets", names)
-    assert dropped == {"regions", "detect", "debug"}, dropped
-    # The template folders the app cannot run without must survive the same filter.
-    for keep in ("match", "lobby", "gamemodes", "images.json"):
+    assert dropped == {"detect", "debug"}, dropped
+    # The folders the app ships must survive the same filter.
+    for keep in ("match", "lobby", "gamemodes", "images.json", "regions"):
         assert keep not in dropped, f"{keep} is shipped data and was dropped"
+
+
+def test_the_shipped_previews_are_present_and_named_for_their_boxes() -> None:
+    """A preview only renders if its filename is the region key the page asks for.
+
+    `get_region_previews` looks up `<key>.png` per spec, so a renamed or missing file is a
+    silently empty column rather than an error.
+    """
+    folder = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "regions")
+    assert os.path.isdir(folder), "assets/regions/ is shipped reference and should exist"
+    pngs = {name[:-4] for name in os.listdir(folder) if name.endswith(".png")}
+    assert pngs, "no previews to ship"
+
+    from sloppykeys.ui_web.bridge import Api
+
+    api = Api.__new__(Api)
+    api._app_root = "."
+    keys = {spec["key"] for spec in api.get_vision_region_specs()}
+    stray = pngs - keys
+    assert not stray, f"preview PNGs matching no region key would never be shown: {sorted(stray)}"
 
 
 def test_shipped_settings_never_carries_a_secret() -> None:

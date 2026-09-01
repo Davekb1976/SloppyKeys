@@ -48,17 +48,18 @@ SHIPPED_ROUTES = ("routes.json", "routes.default.json")
 # webhook. A filtered one is written instead — see `shipped_settings` and
 # `SHIPPED_SETTINGS_KEYS`, which carry the tuning forward and leave the secrets behind.
 SECRET_FILES = ("settings.json",)
-# Build leftovers, dumps, and the folders that only ever hold *this* machine's crops. Matched
-# by bare name at any depth, which is how `debug` has always worked.
+# Build leftovers, dumps, and the one folder that only ever holds *this* machine's crops.
+# Matched by bare name at any depth, which is how `debug` has always worked.
 #
-# `regions` and `detect` are gitignored, so a build on a clean runner never saw them — but a
-# build from a working tree copied the developer's own OCR box previews and Detect captures
-# into the payload, and `installer.iss` ships `assets\*` with `onlyifdoesntexist`, so they
-# would land on a user's machine and then never be replaced. Both are regenerated on demand
-# (`bridge._region_preview_dir` makes its folder when it saves a preview, and
-# `list_detect_images` returns an empty list when the folder is absent), so leaving them out
-# costs nothing: entering Settings > OCR draws that user's own previews.
-SKIP_DIRS = {"debug", "__pycache__", "regions", "detect"}
+# `detect` is the Detect block's Capture folder: arbitrary crops of whatever was on one user's
+# screen, with no meaning to anyone else, and `list_detect_images` returns an empty list when
+# the folder is absent. `installer.iss` ships `assets\*` with `onlyifdoesntexist`, so anything
+# that lands there once is never replaced — which is the reason to be strict about it.
+#
+# `assets/regions/` is **not** here: those crops ship. They are what each OCR box reads at the
+# pinned viewport, so they document the boxes rather than the machine, and without them a
+# fresh install shows an empty preview column until the user gets the Challenge panel up.
+SKIP_DIRS = {"debug", "__pycache__", "detect"}
 
 # `--collect-all` because these ship data next to their Python: rapidocr carries the three
 # ONNX models and their YAML config inside the wheel (that is why recognition is offline),

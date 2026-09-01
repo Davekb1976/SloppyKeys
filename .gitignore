@@ -28,9 +28,10 @@ log.prev.txt
 /assets/debug/
 assets/**/debug/
 
-# Saved crops of the user's own OCR boxes, shown as previews in Settings > OCR. Rewritten
-# on every Preview/Test and specific to their calibration, so there is nothing to ship.
-/assets/regions/
+# `assets/regions/` is deliberately *not* ignored: those crops ship as reference, so a fresh
+# install can see what each OCR box is meant to read instead of an empty column. A user's own
+# Preview overwrites the file in place, so committing them costs them nothing. See
+# `assets/regions/README.md`.
 
 # The user's own walk recordings. `paths/defaults/` is the exception: those are the walk
 # paths Auto looks up by name (`content/walk_paths.py`), shared game data rather than
