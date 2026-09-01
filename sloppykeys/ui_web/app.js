@@ -868,6 +868,9 @@
     if (!el || !uri) return;
     el.src = uri;
     el.hidden = false;
+    // The placeholder holds the column open until a crop exists; drop it once one does.
+    const none = document.querySelector(`[data-vr-none="${key}"]`);
+    if (none) none.hidden = true;
   }
 
   // The box just drawn or typed, cropped out of the shot already in hand — no new grab, so
@@ -927,7 +930,10 @@
             <input type="number" value="${val[2]}" data-vr-key="${s.key}" data-vr-idx="2" data-tip="Width">
             <input type="number" value="${val[3]}" data-vr-key="${s.key}" data-vr-idx="3" data-tip="Height">
             <button class="btn btn--sm" data-vr-set="${s.key}" data-tip="Draw this box on a screenshot">Set</button>
-            <img class="vr-thumb" data-vr-thumb="${s.key}" alt="" hidden>
+            <span class="vr-thumb-cell">
+              <img class="vr-thumb" data-vr-thumb="${s.key}" alt="" hidden>
+              <span class="vr-nopreview" data-vr-none="${s.key}">no preview</span>
+            </span>
             <span class="vr-read" data-vr-read="${s.key}"></span>
           </div>`;
         }).join("")}
