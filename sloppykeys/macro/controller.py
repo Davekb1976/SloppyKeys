@@ -1041,6 +1041,7 @@ class MacroController:
         hook = DiscordWebhook(
             url_provider=lambda: webhook_url,
             log=self._log,
+            user_id_provider=lambda: unified.get("discord_user_id", ""),
         )
         if not hook.enabled:
             return
@@ -1070,6 +1071,10 @@ class MacroController:
             fields=fields,
             color=color,
             image_png=screenshot,
+            # Losses only. A win is the expected outcome and there can be a hundred of them in
+            # a session, so pinging on those trains the user to mute the channel — which
+            # silences the one message worth a notification.
+            ping=result != "win",
         )
 
     def _execute_block(self, block: dict) -> None:

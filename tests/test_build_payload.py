@@ -56,6 +56,7 @@ def test_shipped_settings_never_carries_a_secret() -> None:
                 {
                     "private_server_link": "https://www.roblox.com/share?code=leak&type=Server",
                     "discord_webhook": "https://discord.com/api/webhooks/leak",
+                    "discord_user_id": "286825732000000000",
                     "stats": {"wins": 412, "losses": 7},
                     "tasks": [{"mode": "Expedition"}],
                     "regions": {"wait_wave": [1, 2, 3, 4]},
@@ -73,6 +74,8 @@ def test_shipped_settings_never_carries_a_secret() -> None:
 
     assert payload["private_server_link"] == "", "the private server link shipped"
     assert payload["discord_webhook"] == "", "the Discord webhook shipped"
+    # Not a secret, but it names a person: blanked rather than merely left out.
+    assert payload["discord_user_id"] == "", "the Discord user ID shipped"
     assert payload["stats"] == {"wins": 0, "losses": 0}, "the developer's counters shipped"
 
     # This machine's measurements and the developer's own queue are not shipped: an override

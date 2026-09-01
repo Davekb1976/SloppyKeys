@@ -27,6 +27,8 @@ DEFAULTS: dict[str, Any] = {
     # General
     "private_server_link": "empty",
     "discord_webhook": "",
+    # Optional. Pinged on a loss, and only if the webhook itself is set.
+    "discord_user_id": "",
     "hard_mode": False,
     "camera_once_per_session": False,
     "auto_update": True,

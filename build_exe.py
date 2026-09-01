@@ -104,6 +104,8 @@ PRUNE_GLOBS = (
 #
 # Deliberately excluded, each for its own reason:
 #   private_server_link, discord_webhook — secrets. Always shipped blank.
+#   discord_user_id                      — whose Discord account to ping. Not a secret, but it
+#       identifies a person, so it is blanked rather than merely left out of the allowlist.
 #   stats                                — the developer's win/loss counters. Zeroed.
 #   regions, points                      — measurements from *this* machine. They are
 #       already the code defaults (`content/challenge.py`, `acts.py`, `start_stage.py`), so
@@ -146,6 +148,7 @@ def shipped_settings(source: str) -> tuple[dict, list[str]]:
             carried.append(key)
     payload["private_server_link"] = ""
     payload["discord_webhook"] = ""
+    payload["discord_user_id"] = ""
     payload["stats"] = {"wins": 0, "losses": 0}
     return (payload, carried)
 

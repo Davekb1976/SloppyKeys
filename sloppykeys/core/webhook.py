@@ -12,6 +12,7 @@ otherwise ignored.
 from __future__ import annotations
 
 import json
+import re
 import threading
 import urllib.error
 import urllib.request
@@ -27,6 +28,12 @@ WEBHOOK_PATH_PREFIX = "/api/webhooks/"
 
 TIMEOUT_SECONDS = 10.0
 USER_AGENT = "SloppyKeys (https://github.com/, macro notifier)"
+
+# A Discord snowflake: 17-20 digits. "Copy User ID" (Developer Mode on) gives the bare
+# digits; the `<@123>` and `<@!123>` forms are what you get from copying a mention out of a
+# message, so both are read. Anything else is rejected rather than cleaned up — an ID the app
+# quietly reshaped would silently ping nobody, which is indistinguishable from a broken field.
+_USER_ID_PATTERN = re.compile(r"^<@!?(\d{17,20})>$|^(\d{17,20})$")
 
 # Discord rejects an upload over its per-request limit (8 MiB on a free server) with
 # a 413, which would drop the whole embed. A 1152x756 PNG is ~1 MB, so this only
@@ -60,6 +67,17 @@ def validate_webhook_url(url: str) -> tuple[str, str]:
     ):
         return ("", "Webhook URL should look like /api/webhooks/<id>/<token>.")
     return (cleaned, "")
+
+
+def validate_user_id(text: str) -> tuple[str, str]:
+    """Return (snowflake, error). Empty is not an error — it means "don't ping"."""
+    cleaned = (text or "").strip()
+    if not cleaned:
+        return ("", "")
+    match = _USER_ID_PATTERN.match(cleaned)
+    if match is None:
+        return ("", "That isn't a Discord user ID. Turn on Developer Mode, then Copy User ID.")
+    return (match.group(1) or match.group(2), "")
 
 
 def encode_multipart(payload: dict, image: bytes) -> tuple[str, bytes]:
@@ -99,10 +117,14 @@ class DiscordWebhook:
         url_provider: Callable[[], str],
         log: Callable[[str], None] | None = None,
         username: str = "SloppyKeys",
+        user_id_provider: Callable[[], str] | None = None,
     ) -> None:
         self._url_provider = url_provider
         self._log = log or (lambda _m: None)
         self._username = username
+        # Read through a provider like the URL, so editing the field in Settings takes effect
+        # on the next send without rebuilding the hook.
+        self._user_id_provider = user_id_provider or (lambda: "")
 
     @property
     def enabled(self) -> bool:
@@ -117,6 +139,7 @@ class DiscordWebhook:
         footer: str = "",
         blocking: bool = False,
         image_png: bytes | None = None,
+        ping: bool = False,
     ) -> tuple[bool, str]:
         """Queue one embed. `blocking` is for the Settings test button, which wants
         a real answer; the macro never blocks on this.
@@ -124,6 +147,11 @@ class DiscordWebhook:
         `image_png` attaches a screenshot shown inside the embed. Oversized or empty
         bytes are dropped rather than failing the send — the figures matter more
         than the picture.
+
+        `ping` mentions the configured user. It has to go in `content`: a mention inside an
+        embed renders as a mention but notifies nobody, which is the trap that makes this look
+        implemented when it isn't. No ID configured means no ping and no error — the field is
+        optional and a missing one is not a failed send.
         """
         url, error = validate_webhook_url(self._url_provider())
         if error:
@@ -136,6 +164,12 @@ class DiscordWebhook:
             self._log(
                 f"Discord webhook: screenshot dropped ({len(image_png)} bytes over the limit)."
             )
+
+        user_id, id_error = validate_user_id(self._user_id_provider())
+        if id_error:
+            # Say it once, on the send that wanted it, and post anyway: a mistyped ID must not
+            # cost the notification itself.
+            self._log(f"Discord webhook: {id_error}")
 
         payload = {
             # Per-message username, not the bare bot name. Each send is already its
@@ -170,7 +204,16 @@ class DiscordWebhook:
                     ),
                 }
             ],
+            # Always sent, whether or not this message pings. `parse: []` switches off
+            # @everyone, @here and role mentions outright, so the only mention that can ever
+            # notify from this app is the one ID the user typed into their own settings.
+            "allowed_mentions": {
+                "parse": [],
+                **({"users": [user_id]} if ping and user_id else {}),
+            },
         }
+        if ping and user_id:
+            payload["content"] = f"<@{user_id}>"
 
         if blocking:
             return self._post(url, payload, image)

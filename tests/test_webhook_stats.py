@@ -21,6 +21,7 @@ from sloppykeys.core.webhook import (  # noqa: E402
     USERNAME_MAX,
     DiscordWebhook,
     encode_multipart,
+    validate_user_id,
     validate_webhook_url,
 )
 
@@ -112,6 +113,53 @@ assert ended["username"] != won["username"]
 assert len(DiscordWebhook(lambda: GOOD)._message_username("x" * 200)) <= USERNAME_MAX
 # No title still names the app rather than posting as a blank author.
 assert DiscordWebhook(lambda: GOOD)._message_username("") == "SloppyKeys"
+
+# # The ping. Two things have to hold: the mention reaches `content` (inside an embed it
+# renders but notifies nobody), and @everyone can never be reached from here.
+assert validate_user_id("") == ("", "")           # optional field, not a failure
+assert validate_user_id("   ") == ("", "")
+assert validate_user_id("286825732000000000")[0] == "286825732000000000"
+assert validate_user_id("  286825732000000000 ")[0] == "286825732000000000"
+# Copied straight off a mention, both forms.
+assert validate_user_id("<@286825732000000000>")[0] == "286825732000000000"
+assert validate_user_id("<@!286825732000000000>")[0] == "286825732000000000"
+for bad in ("12345", "everyone", "@everyone", "<@everyone>", "286825732000000000x",
+            "1234567890123456789012345", "<@123>", "here"):
+    got, error = validate_user_id(bad)
+    assert not got and error, bad
+
+pinger = DiscordWebhook(lambda: GOOD, user_id_provider=lambda: "286825732000000000")
+pinger._post = lambda url, payload, image=None: (  # type: ignore[method-assign]
+    captured.append({"payload": payload, "image": image}),
+    (True, "HTTP 200"),
+)[1]
+
+pinger.send("Stage Lost", [("Map", "Story")], blocking=True, ping=True)
+lost = captured[-1]["payload"]
+assert lost["content"] == "<@286825732000000000>", lost.get("content")
+assert lost["allowed_mentions"] == {"parse": [], "users": ["286825732000000000"]}, lost
+
+# Not pinging: no content at all, and the mention allowlist still shuts out @everyone.
+pinger.send("Stage Won", [("Map", "Story")], blocking=True)
+won_quiet = captured[-1]["payload"]
+assert "content" not in won_quiet, won_quiet.get("content")
+assert won_quiet["allowed_mentions"] == {"parse": []}, won_quiet
+
+# Asking to ping with no ID configured sends normally rather than failing the notification.
+no_id = DiscordWebhook(lambda: GOOD)
+no_id._post = lambda url, payload, image=None: (  # type: ignore[method-assign]
+    captured.append({"payload": payload, "image": image}),
+    (True, "HTTP 200"),
+)[1]
+ok, _msg = no_id.send("Stage Lost", [], blocking=True, ping=True)
+assert ok and "content" not in captured[-1]["payload"]
+
+# A mistyped ID is reported once and the embed still goes out.
+lines: list[str] = []
+typo = DiscordWebhook(lambda: GOOD, log=lines.append, user_id_provider=lambda: "nope")
+typo._post = lambda url, payload, image=None: (True, "HTTP 200")  # type: ignore[method-assign]
+ok, _msg = typo.send("Stage Lost", [], blocking=True, ping=True)
+assert ok and any("Developer Mode" in line for line in lines), lines
 
 # # Durations
 assert format_duration(0) == "0:00:00"
