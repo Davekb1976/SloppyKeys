@@ -27,24 +27,30 @@ Untested: <what has not run in game>
 - **type** — `fix` `feat` `refactor` `perf` `docs` `build` `chore`.
 - **scope** — the module or surface: `lobby` `placement` `challenge` `tasks` `runner`
   `vision` `ui` `planner` `dashboard` `settings` `delays` `installer` `build` `steering`.
-- **body** — **three sentences at most, usually none.** Only what the diff cannot say: the
-  root cause, a measurement quoted from a log, or an obvious fix that was rejected so
-  nobody retries it. One fact per sentence. No restating the subject, no explaining the
-  design. A body that reads as a paragraph of prose is too long; seven before/after
-  numbers belong in one sentence quoting the worst one.
-- **`Untested:`** — required unless the change was exercised in the game. Without it a
-  green `compileall` later reads as "it worked".
+- **body** — **40 words, hard. Usually none.** Only what the diff cannot state: the root
+  cause, the number that proves it, or a rejected fix nobody should retry. The old rule
+  said "three sentences" and bought three 40-word ones, so count the words.
+
+  **Cut every time:** what the code now does · why the choice was right · what you
+  verified · what it is consistent with elsewhere · what you decided *not* to do · what a
+  previous commit got wrong · anything answering "why was this asked for". A body arguing
+  for the change is the tell — the diff already won.
+- **`Untested:`** — required unless the change was exercised in the game, because a green
+  `compileall` later reads as "it worked". Name what did **not** run; a list of what you
+  probed belongs in the reply, not here. A docs-only commit needs none — nothing to run.
 
 ```
 fix(lobby): wait for the panel to fade before clicking Start
 
-Start matched 0.96 while still fading in, so the click was swallowed and the run
-sat in the lobby until `Stage loaded` timed out at 60s — the button still scored
-0.954 on screen 55s later. Normalized correlation ignores a uniform brightness
-scale, so no threshold can separate a fading button from a live one.
+Start matched 0.96 while still fading in, so the click was swallowed and the run sat
+until `Stage loaded` timed out at 60s. Normalized correlation ignores a uniform
+uniform brightness, so no threshold separates a fading button from a live one.
 
 Untested: no challenge run since.
 ```
+
+39 words. What it leaves out is the point: no summary of the new code, no defence of
+`fade_wait` over a higher threshold, no note that `compileall` passed.
 
 ## Say what the change is, plainly
 
@@ -60,8 +66,6 @@ different now, in the words the project already uses.
   bumping the version` says it; describing the plumbing leaves the reader guessing.
 - **Proportional.** Not `feat` over a renamed variable, not `fix` over a comment, and
   don't imply a whole surface changed when one function did.
-- **The body states facts, not the conversation.** Never why it was asked for, never what
-  a previous commit got wrong, never anything mistakable for a motive.
 
 ## Releasing
 
