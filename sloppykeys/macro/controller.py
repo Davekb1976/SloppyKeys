@@ -1072,18 +1072,18 @@ class MacroController:
         snap = self._stats.snapshot()
         return ("Session", f"{snap.wins}W – {snap.losses}L ({snap.win_rate})")
 
-    def _send_lifecycle(
-        self, title: str, color: int, extra: list[tuple[str, str]], ping: bool = False
-    ) -> None:
+    def _send_lifecycle(self, title: str, color: int, extra: list[tuple[str, str]]) -> None:
         """One run-lifecycle notification: started, paused, resumed, ended.
 
         Sent from the controller rather than the bridge because the hotkeys and the buttons
         both come through here — notifying at the js_api methods would miss F1/F2 entirely.
+        Every one of these mentions the user if an ID is set; `webhook.send` decides that, so
+        no event here has a say in it.
         """
         hook = self._webhook()
         if hook is None:
             return
-        hook.send(title=title, fields=extra, color=color, ping=ping)
+        hook.send(title=title, fields=extra, color=color)
 
     def _send_webhook_started(self) -> None:
         from sloppykeys.core.webhook import COLOR_START
@@ -1108,7 +1108,6 @@ class MacroController:
     def _send_webhook_paused(self, paused: bool) -> None:
         from sloppykeys.core.webhook import COLOR_PAUSE, COLOR_START
 
-        # Both are user-initiated, from a keyboard the user is sitting at, so neither pings.
         self._send_lifecycle(
             "Macro Paused" if paused else "Macro Resumed",
             COLOR_PAUSE if paused else COLOR_START,
@@ -1119,9 +1118,6 @@ class MacroController:
         from sloppykeys.core.webhook import COLOR_END
 
         snap = self._stats.snapshot()
-        # Pinged only when the run ended on its own. A user who pressed Stop is already at the
-        # machine; a queue that emptied, a Roblox that vanished or a crash is the case worth
-        # pulling someone back for.
         self._send_lifecycle(
             "Macro Ended",
             COLOR_END,
@@ -1131,7 +1127,6 @@ class MacroController:
                 self._session_field(),
                 ("Uptime", snap.macro_time),
             ],
-            ping=not self._stop_requested,
         )
 
     def _send_webhook_result(self, result: str) -> None:
@@ -1163,10 +1158,6 @@ class MacroController:
             fields=fields,
             color=color,
             image_png=screenshot,
-            # Losses only. A win is the expected outcome and there can be a hundred of them in
-            # a session, so pinging on those trains the user to mute the channel — which
-            # silences the one message worth a notification.
-            ping=result != "win",
         )
 
     def _execute_block(self, block: dict) -> None:

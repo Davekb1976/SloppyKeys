@@ -134,31 +134,32 @@ pinger._post = lambda url, payload, image=None: (  # type: ignore[method-assign]
     (True, "HTTP 200"),
 )[1]
 
-pinger.send("Stage Lost", [("Map", "Story")], blocking=True, ping=True)
-lost = captured[-1]["payload"]
-assert lost["content"] == "<@286825732000000000>", lost.get("content")
-assert lost["allowed_mentions"] == {"parse": [], "users": ["286825732000000000"]}, lost
+# Setting the ID is the whole opt-in: every message mentions the user, with no per-event
+# choice to get wrong. Both of these carry the mention.
+for title in ("Stage Lost", "Stage Won"):
+    pinger.send(title, [("Map", "Story")], blocking=True)
+    payload = captured[-1]["payload"]
+    assert payload["content"] == "<@286825732000000000>", (title, payload.get("content"))
+    assert payload["allowed_mentions"] == {
+        "parse": [],
+        "users": ["286825732000000000"],
+    }, payload
 
-# Not pinging: no content at all, and the mention allowlist still shuts out @everyone.
-pinger.send("Stage Won", [("Map", "Story")], blocking=True)
-won_quiet = captured[-1]["payload"]
-assert "content" not in won_quiet, won_quiet.get("content")
-assert won_quiet["allowed_mentions"] == {"parse": []}, won_quiet
-
-# Asking to ping with no ID configured sends normally rather than failing the notification.
+# No ID: no mention, and the allowlist still shuts out @everyone.
 no_id = DiscordWebhook(lambda: GOOD)
 no_id._post = lambda url, payload, image=None: (  # type: ignore[method-assign]
     captured.append({"payload": payload, "image": image}),
     (True, "HTTP 200"),
 )[1]
-ok, _msg = no_id.send("Stage Lost", [], blocking=True, ping=True)
+ok, _msg = no_id.send("Stage Lost", [], blocking=True)
 assert ok and "content" not in captured[-1]["payload"]
+assert captured[-1]["payload"]["allowed_mentions"] == {"parse": []}
 
 # A mistyped ID is reported once and the embed still goes out.
 lines: list[str] = []
 typo = DiscordWebhook(lambda: GOOD, log=lines.append, user_id_provider=lambda: "nope")
 typo._post = lambda url, payload, image=None: (True, "HTTP 200")  # type: ignore[method-assign]
-ok, _msg = typo.send("Stage Lost", [], blocking=True, ping=True)
+ok, _msg = typo.send("Stage Lost", [], blocking=True)
 assert ok and any("Developer Mode" in line for line in lines), lines
 
 # # Durations

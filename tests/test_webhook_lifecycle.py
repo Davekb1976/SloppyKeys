@@ -2,8 +2,7 @@
 
 These existed only in the webhook module's docstring for months -- the match result was the
 one event with a caller. What this pins down is *which* events fire, that they fire once, and
-which of them pings, because a notifier that cries wolf gets muted and then the one message
-worth having is silent too.
+that each carries the mention when a user ID is configured.
 
 Nothing is posted: `_post` is replaced, so no network and no Discord.
 
@@ -78,8 +77,7 @@ def test_start_announces_the_queue() -> None:
         values = {f["name"]: f["value"] for f in embed["fields"]}
         assert values["Queue"] == "2 task(s)", values
         assert "School Grounds" in values["Up first"], values
-        # Starting is not worth a phone buzz: the user just pressed the button.
-        assert "content" not in sent[0], sent[0]
+        assert sent[0]["content"] == f"<@{USER}>", sent[0].get("content")
 
 
 def test_start_refused_on_an_empty_queue_says_nothing() -> None:
@@ -91,7 +89,7 @@ def test_start_refused_on_an_empty_queue_says_nothing() -> None:
         assert sent == [], "a refused start must not notify"
 
 
-def test_pause_and_resume_fire_once_each_and_never_ping() -> None:
+def test_pause_and_resume_fire_once_each() -> None:
     with tempfile.TemporaryDirectory() as root:
         ctrl, sent = build(root)
         ctrl.start()
@@ -104,16 +102,15 @@ def test_pause_and_resume_fire_once_each_and_never_ping() -> None:
         assert titles(sent) == ["Macro Paused", "Macro Resumed"], titles(sent)
         assert sent[0]["embeds"][0]["color"] == COLOR_PAUSE
         assert sent[1]["embeds"][0]["color"] == COLOR_START
-        # Both are keyboard-initiated, so the user is present either way.
         for payload in sent:
-            assert "content" not in payload, payload
+            assert payload["content"] == f"<@{USER}>", payload.get("content")
 
 
-def test_end_pings_only_when_the_run_stopped_on_its_own() -> None:
+def test_end_reports_the_reason_and_mentions_either_way() -> None:
     with tempfile.TemporaryDirectory() as root:
         ctrl, sent = build(root)
 
-        # A run that ended by itself -- an empty queue here -- is the case worth a ping.
+        # Ended on its own, an empty queue here.
         ctrl._run = lambda: (True, "queue empty")  # type: ignore[method-assign]
         ctrl.run_loop()
         assert titles(sent)[-1] == "Macro Ended", titles(sent)
@@ -124,13 +121,16 @@ def test_end_pings_only_when_the_run_stopped_on_its_own() -> None:
         assert values["Reason"] == "queue empty", values
         assert "Uptime" in values and "Session" in values, values
 
-        # The user pressing Stop is already at the machine, so that ending stays quiet.
+        # A user-requested stop reports its own reason and still mentions: setting the ID is
+        # the opt-in, so no event decides on the user's behalf.
         ctrl2, sent2 = build(root)
         ctrl2._run = lambda: (True, "stopped after 3 cycles")  # type: ignore[method-assign]
         ctrl2.stop()
         ctrl2.run_loop()
         assert titles(sent2)[-1] == "Macro Ended"
-        assert "content" not in sent2[-1], sent2[-1]
+        assert sent2[-1]["content"] == f"<@{USER}>", sent2[-1].get("content")
+        stopped = {f["name"]: f["value"] for f in sent2[-1]["embeds"][0]["fields"]}
+        assert stopped["Reason"] == "stopped after 3 cycles", stopped
 
 
 def test_a_crash_still_reports_an_ending() -> None:

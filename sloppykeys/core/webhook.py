@@ -140,7 +140,6 @@ class DiscordWebhook:
         footer: str = "",
         blocking: bool = False,
         image_png: bytes | None = None,
-        ping: bool = False,
     ) -> tuple[bool, str]:
         """Queue one embed. `blocking` is for the Settings test button, which wants
         a real answer; the macro never blocks on this.
@@ -149,10 +148,11 @@ class DiscordWebhook:
         bytes are dropped rather than failing the send — the figures matter more
         than the picture.
 
-        `ping` mentions the configured user. It has to go in `content`: a mention inside an
-        embed renders as a mention but notifies nobody, which is the trap that makes this look
-        implemented when it isn't. No ID configured means no ping and no error — the field is
-        optional and a missing one is not a failed send.
+        Every message mentions the configured user — setting the ID *is* the opt-in, so there
+        is no per-event choice to get wrong. The mention has to go in `content`: inside an
+        embed it renders as a mention but notifies nobody, which is the trap that makes this
+        look implemented when it isn't. No ID configured means no mention and no error, since
+        the field is optional and a missing one is not a failed send.
         """
         url, error = validate_webhook_url(self._url_provider())
         if error:
@@ -205,15 +205,15 @@ class DiscordWebhook:
                     ),
                 }
             ],
-            # Always sent, whether or not this message pings. `parse: []` switches off
-            # @everyone, @here and role mentions outright, so the only mention that can ever
-            # notify from this app is the one ID the user typed into their own settings.
+            # `parse: []` switches off @everyone, @here and role mentions outright, so the
+            # only mention that can ever notify from this app is the one ID the user typed
+            # into their own settings.
             "allowed_mentions": {
                 "parse": [],
-                **({"users": [user_id]} if ping and user_id else {}),
+                **({"users": [user_id]} if user_id else {}),
             },
         }
-        if ping and user_id:
+        if user_id:
             payload["content"] = f"<@{user_id}>"
 
         if blocking:
