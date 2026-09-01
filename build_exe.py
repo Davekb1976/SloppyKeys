@@ -48,8 +48,17 @@ SHIPPED_ROUTES = ("routes.json", "routes.default.json")
 # webhook. A filtered one is written instead — see `shipped_settings` and
 # `SHIPPED_SETTINGS_KEYS`, which carry the tuning forward and leave the secrets behind.
 SECRET_FILES = ("settings.json",)
-# Build leftovers and dumps that must not ship.
-SKIP_DIRS = {"debug", "__pycache__"}
+# Build leftovers, dumps, and the folders that only ever hold *this* machine's crops. Matched
+# by bare name at any depth, which is how `debug` has always worked.
+#
+# `regions` and `detect` are gitignored, so a build on a clean runner never saw them — but a
+# build from a working tree copied the developer's own OCR box previews and Detect captures
+# into the payload, and `installer.iss` ships `assets\*` with `onlyifdoesntexist`, so they
+# would land on a user's machine and then never be replaced. Both are regenerated on demand
+# (`bridge._region_preview_dir` makes its folder when it saves a preview, and
+# `list_detect_images` returns an empty list when the folder is absent), so leaving them out
+# costs nothing: entering Settings > OCR draws that user's own previews.
+SKIP_DIRS = {"debug", "__pycache__", "regions", "detect"}
 
 # `--collect-all` because these ship data next to their Python: rapidocr carries the three
 # ONNX models and their YAML config inside the wheel (that is why recognition is offline),
