@@ -59,6 +59,11 @@ from sloppykeys.core.win32.roblox_window import (
     window_rect,
 )
 from sloppykeys.config.keybinds import DEFAULTS as KEYBIND_DEFAULTS, KeybindStore
+from sloppykeys.config.settings import (
+    EMPTY_VALUE,
+    PRIVATE_SERVER_KEY,
+    parse_private_server_link,
+)
 from sloppykeys.config.unified import UnifiedSettings
 from sloppykeys.macro.controller import MacroController
 
@@ -463,6 +468,31 @@ class Api:
         if not self._app_root:
             return {}
         return UnifiedSettings(self._app_root).get_all()
+
+    def join_private_server(self) -> dict:
+        """Launch Roblox straight into the private server the user saved in Settings.
+
+        Goes through `parse_private_server_link` rather than handing the stored string to the
+        shell. A share URL opened directly lands in a browser tab with a Join button; the
+        parsed `roblox://` deep link starts the client itself, which is the whole point of
+        having the parser. It builds the URI from a code it has already matched against
+        `_CODE_PATTERN`, so what reaches the shell is constructed here rather than pasted —
+        a whitelist, not an escape.
+        """
+        if not self._app_root:
+            return {"ok": False, "reason": "still starting up"}
+        link = str(UnifiedSettings(self._app_root).get(PRIVATE_SERVER_KEY, "") or "").strip()
+        if not link or link.lower() == EMPTY_VALUE:
+            return {"ok": False, "reason": "No private server link saved — add one in Settings."}
+        uri, error = parse_private_server_link(link)
+        if error or not uri:
+            return {"ok": False, "reason": error or "That private server link could not be read."}
+        try:
+            os.startfile(uri)
+        except OSError as exc:
+            return {"ok": False, "reason": f"Failed to launch Roblox: {exc}"}
+        self._log_to_ui("Joining the private server...")
+        return {"ok": True}
 
     def set_setting(self, key: str, value) -> dict:
         """Write one setting immediately. No save button needed."""

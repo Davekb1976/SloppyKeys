@@ -180,6 +180,25 @@
     pywebview.api.stop_macro();
   });
 
+  // Joining is a one-shot action, so it gets a disabled in-flight state rather than a render
+  // pipeline. Re-enabled in `finally`, including when the launch fails — a button stuck
+  // disabled after an unset link reads as a broken app.
+  const btnJoinPs = document.getElementById("btn-join-ps");
+  if (btnJoinPs) {
+    btnJoinPs.addEventListener("click", async () => {
+      if (!window.pywebview || !pywebview.api || !pywebview.api.join_private_server) return;
+      btnJoinPs.disabled = true;
+      try {
+        const r = await pywebview.api.join_private_server();
+        if (r && !r.ok) window.addLog("Join private server: " + (r.reason || "failed"));
+      } catch (e) {
+        window.addLog("Join private server failed: " + e);
+      } finally {
+        btnJoinPs.disabled = false;
+      }
+    });
+  }
+
   // Called from Python when macro state changes.
   window.onMacroStatus = function (running, cycle, target, phase) {
     btnStart.disabled = running;

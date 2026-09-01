@@ -402,9 +402,18 @@ input:focus, select:focus {
 .btn--sm { height: var(--control-md); padding: 0 var(--space-3); font-size: 12px; }
 .btn--lg { height: var(--control-lg); padding: 0 var(--space-4); font-size: 13px; }
 
+/* Icon-only plate: a square the width of its own height, so it keeps its footprint in a row
+   where the labelled buttons stretch. `.btn` already centres its SVG and sets min-width. */
+.btn--icon { width: var(--control-md); padding: 0; }
+.btn--icon svg { color: var(--sky); }
+.btn--icon:hover svg { color: var(--text); }
+
 /* Controls row (Dashboard) */
 .controls-row { display: flex; gap: var(--space-2); }
 .controls-row .btn { flex: 1; }
+/* After `.controls-row .btn` and equally specific, so this is the rule that wins: the three
+   run controls share the row and the icon button is not one of them. */
+.controls-row .btn--icon { flex: 0 0 auto; }
 
 /* Scoreboard */
 .scoreboard-row { display: flex; align-items: center; }

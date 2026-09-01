@@ -205,13 +205,22 @@ class MacroController:
             self._log("Roblox closed but no private server link — can't reopen.")
             return False
 
+        # Through the parser, not raw. `parse_private_server_link` turns a share URL into the
+        # `roblox://` deep link that starts the client; handing the stored URL to the shell
+        # opens a browser tab with a Join button instead, so the reopen never completed on
+        # its own and the 60s wait below always timed out. The parser existed for this and
+        # had no caller.
+        from sloppykeys.config.settings import parse_private_server_link
+
+        uri, error = parse_private_server_link(link)
+        if error or not uri:
+            self._log(f"Can't reopen Roblox: {error or 'the private server link is unusable'}")
+            return False
+
         self._log("Roblox closed mid-run. Relaunching via deep link...")
-        import subprocess
         try:
-            # Roblox deep links use the roblox:// protocol or the HTTPS share URL
-            # which Windows handles via the default browser / Roblox launcher.
             import os as _os
-            _os.startfile(link)
+            _os.startfile(uri)
         except OSError as exc:
             self._log(f"Failed to launch Roblox: {exc}")
             return False
