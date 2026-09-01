@@ -270,7 +270,9 @@ class MacroController:
                     if not self._try_reopen_roblox():
                         if self._stop_requested:
                             return (True, f"stopped after {self._cycle} cycles")
-                        self._log("  Roblox unavailable — skipping task.")
+                        self._log(
+                            f"  Roblox unavailable — skipping task {i}: {mode} / {map_name}."
+                        )
                         break
 
                     # Navigate lobby
@@ -278,7 +280,14 @@ class MacroController:
                     if not ok:
                         if self._stop_requested:
                             return (True, f"stopped after {self._cycle} cycles")
-                        self._log(f"  Lobby navigation failed — skipping task.")
+                        # Named, because a skipped task is otherwise indistinguishable from
+                        # the queue repeating: the pass just moves on and the *next* pass
+                        # plays the earlier task again, which reads as "it did that map
+                        # twice" rather than "this one never started".
+                        self._log(
+                            f"  Lobby navigation failed — skipping task {i}: "
+                            f"{mode} / {map_name} / {stage}."
+                        )
                         break
 
                     # Load and run the macro operation
