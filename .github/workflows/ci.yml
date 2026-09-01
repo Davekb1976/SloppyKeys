@@ -63,3 +63,8 @@ jobs:
       # WebView2 has no console to say so. Node is preinstalled on the runner.
       - name: app.js loads
         run: node tests\test_app_js_loads.js
+
+      # The load harness stubs getElementById with a Proxy that answers to any id, so it
+      # cannot see a button nobody wired. This reads the markup against app.js instead.
+      - name: buttons are wired
+        run: node tests\test_ui_buttons_wired.js

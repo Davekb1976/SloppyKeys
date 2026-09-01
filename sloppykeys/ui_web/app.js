@@ -624,6 +624,32 @@
     });
   });
 
+  const btnCloneTask = document.getElementById("btn-clone-task");
+  btnCloneTask.addEventListener("click", async () => {
+    if (!selectedTaskId || !window.pywebview || !pywebview.api) return;
+    const original = tasks.find((t) => t.id === selectedTaskId);
+    if (!original) return;
+    btnCloneTask.disabled = true;
+    try {
+      // Deep copy. `challenge_macros` and `challenge_slots` are nested, so a shallow one
+      // would leave the clone sharing them with the task it came from.
+      const copy = JSON.parse(JSON.stringify(original));
+      delete copy.id;  // the backend mints the id
+      const r = await pywebview.api.add_task(copy);
+      if (!r || !r.ok) { window.addLog("[Queue] Clone failed."); return; }
+      copy.id = r.id;
+      // add_task appends, but queue order is play order, so the copy goes next to its
+      // original rather than to the bottom of the queue.
+      const at = tasks.findIndex((t) => t.id === selectedTaskId);
+      tasks.splice(at + 1, 0, copy);
+      await pywebview.api.reorder_tasks(tasks.map((t) => t.id));
+      selectTask(copy.id);
+      renderTaskList();
+    } finally {
+      btnCloneTask.disabled = false;
+    }
+  });
+
   // ---- Challenge per-map macro grid ----
   // From content/gamemodes.py, not a copy of it: this list was hard-coded and had already
   // gone stale — East Town was added to the table and never appeared here.
