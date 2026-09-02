@@ -129,6 +129,18 @@ EXP_EXTRACT_IMAGE = "exp_extract.png"
 EXP_EXTRACT_CONFIRM_IMAGE = "exp_extract_confirm.png"
 EXP_UPGRADE_CARD_IMAGE = "exp_upgrade_card.png"
 
+# # The game's own Auto Play
+# A pair, because the whole point is telling the two states apart: `autoplay` is the button
+# to click, `autoplay_active` is what proves the click took. One template could not do it —
+# a toggle that is found is not a toggle that is on.
+#
+# Crop them from the **same** area so only the state differs, and crop something that
+# actually changes (the lit border, the label, the fill) rather than an icon that looks
+# identical either way. If the two crops cross-match, the block will report success the
+# instant it finds the off state and place nothing all match.
+AUTOPLAY_IMAGE = "autoplay.png"
+AUTOPLAY_ACTIVE_IMAGE = "autoplay_active.png"
+
 # # The post-match panel's "change gamemode" control
 # Leaving a finished match lands on a panel showing the mode just played; this is the
 # control that reopens the gamemode chooser. It used to be a blind coordinate only
@@ -312,6 +324,16 @@ def expedition_match_paths() -> list[str]:
     ]
 
 
+def autoplay_image() -> str:
+    """The game's Auto Play button, **off** — the one the block clicks."""
+    return os.path.join(IMAGES_DIR, MATCH_DIR, AUTOPLAY_IMAGE)
+
+
+def autoplay_active_image() -> str:
+    """Auto Play in its **on** state — the only proof the click landed."""
+    return os.path.join(IMAGES_DIR, MATCH_DIR, AUTOPLAY_ACTIVE_IMAGE)
+
+
 def portal_bag_image() -> str:
     """The lobby's inventory bag — how a Portals run enters, instead of Play."""
     return os.path.join(IMAGES_DIR, PORTALS_DIR, PORTAL_BAG_IMAGE)
@@ -406,6 +428,11 @@ def expected_paths() -> list[str]:
         start_game_image(),
         repeat_image(),
         win_change_image(),
+        # Only the `autoplay` block searches for these, and a plan without one never looks —
+        # but an uncaptured template is indistinguishable from a broken block, so both get a
+        # card. `sighted` returns False for a missing file, which leaves the block inert.
+        autoplay_image(),
+        autoplay_active_image(),
     ]
     paths += expedition_match_paths()
     # Listed before the gamemode loop because Portals' chain is not derived from the

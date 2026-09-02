@@ -32,6 +32,8 @@ from sloppykeys.content.start_stage import (
     hard_mode_from_task,
 )
 from sloppykeys.content.nav_images import (
+    autoplay_active_image,
+    autoplay_image,
     exp_continue_2_image,
     exp_continue_image,
     exp_extract_confirm_image,
@@ -67,6 +69,16 @@ TICK_SLEEP = 0.05
 STEP_TIMEOUT = 180.0
 MATCH_POLL = 1.0
 REOPEN_COOLDOWN = 60.0  # seconds between reopen attempts
+
+# How many times the `autoplay` block will click before it gives up and lets the match play
+# on. A bound rather than a retry-forever: the block's own verification is what makes it
+# useful, and a toggle that never reads as active is a template problem no amount of clicking
+# fixes — meanwhile every tick spent here is a tick not spent on the outcome poll.
+AUTOPLAY_CLICKS = 3
+# Gap between a click and the look that checks it. The toggle animates, and two searches is
+# ~34ms against a 50ms tick, so looking every tick would burn the budget re-asking a question
+# the game has not had time to answer.
+AUTOPLAY_RECHECK = 1.0
 
 RectProvider = Callable[[], tuple[int, int, int, int] | None]
 
@@ -802,6 +814,8 @@ class MacroController:
             return self._tick_target_priority(block)
         elif btype == "wait_wave":
             return self._tick_wait_wave(block)
+        elif btype == "autoplay":
+            return self._tick_autoplay(block)
         else:
             # All other blocks are one-shot (execute and move on)
             self._execute_block(block)
@@ -977,6 +991,72 @@ class MacroController:
         time.sleep(0.2)
         self._log(f"    [block] target priority → {wanted} ({presses}× {key.upper()})")
         return True
+
+    def _tick_autoplay(self, block: dict) -> bool:
+        """Turn the game's own Auto Play on, and confirm it went on.
+
+        Two templates, because a toggle that is *found* is not a toggle that is *on*:
+        `autoplay.png` is the button, `autoplay_active.png` is the proof. Without the second
+        one this block would report success on a click the client swallowed and then place
+        nothing for the whole match, which looks exactly like a working run until the result.
+
+        Ordering per tick: check active first, so a match that already has it on costs one
+        look and no click, and so a block sitting in a loop phase re-asserts it for free if
+        the game ever turns it off. Then click, and let the *next* tick do the checking —
+        `AUTOPLAY_RECHECK` apart, because the toggle animates.
+
+        **Deliberately uses the navigator's parking click**, against the usual in-match rule
+        that clicks stay where they landed. Here the cursor must leave: it would sit on the
+        very button whose *appearance* the next search reads, and a hovered control does not
+        match its own template. It parks at the client's top-left corner, the same empty
+        ground `UnitPlacer.park_click` already clicks as a keep-alive.
+
+        Not a `detect` block with a click in its Then branch: `detect` throws away where the
+        template matched, so that click would be a fixed coordinate, and nothing would verify
+        the toggle flipped.
+        """
+        if not hasattr(self, "_autoplay_state"):
+            self._autoplay_state = {}
+        state = self._autoplay_state.setdefault(id(block), {"clicks": 0, "next_look": 0.0})
+
+        off_path = autoplay_image()
+        active_path = autoplay_active_image()
+        # A missing template leaves the block inert instead of stalling the match — the same
+        # answer `wait_wave` gives when OCR is unavailable. Checked on the off state only:
+        # without it there is nothing to click, and the run has to go on regardless.
+        if not self._engine.template_exists(off_path):
+            self._log(f"    [block] autoplay: {off_path} not captured — skipping")
+            del self._autoplay_state[id(block)]
+            return True
+
+        now = time.time()
+        if now < state["next_look"]:
+            return False  # the toggle is mid-animation; ask again in a moment
+
+        if self._nav.sighted(active_path):
+            if state["clicks"]:
+                self._log(f"    [block] autoplay is on (after {state['clicks']} click(s))")
+            else:
+                self._log("    [block] autoplay was already on — no click")
+            del self._autoplay_state[id(block)]
+            return True
+
+        if state["clicks"] >= AUTOPLAY_CLICKS:
+            # Give up rather than spin: either the active crop never matches, or the button
+            # is somewhere this template can't see. Both are for the user to fix, and the
+            # match is still playable — the plan's own blocks run as normal.
+            self._log(
+                f"    [block] autoplay: clicked {state['clicks']}× and "
+                f"{active_path} never matched — playing on without it"
+            )
+            del self._autoplay_state[id(block)]
+            return True
+
+        ok, message = self._nav.click_button(off_path, "Auto Play")
+        state["clicks"] += 1
+        state["next_look"] = time.time() + AUTOPLAY_RECHECK
+        self._log(f"    [block] autoplay click {state['clicks']}/{AUTOPLAY_CLICKS}: {message}")
+        return False
 
     def _tick_wait_wave(self, block: dict) -> bool:
         """Wait until the wave counter reaches the target. Polls OCR every 2s."""
@@ -1201,6 +1281,15 @@ class MacroController:
         elif btype == "wait_wave":
             # In a linear phase there is no tick loop, so poll until it clears.
             while not self._tick_wait_wave(block):
+                if self._checkpoint():
+                    break
+                time.sleep(TICK_SLEEP)
+
+        elif btype == "autoplay":
+            # Same as above: Pre Start has no tick loop, so drain the click/verify cycle
+            # here. Without this branch the block would fall off the end of this chain and
+            # be silently counted as done — the way any unknown type is.
+            while not self._tick_autoplay(block):
                 if self._checkpoint():
                     break
                 time.sleep(TICK_SLEEP)

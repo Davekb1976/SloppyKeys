@@ -1247,6 +1247,12 @@
         + `<label class="check tip-left" data-tip="Set auto-upgrade to the level in Times&#10;instead of pressing upgrade"><input type="checkbox" ${b.autograde ? "checked" : ""} data-field="autograde"><span class="check-box"></span>Auto</label>`;
     }
     if (t === "sell_unit") return unitIndexSelect(b);
+    // No fields: the button is found by template, not by coordinate, and there is nothing
+    // to configure. The hint is there so the row doesn't read as an unfinished block, and
+    // because "it verifies itself" is the part worth knowing.
+    if (t === "autoplay") {
+      return `<span class="blk-field-label tip-left" data-tip="Clicks the game's Auto Play button, then confirms it turned on&#10;by finding its active state. Needs both autoplay.png and&#10;autoplay_active.png captured (Image Manager &rarr; Match State).">clicks Auto Play and confirms it turned on</span>`;
+    }
     if (t === "target_priority") {
       // Options come from content/units.py so the order matches the in-game cycle the
       // runner counts presses against. Filled in by populatePrioritySelect.

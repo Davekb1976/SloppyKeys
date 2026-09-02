@@ -52,3 +52,18 @@ the three faces are different every time.
   buttons underneath, so anything found behind it is drawn but unclickable.
 - `portal_choice.png` — the Portals chooser: three portals, one to pick, and it appears
   **before** the victory screen. The rest of that chain is in `assets/portals/`.
+
+## Auto Play — a pair, and they must not cross-match
+
+The `autoplay` block searches both:
+
+- `autoplay.png` — the button in its **off** state, the one it clicks.
+- `autoplay_active.png` — the **on** state, which is the only proof the click landed.
+
+Crop them from the same area so only the state differs, and crop the part that actually
+changes — the lit border, the fill, the label. An icon that looks the same either way makes
+the two templates score alike, and then the block reports success the moment it finds the
+*off* state and places nothing all match.
+
+Both optional. A missing `autoplay.png` makes the block skip itself and say so; the plan's
+other blocks run as normal.
