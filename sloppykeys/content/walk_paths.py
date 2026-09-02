@@ -32,6 +32,10 @@ DEFAULT_WALK_PATHS: dict[str, str] = {
     # act including Infinite and Mastery walks the same route. Expedition's East Town is a
     # different spawn and deliberately has no row.
     "Story/East Town": "East Town",
+    # Summer is the Portals playfield: forward, right, forward, right, forward. Keyed at map
+    # level because Portals has no act dimension — every portal that drops into Summer walks
+    # the same route, whatever its tier.
+    "Portals/Summer": "Summer",
 }
 
 
