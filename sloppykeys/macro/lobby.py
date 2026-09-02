@@ -1030,6 +1030,12 @@ class LobbyNavigator:
         )
         if not ok:
             return (False, f"search field: {message}")
+        # **Kept in the trail.** This message used to be discarded on success and read only on
+        # failure, so the log jumped straight from Select Portal to the typing and the first
+        # click of the chain was invisible — which is indistinguishable from a stray click at
+        # the wrong place. The field is matched, not a stored coordinate, so where it landed is
+        # the fact that settles whether the in-match picker's field is somewhere else.
+        trail_parts = [message]
         if not self._ahk.available():
             return (False, "AutoHotkey v2 not found")
         # The click above parked the cursor at the corner, which does not take focus off a
@@ -1041,7 +1047,8 @@ class LobbyNavigator:
         )
         if not ok:
             return (False, f"typing '{wanted}' failed: {message}")
-        trail = f"typed '{wanted}'"
+        trail_parts.append(f"typed '{wanted}'")
+        trail = " → ".join(trail_parts)
 
         # **Always click the filtered tile.** This used to look for the confirm first and skip
         # the tile whenever it was already on screen — which it always was, so the tile was
