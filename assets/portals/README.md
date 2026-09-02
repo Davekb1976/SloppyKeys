@@ -1,4 +1,4 @@
-# images/portals
+# assets/portals
 
 The chain into a Portals run. Portals is entered from the **inventory bag**, not the
 intermission menu, so none of these belong in `lobby/` and there is no card in

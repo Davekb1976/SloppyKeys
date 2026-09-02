@@ -1,6 +1,6 @@
-# images/match
+# assets/match
 
-Templates seen from **inside** a stage. Capture them from **Settings > Vision**, which
+Templates seen from **inside** a stage. Capture them from the **Image Manager** (F6), which
 grabs the exact pixels the matcher reads at the pinned client size.
 
 ## The match cycle
@@ -39,7 +39,7 @@ template rather than clicking a fixed coordinate after a sleep:
 - `back_lobby.png` → `return_lobby_confirm.png` (the second click is the one that leaves)
 - `settings.png` → `restart_game.png`
 - `match_play.png` — opens the gamemode selection from inside a stage. A *different*, smaller
-  Play than the lobby's `images/lobby/play.png`.
+  Play than the lobby's `assets/lobby/play.png`.
 - `win_change.png` — the post-match panel's change-gamemode control. Never matched in game, so
   `change_gamemode` clicks `CHANGE_GAMEMODE_CLICK` instead and waits `panel_fade_wait` first.
 

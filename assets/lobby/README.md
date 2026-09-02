@@ -1,4 +1,4 @@
-# images/lobby
+# assets/lobby
 
 - `play.png` — the Play button that opens the intermission menu.
 - `events.png` — the Events button. Used instead of `play.png` for the Events
@@ -6,7 +6,7 @@
 - `select_stage.png` — **the Select Stage button**, clicked one step before Start.
 - `start_match.png` — **the lobby Start button**, the last click before a stage loads.
 
-Capture all of these from **Settings > Images**: it grabs the exact pixels the matcher
+Capture all of these from the **Image Manager** (F6): it grabs the exact pixels the matcher
 reads, at the pinned client size, and writes them to the right filename. Cropping from
 Roblox's own screenshot gives the wrong pixel size and the template will never match.
 
@@ -29,9 +29,9 @@ same files in FIND steps, since routes are authored rather than tabled.
 
 Don't confuse `click_select_stage` (this button) with `LobbyNavigator.select_stage`, which
 picks the *map card* out of the stage list — an earlier step. And don't confuse
-`start_match.png` with `images/match/start_game.png`, the *in-match* button that begins the
+`start_match.png` with `assets/match/start_game.png`, the *in-match* button that begins the
 wave.
 
 Until a file exists the macro falls back to the old fixed coordinate and says so in the log
-(`clicked Select Stage at x,y (fixed coordinate — add images/lobby/select_stage.png ...)`),
+(`clicked Select Stage at x,y (fixed coordinate — add assets/lobby/select_stage.png ...)`),
 so nothing breaks in the meantime — but the fallback is the bug these files fix.

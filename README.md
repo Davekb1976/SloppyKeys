@@ -93,7 +93,8 @@ Turn the whole thing off with the toggle and nothing contacts GitHub.
 
 ## Your data
 
-`images\`, `configs\`, `routes.json` and `settings.json` live **beside the exe** — the app
+`assets\`, `operations\`, `paths\`, `presets\`, `routes.json` and `settings.json` live
+**beside the exe** — the app
 writes to all of them, so a captured template has to survive a restart. An upgrade never
 overwrites them, and an uninstall asks before removing them.
 

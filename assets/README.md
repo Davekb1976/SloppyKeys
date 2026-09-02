@@ -1,4 +1,4 @@
-# images/
+# assets/
 
 Search templates. Read this before capturing another one — the two mistakes below cost a
 whole debugging session each, and neither of them looks like a capture problem from the log.
@@ -21,7 +21,7 @@ Measured on this project's own images against the live client:
 
 `0.80` is exactly `1/1.25` — a **125% display-scaling factor**. Roblox's own screenshot
 function multiplies its output by the Windows display scale, so anything cropped from it is
-the wrong size for the live 800×599 client. The two templates that match perfectly were
+the wrong size for the live client. The two templates that match perfectly were
 captured from the app's own capture path; the rest were not.
 
 ### The workflow that can't go wrong
@@ -56,7 +56,7 @@ At 125% a button is 1.25x its calibrated size, so a template cropped there peaks
 `1/1.25 = 0.80x` — exactly what was measured — and every stored coordinate misses too.
 
 **Keep Roblox on a display set to 100%** (Windows Settings → System → Display → Scale).
-Everything in this project is calibrated at 100%: the pinned 800×599 client, every coordinate
+Everything in this project is calibrated at 100%: the pinned 1152×756 client, every coordinate
 in `content/`, every template's pixel size. The app warns in the log when Roblox is on a
 scaled monitor, and **Geometry + capture report** prints `game monitor scaling: N%`.
 

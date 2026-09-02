@@ -1,9 +1,8 @@
-# images/stages/story
+# assets/stages/story
 
-Story stage images (scroll right to reach later stages):
+Story's stage cards, one per map, named `<map slug>.png` — scroll right in game to reach the
+later ones.
 
-- `school_grounds.png`
-- `flower_forest.png`
-- `rose_kingdom.png`
-- `fairy_king_forest.png`
-- `kings_tomb.png`
+No list here on purpose: `nav_images.expected_paths()` derives it from `STORY_MAPS`, so the
+Image Manager's **Stage Selection** section shows a card per map, captured or not. This file
+used to name five while the table held six.

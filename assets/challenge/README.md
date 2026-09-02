@@ -1,4 +1,4 @@
-# images/challenge
+# assets/challenge
 
 The challenge panel is read by **OCR**, not by templates. Its two useful strings both
 change: the daily limit counts down, and the map rotates with an act appended
