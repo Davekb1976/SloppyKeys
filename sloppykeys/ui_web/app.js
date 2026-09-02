@@ -1470,7 +1470,7 @@
               <label class="check tip-left" data-tip="Keep looking for a few attempts&#10;before taking the Else branch"><input type="checkbox" ${b.loop ? "checked" : ""} data-field="loop"><span class="check-box"></span>Loop</label>
               ${b.loop ? blkField("Attempts", `<input value="${b.loopAttempts || 5}" data-field="loopAttempts" type="number" min="1" style="width:46px;">`) : ""}
               <span class="block-actions">
-                <span class="block-once tip-left${b.once ? " on" : ""}" data-phase="${phase}" data-idx="${i}" data-tip="Run once per run">1×</span>
+                <span class="block-once tip-left${b.once ? " on" : ""}" data-phase="${phase}" data-idx="${i}" data-tip="Run once per match">1×</span>
                 <span class="block-clone tip-left" data-phase="${phase}" data-idx="${i}" data-tip="Clone">⊕</span>
                 <span class="block-remove" data-phase="${phase}" data-idx="${i}">&times;</span>
               </span>
@@ -1493,7 +1493,7 @@
         }
         // Block actions: Once toggle + Clone + Remove (not on pinned)
         const actions = isPinned ? "" : `<span class="block-actions">
-          <span class="block-once tip-left${b.once ? " on" : ""}" data-phase="${phase}" data-idx="${i}" data-tip="Run once per run">1×</span>
+          <span class="block-once tip-left${b.once ? " on" : ""}" data-phase="${phase}" data-idx="${i}" data-tip="Run once per match">1×</span>
           <span class="block-clone tip-left" data-phase="${phase}" data-idx="${i}" data-tip="Clone">⊕</span>
           <span class="block-remove" data-phase="${phase}" data-idx="${i}">&times;</span>
         </span>`;
