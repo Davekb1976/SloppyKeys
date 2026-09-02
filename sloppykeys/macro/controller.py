@@ -350,6 +350,10 @@ class MacroController:
                         self._log(
                             f"  Roblox unavailable — skipping task {i}: {mode} / {map_name}."
                         )
+                        # Roblox is gone, so the character is wherever a fresh join puts it.
+                        # This `break` skips the clear below, and a `True` left by the previous
+                        # rep's Repeat would suppress the walk for whatever runs next.
+                        self._kept_position = False
                         break
 
                     # Navigate lobby
@@ -365,6 +369,9 @@ class MacroController:
                             f"  Lobby navigation failed — skipping task {i}: "
                             f"{mode} / {map_name} / {stage}."
                         )
+                        # Same leak as above: the chain stopped part-way through, so nothing
+                        # can promise the character is still standing where a Repeat left it.
+                        self._kept_position = False
                         break
 
                     # Load and run the macro operation
@@ -713,7 +720,12 @@ class MacroController:
         one, then Loop B by one, then poll for win/loss. This cooperative approach
         means Victory/Defeat detection runs between every block execution.
         """
-        self._battle_started_at = time.time()
+        # Per-match, keyed by `id(block)`, and these dicts live on the **instance** — so an
+        # entry left behind by a drain that a stop interrupted would be inherited by whatever
+        # block dict CPython later allocates at the same address. Cleared here because the
+        # operation is reloaded per rep, which is what makes the old ids meaningless.
+        self._upgrade_state = {}
+        self._autoplay_state = {}
 
         # Flatten into indexable lists with per-loop state
         battle_idx = 0
@@ -750,6 +762,12 @@ class MacroController:
 
         while not self._stop_requested:
             if self._checkpoint():
+                # Nobody saw this match end, so its clock must not keep running into the next
+                # one. `abandon_stage` had no caller at all: the clock is stopped only by
+                # `record`, so a stopped or timed-out match left it running, and the *next*
+                # match whose Start Game click failed then reported a duration measured from
+                # this one — a plausible wrong number on the history card and in Discord.
+                self._stats.abandon_stage()
                 return
 
             if time.monotonic() >= match_deadline:
@@ -757,6 +775,7 @@ class MacroController:
                     f"  No result screen in {match_budget / 60:.0f} min — giving up on this "
                     f"match and moving on. Check the Won/Lost templates if it really did end."
                 )
+                self._stats.abandon_stage()
                 return
 
             # Before the blocks and before parking: Expedition's own screens are what a
@@ -826,7 +845,10 @@ class MacroController:
                     self._log(f"  Loss. ({msg})")
                     self._send_webhook_result("loss")
                 else:
+                    # An outcome that is neither banner — nothing to record, so nothing to
+                    # time either.
                     self._log(f"  Match ended: {msg}")
+                    self._stats.abandon_stage()
                 return
 
             time.sleep(TICK_SLEEP)
@@ -1232,10 +1254,16 @@ class MacroController:
         # A missing template leaves the block inert instead of stalling the match — the same
         # answer `wait_wave` gives when OCR is unavailable. Checked on the off state only:
         # without it there is nothing to click, and the run has to go on regardless.
-        if not self._engine.template_exists(off_path):
-            self._log(f"    [block] autoplay: {off_path} not captured — skipping")
-            del self._autoplay_state[id(block)]
-            return True
+        # **Both**, not just the off state. With only `autoplay.png` captured, `sighted` can
+        # never match, so the block spent all three clicks — and once the toggle is already on,
+        # `click_button(off_path)` is hunting a button that is not on screen, making each of
+        # those a full search timeout. Three of those per match, every match, to end up
+        # "playing on without it".
+        for path in (off_path, active_path):
+            if not self._engine.template_exists(path):
+                self._log(f"    [block] autoplay: {path} not captured — skipping")
+                del self._autoplay_state[id(block)]
+                return True
 
         now = time.time()
         if now < state["next_look"]:
@@ -1457,18 +1485,23 @@ class MacroController:
             x = int(params.get("x", 0))
             y = int(params.get("y", 0))
             hotkey = self._safe_key(block.get("hotkey", ""))
-            if x and y:
-                from sloppykeys.macro.input_scripts import nudge_click_script, key_script, SPREAD_TIGHT
-                # Convert client-space coords to screen coords
-                screen_pos = self._client_to_screen(x, y)
-                if screen_pos is None:
-                    self._log("    [block] place_unit: can't resolve screen position")
-                    return
-                sx, sy = screen_pos
-                if hotkey:
-                    self._ahk.run(key_script(hotkey), wait=True, timeout=5.0)
-                    time.sleep(0.3)
-                self._ahk.run(nudge_click_script(sx, sy, spread=SPREAD_TIGHT), wait=True, timeout=5.0)
+            if not (x and y):
+                # Said out loud. An unset coordinate used to drop the block in silence, which
+                # is the same failure mode the missing `walk_path` branch had: the log reads
+                # like a working plan and a unit is simply never placed.
+                self._log("    [block] place_unit: no coordinate set — skipping")
+                return
+            from sloppykeys.macro.input_scripts import nudge_click_script, key_script, SPREAD_TIGHT
+            # Convert client-space coords to screen coords
+            screen_pos = self._client_to_screen(x, y)
+            if screen_pos is None:
+                self._log("    [block] place_unit: can't resolve screen position")
+                return
+            sx, sy = screen_pos
+            if hotkey:
+                self._ahk.run(key_script(hotkey), wait=True, timeout=5.0)
+                time.sleep(0.3)
+            self._ahk.run(nudge_click_script(sx, sy, spread=SPREAD_TIGHT), wait=True, timeout=5.0)
 
         elif btype == "upgrade_unit":
             # Drain the repeat state so a linear-phase upgrade runs to completion.
@@ -1487,9 +1520,22 @@ class MacroController:
             time.sleep(ms / 1000.0)
 
         elif btype == "wait_wave":
-            # In a linear phase there is no tick loop, so poll until it clears.
+            # In a linear phase there is no tick loop, so poll until it clears — **bounded**.
+            # Inside a match `_run_match`'s own deadline caps this, but Pre Start runs *before*
+            # Start Game, so there is no wave counter on screen and the block could never
+            # finish: it held the run until the user pressed F1, with the only clue being a
+            # queue that stopped advancing. Same budget the match uses, so one setting governs.
+            budget = max(1.0, float(getattr(self._placer, "won_timeout", 900.0)))
+            deadline = time.monotonic() + budget
             while not self._tick_wait_wave(block):
                 if self._checkpoint():
+                    break
+                if time.monotonic() >= deadline:
+                    self._log(
+                        f"    [block] wait wave: no wave counter read in {budget / 60:.0f} min "
+                        "— moving on. A Wait for Wave in Pre Start can never clear: the match "
+                        "has not started, so there is nothing to count."
+                    )
                     break
                 time.sleep(TICK_SLEEP)
 
@@ -1505,11 +1551,17 @@ class MacroController:
         elif btype == "click":
             x = int(params.get("x", 0))
             y = int(params.get("y", 0))
-            if x and y:
-                from sloppykeys.macro.input_scripts import nudge_click_script
-                screen_pos = self._client_to_screen(x, y)
-                if screen_pos:
-                    self._ahk.run(nudge_click_script(screen_pos[0], screen_pos[1]), wait=True, timeout=5.0)
+            if not (x and y):
+                self._log("    [block] click: no coordinate set — skipping")
+                return
+            from sloppykeys.macro.input_scripts import nudge_click_script
+            screen_pos = self._client_to_screen(x, y)
+            if screen_pos is None:
+                self._log("    [block] click: can't resolve screen position")
+                return
+            self._ahk.run(
+                nudge_click_script(screen_pos[0], screen_pos[1]), wait=True, timeout=5.0
+            )
 
         elif btype == "send_key":
             key = self._safe_key(block.get("key", ""))
@@ -1726,11 +1778,18 @@ class MacroController:
         Expedition's mid-match handler inside a challenge.
         """
         previous_task = self._current_task
+        # `_phases` too. The detour loads the challenge's operation over it and nothing put it
+        # back, so between the detour and the next task's own load the pair disagreed:
+        # `_current_task` said the interrupted task, `_phases` said the challenge. Nothing
+        # reads it in that window today, which is exactly why it would go unnoticed the first
+        # time something did — `_place_unit_by_index` resolves a unit from it.
+        previous_phases = getattr(self, "_phases", None)
         self._current_task = task
         try:
             self._run_challenge_task_inner(task)
         finally:
             self._current_task = previous_task
+            self._phases = previous_phases
 
     def _run_challenge_task_inner(self, task: dict) -> None:
         """The body. Split out so the `_current_task` swap above has one exit point — this
