@@ -184,11 +184,10 @@ PORTAL_ACTIVATE_IMAGE = "activate.png"
 PORTAL_SELECT_PORTAL_IMAGE = "select_portal.png"
 PORTAL_SELECT_IMAGE = "select.png"
 
-# The end-of-match chooser: three portals, one of which must be picked before the victory
-# screen appears. Lives with the match templates because that is where it is seen, and
-# cropped from its **header** for the same reason as `exp_upgrade_card` — the three faces
-# are different portals every time, so no card is a stable crop.
-PORTAL_CHOICE_IMAGE = "portal_choice.png"
+# There is no `portal_choice`. A chooser of three portals does appear at the end of a run, but
+# **the game picks one itself** if nothing is clicked, so a template, a click point and a
+# mid-match handler would all have existed to do what the game already does. The run waits for
+# the victory screen instead.
 
 
 def slug(name: str) -> str:
@@ -376,11 +375,6 @@ def portal_select_image() -> str:
     return os.path.join(IMAGES_DIR, PORTALS_DIR, PORTAL_SELECT_IMAGE)
 
 
-def portal_choice_image() -> str:
-    """The end-of-match "pick one of three portals" header, before the victory screen."""
-    return os.path.join(IMAGES_DIR, MATCH_DIR, PORTAL_CHOICE_IMAGE)
-
-
 def portal_paths() -> list[str]:
     """Every template a Portals run looks for, in the order it meets them."""
     return [
@@ -388,7 +382,6 @@ def portal_paths() -> list[str]:
         portals_tab_image(),
         portal_search_image(),
         portal_activate_image(),
-        portal_choice_image(),
         portal_select_portal_image(),
         portal_select_image(),
     ]

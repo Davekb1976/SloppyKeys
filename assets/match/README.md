@@ -45,13 +45,15 @@ template rather than clicking a fixed coordinate after a sleep:
 
 ## Mid-match modals
 
-Both are cropped from a **header**, never from a card face: each hands out three choices and
-the three faces are different every time.
+- `exp_upgrade_card.png` — Expedition's "Select an upgrade!" modal. Cropped from the
+  **header**, never a card face: it hands out three choices and the three faces differ every
+  time. It renders over the buttons underneath, so anything found behind it is drawn but
+  unclickable.
 
-- `exp_upgrade_card.png` — Expedition's "Select an upgrade!" modal. It renders over the
-  buttons underneath, so anything found behind it is drawn but unclickable.
-- `portal_choice.png` — the Portals chooser: three portals, one to pick, and it appears
-  **before** the victory screen. The rest of that chain is in `assets/portals/`.
+There is deliberately **no Portals equivalent.** A chooser of three portals does appear at the
+end of a portal run, but the game selects one itself when nothing is clicked — so a template
+for it, a click point, and a mid-match handler would all have existed to do what already
+happens. A Portals run waits for the victory screen.
 
 ## Auto Play — a pair, and they must not cross-match
 

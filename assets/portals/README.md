@@ -69,9 +69,9 @@ that is what the game is counting: two frames is 33ms at 60Hz and 8ms at 240Hz. 
 still go missing, raise that number — it is the one knob, and it is the first thing to try
 before suspecting the field or the template.
 
-## The end-of-match chooser is not here
+## There is no chooser template
 
-`assets/match/portal_choice.png` — three portals appear before the victory screen and one
-must be picked. It lives with the match templates because that is where it is seen. Crop the
-**header**, not a card: the three faces are different portals every match, so no card face
-is a stable crop. Same reasoning as `match/exp_upgrade_card.png`.
+A chooser of three portals appears at the end of a run, and **the game selects one itself**
+when nothing is clicked. So there is nothing here for it: a template, a result click point and
+a mid-match handler would have existed to do what already happens on its own. The run waits
+for the victory screen and takes Select Portal from there.
