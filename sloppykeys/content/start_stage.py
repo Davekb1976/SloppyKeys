@@ -117,6 +117,22 @@ def difficulty_clicks(target: int) -> int:
     return (wanted - DIFFICULTY_ON_OPEN) % span
 
 
+def has_difficulty(gamemode: str) -> bool:
+    """Does this gamemode have a difficulty control the macro can actually operate?
+
+    Two different in-game controls count, which is why this is derived from both tables
+    rather than listed: a cycling 1-3 button (`DIFFICULTY_COORDS`) or a Hard Mode toggle
+    (`START_COORDS[...]["hard_mode"]`). A mode with neither has nothing to click, so the
+    Task Builder hides the row instead of offering Easy/Hard that goes nowhere — which is
+    what Raid, Events and Portals were all doing.
+
+    Derived, so a mode that gains a toggle gains the field by adding its coordinate.
+    """
+    if difficulty_coord(gamemode) is not None:
+        return True
+    return "hard_mode" in (start_coords(gamemode) or {})
+
+
 def difficulty_options(gamemode: str) -> list[str]:
     """What a task's Difficulty field offers for this gamemode.
 

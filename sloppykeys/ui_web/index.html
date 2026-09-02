@@ -356,20 +356,33 @@
                   <select class="setting-select" id="tb-mode" style="width:160px;"></select>
                 </div>
                 <div id="tb-standard-fields" style="display:contents;">
-                  <div class="setting-row">
-                    <div class="setting-info"><span class="setting-label">Map</span></div>
+                  <div class="setting-row" id="tb-map-row">
+                    <div class="setting-info"><span class="setting-label" id="tb-map-label">Map</span></div>
                     <select class="setting-select" id="tb-map"><option value="">—</option></select>
                   </div>
-                  <div class="setting-row">
-                    <div class="setting-info"><span class="setting-label">Stage</span></div>
+                  <!-- Every row below is shown or hidden from `get_mode_fields`, which
+                       derives it from `content/`. A mode with no act list or no difficulty
+                       control gets no row, rather than a control that reads as applied and
+                       does nothing. -->
+                  <div class="setting-row" id="tb-stage-row">
+                    <div class="setting-info"><span class="setting-label" id="tb-stage-label">Stage</span></div>
                     <select class="setting-select" id="tb-stage"><option value="">—</option></select>
                   </div>
-                  <div class="setting-row">
+                  <div class="setting-row" id="tb-difficulty-row">
                     <div class="setting-info"><span class="setting-label">Difficulty</span></div>
                     <select class="setting-select" id="tb-difficulty">
                       <option value="Normal">Normal</option>
                       <option value="Hard">Hard</option>
                     </select>
+                  </div>
+                  <!-- Portals: the portal is picked by typing its name into the game's own
+                       search box, so no dropdown can offer it. -->
+                  <div class="setting-row" id="tb-search-row" style="display:none;">
+                    <div class="setting-info">
+                      <span class="setting-label" id="tb-search-label">Portal</span>
+                      <span class="setting-desc">Typed into the game's search box to find it</span>
+                    </div>
+                    <input type="text" class="setting-input" id="tb-search" maxlength="40" placeholder="Portal name" style="width:140px;">
                   </div>
                   <div class="setting-row">
                     <div class="setting-info"><span class="setting-label">Repeat</span></div>

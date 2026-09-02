@@ -76,6 +76,11 @@ class Gamemode:
     # it still needs `assets/reference/<Mode>/<Map>.png` — leaving it out is what left
     # Expedition with no maps to capture.
     own_entry: bool = False
+    # Caption for a free-text field the user fills in per task, or "" for a mode that has
+    # none. Portals is picked by typing a name into the game's own search box, which no
+    # dropdown can offer: the list is whatever that account owns and the devs add tiers.
+    # A caption rather than a bool so the row reads "Portal", not "Search".
+    search_label: str = ""
 
     def targets_for_map(self, _map_name: str) -> list[str]:
         # Every map in a gamemode currently exposes the same target set.
@@ -126,19 +131,23 @@ GAMEMODES: dict[str, Gamemode] = {
     # Entered from the inventory bag, not the gamemode cards, so `own_entry` — its chain
     # lives in `assets/portals/` (bag, Portals tab, search field, Activate Portal).
     #
-    # **One map, and its name is the mode's.** Every portal drops into the same playfield,
-    # so the map dimension carries no information; the single entry exists so the per-map
-    # machinery has a key — one placement backdrop at `assets/reference/Portals/Portals.png`
-    # and one config path. What actually varies is *which portal* is activated, and that is
-    # a typed search string on the task, not a map. Rename this the moment the playfield's
-    # in-game name is known: it costs this string plus the backdrop's filename.
+    # The maps are **playfields**, not portals. Summer is the first; a portal drops into one
+    # of these, and several portals of different tiers share a playfield. So the map picks the
+    # backdrop and the config path, while *which portal* to activate is the task's typed
+    # search string. Adding the next playfield is one entry here plus its backdrop.
+    #
+    # There is no act dimension (`targets=[]`) and no difficulty control, so the Task Builder
+    # hides both rows — see `has_targets` and `start_stage.has_difficulty`.
     "Portals": Gamemode(
         name="Portals",
-        map_label="Map",
+        map_label="Portal Map",
         target_label="Act",
-        maps=["Portals"],
+        maps=["Summer"],
         targets=[],
         own_entry=True,
+        # Non-empty means "chosen by typing a name": the Task Builder shows a text field
+        # with this caption and the run types it into the game's search box.
+        search_label="Portal",
     ),
     # A side task, not a farm target: the macro reaches it from inside a match and
     # the game rotates which map each of the three offered challenges is on. No act
@@ -214,6 +223,16 @@ def selection_complete(gamemode: str, map_name: str, target: str) -> bool:
     if not gamemode or not map_name:
         return False
     return bool(target) or not has_targets(gamemode)
+
+
+def search_label(gamemode_name: str) -> str:
+    """Caption for this mode's free-text field, or "" when it has none.
+
+    The Task Builder shows the row only when this is non-empty, so a mode that is chosen
+    from dropdowns never carries a text box nothing reads.
+    """
+    gamemode = get_gamemode(gamemode_name)
+    return gamemode.search_label if gamemode else ""
 
 
 def labels_for(gamemode_name: str) -> tuple[str, str]:

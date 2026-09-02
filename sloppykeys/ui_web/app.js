@@ -385,6 +385,12 @@
   const tbExtract = document.getElementById("tb-extract");
   const tbExtractRow = document.getElementById("tb-extract-row");
   const tbMacro = document.getElementById("tb-macro");
+  const tbSearch = document.getElementById("tb-search");
+  const tbSearchRow = document.getElementById("tb-search-row");
+  // What the current mode's rows are, from `get_mode_fields`. Kept as state rather than
+  // read back out of the DOM, so `saveCurrentTask` knows which fields mean anything without
+  // inspecting `style.display`.
+  let tbModeFields = {};
 
   function renderTaskList() {
     queueCount.textContent = tasks.length + " task" + (tasks.length !== 1 ? "s" : "");
@@ -430,15 +436,30 @@
       loadDifficulty(task.mode, task.difficulty);
       tbRepeat.value = task.repeat || 1;
       tbExtract.value = task.extract_after || 1;
-      showExtractRow(task.mode);
+      tbSearch.value = task.search || "";
+      applyModeFields(task.mode);
       tbMacro.value = task.macro || "";
     }
   }
 
-  // Only Expedition ends by extracting, so the field is hidden everywhere else rather than
-  // offered as a setting that does nothing.
-  function showExtractRow(mode) {
-    tbExtractRow.style.display = mode === "Expedition" ? "" : "none";
+  // Show only the rows this gamemode can actually use. Every answer comes from `content/`
+  // through one bridge call, so no mode name is hard-coded here and a mode that gains an act
+  // list or a Hard Mode coordinate gains its row with no change on this side.
+  //
+  // A row that does nothing is worse than a missing one: it reads as a setting that was
+  // applied. Expedition's Stage could only ever say "—", and Raid, Events and Portals all
+  // offered Easy/Hard with no toggle for the macro to click.
+  async function applyModeFields(mode) {
+    if (!mode || !window.pywebview || !pywebview.api) return;
+    const f = await pywebview.api.get_mode_fields(mode);
+    tbModeFields = f || {};
+    document.getElementById("tb-map-label").textContent = f.map_label || "Map";
+    document.getElementById("tb-stage-label").textContent = f.target_label || "Stage";
+    document.getElementById("tb-stage-row").style.display = f.stage ? "" : "none";
+    document.getElementById("tb-difficulty-row").style.display = f.difficulty ? "" : "none";
+    tbExtractRow.style.display = f.extract ? "" : "none";
+    tbSearchRow.style.display = f.search_label ? "" : "none";
+    if (f.search_label) document.getElementById("tb-search-label").textContent = f.search_label;
   }
 
   function showBuilderEmpty() {
@@ -492,16 +513,18 @@
     const changes = {
       mode: tbMode.value,
       map: tbMap.value,
-      stage: tbStage.value,
-      difficulty: tbDifficulty.value,
       repeat: Math.max(1, parseInt(tbRepeat.value) || 1),
       macro: tbMacro.value,
     };
-    // Only where it means something: every other mode would carry a stored field nothing
-    // reads, and the runner defaults a missing one to the first offer anyway.
-    if (tbMode.value === "Expedition") {
+    // Only the fields this mode has a control for, so a task can't carry a stage or a
+    // difficulty its mode never offered — which is what made Expedition tasks store an
+    // empty stage and Raid tasks store an Easy/Hard nothing clicked.
+    if (tbModeFields.stage) changes.stage = tbStage.value;
+    if (tbModeFields.difficulty) changes.difficulty = tbDifficulty.value;
+    if (tbModeFields.extract) {
       changes.extract_after = Math.max(1, parseInt(tbExtract.value) || 1);
     }
+    if (tbModeFields.search_label) changes.search = tbSearch.value.trim();
     // Challenge-specific: per-map macros + slot enables
     if (tbMode.value === "Challenge") {
       const t = tasks.find(x => x.id === selectedTaskId);
@@ -529,10 +552,14 @@
     } else {
       loadMaps(tbMode.value, "");
       tbStage.innerHTML = '<option value="">—</option>';
-      showExtractRow(tbMode.value);
-      // The new mode may not offer the difficulty the old one had, so save after the
-      // rebuild rather than storing a value the control no longer lists.
-      loadDifficulty(tbMode.value, tbDifficulty.value).then(() => saveCurrentTask());
+      // Before the save, not after: `saveCurrentTask` reads `tbModeFields` to decide which
+      // fields this mode even has, so storing while it still describes the *old* mode would
+      // carry the old mode's fields onto the task.
+      applyModeFields(tbMode.value).then(() =>
+        // The new mode may not offer the difficulty the old one had, so save after the
+        // rebuild rather than storing a value the control no longer lists.
+        loadDifficulty(tbMode.value, tbDifficulty.value).then(() => saveCurrentTask())
+      );
       return;
     }
     saveCurrentTask();
@@ -546,6 +573,9 @@
   tbRepeat.addEventListener("change", saveCurrentTask);
   tbExtract.addEventListener("change", saveCurrentTask);
   tbMacro.addEventListener("change", saveCurrentTask);
+  // `change` fires on blur for a text input, which is the same contract every other row
+  // here has — no keystroke-by-keystroke writes to settings.json.
+  tbSearch.addEventListener("change", saveCurrentTask);
 
   document.getElementById("btn-add-task").addEventListener("click", () => {
     if (!window.pywebview || !pywebview.api) return;
