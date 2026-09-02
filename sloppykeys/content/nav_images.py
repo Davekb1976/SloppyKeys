@@ -418,6 +418,12 @@ def expected_paths() -> list[str]:
         # whatever the user's route references.
         if gamemode.custom:
             continue
+        # An `own_entry` mode has neither: Portals is reached from the inventory bag, and
+        # its portal is found by a typed search, so there is no card in the intermission
+        # menu and no stage list. Listing either would put a permanent MISSING card in the
+        # Image Manager for a screen that does not exist.
+        if gamemode.own_entry:
+            continue
         paths.append(gamemode_image(name))
         # A side task (Challenge) *does* have a card in the gamemode menu — that is how
         # the macro reaches it — but no stage cards: which map each challenge is on is

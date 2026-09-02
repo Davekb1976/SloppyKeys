@@ -66,6 +66,16 @@ class Gamemode:
     # Selector page, the full-run tester dialog and the lobby template expectations,
     # while configs / reference images / start positions treat it normally.
     side_task: bool = False
+    # True when the mode is reached through its **own** chain of templates rather than the
+    # intermission menu, so neither a card in `assets/gamemodes/` nor stage cards in
+    # `assets/stages/<mode>/` exist to be captured — Portals is entered from the inventory
+    # bag and its portal is found by a typed search, not picked off a stage list.
+    #
+    # Not `custom`: that also means the maps are unknown to this table, and it drops the
+    # placement backdrop with them. An `own_entry` mode still plays on a real playfield, so
+    # it still needs `assets/reference/<Mode>/<Map>.png` — leaving it out is what left
+    # Expedition with no maps to capture.
+    own_entry: bool = False
 
     def targets_for_map(self, _map_name: str) -> list[str]:
         # Every map in a gamemode currently exposes the same target set.
@@ -112,6 +122,23 @@ GAMEMODES: dict[str, Gamemode] = {
         maps=[],
         targets=[],
         custom=True,
+    ),
+    # Entered from the inventory bag, not the gamemode cards, so `own_entry` — its chain
+    # lives in `assets/portals/` (bag, Portals tab, search field, Activate Portal).
+    #
+    # **One map, and its name is the mode's.** Every portal drops into the same playfield,
+    # so the map dimension carries no information; the single entry exists so the per-map
+    # machinery has a key — one placement backdrop at `assets/reference/Portals/Portals.png`
+    # and one config path. What actually varies is *which portal* is activated, and that is
+    # a typed search string on the task, not a map. Rename this the moment the playfield's
+    # in-game name is known: it costs this string plus the backdrop's filename.
+    "Portals": Gamemode(
+        name="Portals",
+        map_label="Map",
+        target_label="Act",
+        maps=["Portals"],
+        targets=[],
+        own_entry=True,
     ),
     # A side task, not a farm target: the macro reaches it from inside a match and
     # the game rotates which map each of the three offered challenges is on. No act
