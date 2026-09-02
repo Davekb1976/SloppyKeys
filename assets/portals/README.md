@@ -9,9 +9,10 @@ the matcher reads at the pinned client size and writes them to the right filenam
 from Roblox's own screenshot gives the wrong pixel size and the template can never match —
 see `assets/README.md`.
 
-The chain is `LobbyNavigator.enter_portal`: bag → Portals tab → search field → type the
-portal's name → Activate Portal → Start. The **search field is not a template** — it is a
-measured click point, for the reason below. In the order a run meets them:
+The chain is `LobbyNavigator.enter_portal`, which logs its route as
+`Bag → Portals tab → search '<name>' → slot 1 → Activate Portal → Start`. The **search field is
+not a template** — it is a measured click point, for the reason below. In the order a run meets
+them:
 
 - `bag.png` — the lobby's inventory button. This is the run's entry point, the way
   `lobby/play.png` is for Story and `lobby/events.png` is for Events. Nothing in the Play
@@ -63,9 +64,17 @@ a threshold, a recapture, or a search region. And it only failed on one of the t
 the bag chain worked throughout, which is what made it hard to see.
 
 So the field is a **measured point per panel** now — `content/portals.py::SEARCH_COORDS` and
-`MATCH_SEARCH_COORDS`, set in Settings → Debug → Click Points as *Bag search field* and
-*In-match search field*. Both ship unset and the run refuses rather than guessing, because a
-guess focuses nothing and the name goes into the world.
+`MATCH_SEARCH_COORDS`, editable in Settings → Debug → Click Points as *Bag search field* and
+*In-match search field*. Both ship a measured default: `(463, 182)` for the bag and
+`(514, 186)` in-match, captured at the pinned 1152×756 viewport. They differ in both axes,
+which is why one point cannot serve both panels.
+
+They shipped **unset** for a release, on the argument that a guess focuses nothing and the name
+then goes into the world. What changed is the gate below: nothing is typed until the panel's own
+confirm button has been found, so a stale coordinate now costs a click on the wrong part of an
+open picker rather than a name typed into the game. Unset meant only the account that measured
+these could run Portals at all — every other install refused at the first typed portal. Storing
+`UNSET` (0, 0) still refuses, so a user whose panels sit elsewhere is no worse off than before.
 
 The gate moved to the panel's **own confirm button** — `activate.png` for the bag, `select.png`
 in-match. That is unique per panel, so finding it proves *which* picker is open rather than

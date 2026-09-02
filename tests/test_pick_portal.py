@@ -221,11 +221,13 @@ assert not ok
 assert "In-match result slot 1" in message, message
 assert not nav.slot_clicked, "an unset point must not fall back to the other grid's"
 
-# # An unmeasured search field refuses, and names which panel to measure
-# # The point is required, not an override: a guess focuses nothing, and the portal name then
-# # goes into the world where `r`, `t` and `x` are priority, upgrade and sell.
+# # A search field **stored as UNSET** refuses, and names which panel to measure
+# # Both fields ship a measured default now, so the way to be uncalibrated is to store UNSET —
+# # the same shape the slot case above uses. The refusal has to survive that: a guess focuses
+# # nothing, and the portal name then goes into the world where `r`, `t` and `x` are priority,
+# # upgrade and sell.
 for in_match, row in ((False, "Bag search field"), (True, "In-match search field")):
-    reset_slot(bag_field=None, match_field=None)
+    reset_slot(bag_field=portals_table.UNSET, match_field=portals_table.UNSET)
     ahk = FakeAhk()
     nav = navigator(confirm_after_typing=True, ahk=ahk)
     ok, message = nav.pick_portal("Summer Portal", CONFIRM, "Select", in_match=in_match)

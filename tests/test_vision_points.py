@@ -27,6 +27,8 @@ from sloppykeys.content.gamemodes import RAID_ACTS, STORY_ACTS  # noqa: E402
 from sloppykeys.content.portals import (  # noqa: E402
     UNSET,
     apply_point_overrides as apply_portal_overrides,
+    search_coord,
+    search_key,
     slot_coord,
     slot_key,
 )
@@ -63,11 +65,11 @@ with tempfile.TemporaryDirectory() as root:
     # Story's pair is the Hard Mode toggle; Expedition's is the cycling button.
     assert [p["label"] for p in groups["start.Story"]["points"]] == ["Hard Mode toggle"]
     assert [p["label"] for p in groups["start.Expedition"]["points"]] == ["Difficulty cycle"]
-    # **Two** portal grids, both listed — the row is what whitelists a key, so a grid with no
-    # row here could never be measured and its run step would refuse forever. The bag's ships
-    # the measured default so Portals works on a fresh install; the in-match one ships unset
-    # because nobody has measured it, and `slot_coord` answers None rather than handing back
-    # (0, 0) or quietly borrowing the bag's. Activating a portal consumes it.
+    # **Two** portal grids and **two** search fields, all four listed — the row is what
+    # whitelists a key, so a point with no row here could never be measured and its run step
+    # would refuse forever. All four ship the user's measured value so Portals works on a fresh
+    # install; `UNSET` still refuses, which is checked below. Activating a portal consumes it,
+    # so neither table may quietly borrow the other's.
     portal_points = groups["portal.Portals"]["points"]
     assert [p["label"] for p in portal_points] == [
         "Bag result slot 1",
@@ -77,10 +79,22 @@ with tempfile.TemporaryDirectory() as root:
     ], [p["label"] for p in portal_points]
     assert (portal_points[0]["x"], portal_points[0]["y"]) == (394, 253)
     assert (portal_points[1]["x"], portal_points[1]["y"]) == (294, 253)
-    # The two search rows ship unset on purpose: unset means "click where the template matched",
-    # which is right for both panels until someone finds a panel where it is not.
-    assert (portal_points[2]["x"], portal_points[2]["y"]) == (0, 0)
-    assert (portal_points[3]["x"], portal_points[3]["y"]) == (0, 0)
+    # The two search fields ship measured too. They were unset, which meant only the account
+    # that measured them could run Portals at all — every other install refused the moment a
+    # portal name had to be typed.
+    assert (portal_points[2]["x"], portal_points[2]["y"]) == (463, 182)
+    assert (portal_points[3]["x"], portal_points[3]["y"]) == (514, 186)
+    assert search_coord() == (463, 182), search_coord()
+    assert search_coord(in_match=True) == (514, 186), search_coord(in_match=True)
+    # The two panels' fields are pixel-identical, so only position separates them — equal here
+    # would put the in-match typing into the bag's box, which is the bug that deleted search.png.
+    assert search_coord() != search_coord(in_match=True)
+    # A field stored as (0, 0) still refuses: nothing focused means the portal name goes into
+    # the world, where r/t/x are priority, upgrade and sell.
+    apply_portal_overrides({search_key(): UNSET, search_key(True): UNSET})
+    assert search_coord() is None, "a search field stored as (0, 0) must still refuse"
+    assert search_coord(in_match=True) is None
+    apply_portal_overrides({})
     assert slot_coord(1) == (394, 253), slot_coord(1)
     # Same row, 100px apart. Distinct is the whole point: equal here would mean one grid is
     # silently clicking the other's tile.

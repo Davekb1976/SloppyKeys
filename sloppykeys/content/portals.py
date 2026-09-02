@@ -15,11 +15,12 @@ and its own stored point. Sharing one coordinate across both clicks the wrong ti
 whichever context was not measured — and the log still reads like a working run, which is the
 failure this module is built around.
 
-Both grids now ship a **measured** default, like `ACT_COORDS` and `START_COORDS` do. What this
-module refuses to ship is a *guessed* one: activating a portal consumes it, so a click 40px out
-spends the wrong item and the log still reads like a working run. That is why `UNSET` and
-`slot_coord`'s `None` stay — a slot stored as (0, 0), or a slot added to a table before anyone
-measures it, still refuses instead of clicking empty ground.
+Every point here — both grids and both search fields — ships a **measured** default, like
+`ACT_COORDS` and `START_COORDS` do. What this module refuses to ship is a *guessed* one:
+activating a portal consumes it, so a click 40px out spends the wrong item and the log still
+reads like a working run. That is why `UNSET` and the `None` returns stay — a point stored as
+(0, 0), or a slot added to a table before anyone measures it, still refuses instead of clicking
+empty ground.
 """
 
 from __future__ import annotations
@@ -57,12 +58,24 @@ MATCH_SLOT_COORDS: dict[int, tuple[int, int]] = {
 # The bag's chain worked fine on the template, which is exactly what made this hard to see: one
 # panel had one field, the other had two.
 #
-# Both ship `UNSET` and the run **refuses** rather than guessing. A wrong guess here is not a
-# missed click: with nothing focused the name goes into the world, where `r`, `t` and `x` are
-# priority, upgrade and sell. What proves a picker is open is now its own confirm button —
-# `activate.png` for the bag, `select.png` in-match — which is unique per panel.
-SEARCH_COORDS: dict[int, tuple[int, int]] = {1: UNSET}
-MATCH_SEARCH_COORDS: dict[int, tuple[int, int]] = {1: UNSET}
+# Both now ship a **measured** default, for the same reason the two grids above do: unset, every
+# install but the one that measured it refuses the moment a portal has to be typed, so the mode
+# only worked for one account.
+#
+# What made shipping one unsafe was that a wrong field coordinate does not merely miss — with
+# nothing focused the name goes into the world, where `r`, `t` and `x` are priority, upgrade and
+# sell. That objection was written before the gate changed: nothing is typed until this panel's
+# own confirm button has been *found* (`activate.png` for the bag, `select.png` in-match, unique
+# per panel), so a stale coordinate now costs a click on the wrong part of an open picker rather
+# than a name typed into the game.
+#
+# `UNSET` keeps its meaning: a user whose panels sit elsewhere stores it and the step refuses
+# again, rather than clicking a point measured on somebody else's screen.
+#
+# The two differ in both axes, which is the whole reason there are two tables — a single
+# coordinate would land 51px off on one of the panels.
+SEARCH_COORDS: dict[int, tuple[int, int]] = {1: (463, 182)}
+MATCH_SEARCH_COORDS: dict[int, tuple[int, int]] = {1: (514, 186)}
 
 # The mode these points belong to, for the editor's grouping.
 GAMEMODE = "Portals"
@@ -134,7 +147,8 @@ def point_specs() -> list[tuple[str, str, str, tuple[int, int]]]:
         (slot_key(slot, True), GAMEMODE, f"In-match result slot {slot}", coord)
         for slot, coord in MATCH_SLOT_COORDS.items()
     ]
-    # Unset by default, so these two rows read `default` and change nothing until measured.
+    # Measured defaults now, like the two grids — so these rows open on a working coordinate
+    # instead of reading `unset` and blocking the mode until someone calibrates it.
     specs.append((search_key(), GAMEMODE, "Bag search field", SEARCH_COORDS[1]))
     specs.append((search_key(True), GAMEMODE, "In-match search field", MATCH_SEARCH_COORDS[1]))
     return specs
