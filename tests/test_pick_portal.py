@@ -98,14 +98,18 @@ def reset_slot(coord=None) -> None:
     )
 
 
-# # The panel's confirm is already lit after typing: no tile click at all
+# # The tile is clicked even when the confirm is already lit — that is the whole ordering.
+# # This asserted the opposite for two releases: it looked for the confirm first and skipped the
+# # tile whenever it was found, and it was always found, so the tile was never clicked in any
+# # run. The button is not proof of *which* portal it would activate — the search filters the
+# # grid without selecting anything — so skipping the tile confirms whatever was selected before.
 reset_slot()
 ahk = FakeAhk()
 nav = navigator(confirm_after_typing=True, ahk=ahk)
 ok, message = nav.pick_portal("Summer Portal", CONFIRM, "Select")
 assert ok, message
-assert nav.trail == ["click:Portal search", "click:Select"], nav.trail
-assert not nav.slot_clicked, "the tile must not be clicked when the confirm is already up"
+assert nav.trail == ["click:Portal search", "slot:394,253", "click:Select"], nav.trail
+assert nav.slot_clicked, "the tile must be clicked before the portal is confirmed"
 # One SendText per character, paced — sent as one string the field dropped letters. The
 # characters and their order are what matter here; the pacing itself is pinned in
 # tests/test_search_text.py.
@@ -116,7 +120,7 @@ typed = "".join(
 )
 assert typed == "Summer Portal", typed
 
-# # The confirm only appears once the filtered tile is selected
+# # A stored override moves the tile, and the confirm follows it
 reset_slot((640, 300))
 nav = navigator(confirm_after_typing=False)
 ok, message = nav.pick_portal("Summer Portal", CONFIRM, "Select")

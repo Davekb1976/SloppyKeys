@@ -1005,12 +1005,12 @@ class LobbyNavigator:
         point — passing the wrong one clicks a tile the user did not ask for, and confirming
         spends it.
 
-        Ordering is find-field, click, type, confirm — and the confirm is looked for
-        **before** the grid is touched. That is not an optimisation: nobody has confirmed
-        whether this panel needs the filtered tile clicked before its button lights up, and
-        this way both layouts work. If the button is already there the tile click never
-        happens; if it is not, the tile is clicked and the button is given the fade wait it
-        needs as an arriving control.
+        Ordering is find-field, click, type, **click the tile**, confirm. The tile click is
+        unconditional. An earlier version looked for the confirm first and skipped the tile
+        whenever it was already on screen — and it always was, so the tile was never clicked in
+        any run. The confirm acts on whatever the panel has selected, and typing filters the
+        grid without selecting anything, so its presence says nothing about which portal it
+        would spend.
 
         The name is sanitised **here** rather than trusted from the caller, because this is
         the one method that hands it to `SendText`. A name that doesn't survive fails the
@@ -1043,25 +1043,31 @@ class LobbyNavigator:
             return (False, f"typing '{wanted}' failed: {message}")
         trail = f"typed '{wanted}'"
 
-        # The grid filters as the name is typed, so give the confirm one look before
-        # assuming a tile has to be selected.
-        match = self._find(confirm_path, timeout=self.panel_fade_wait)
-        if match is None:
-            coord = slot_coord(1, in_match=in_match)
-            if coord is None:
-                which = "In-match result slot 1" if in_match else "Bag result slot 1"
-                return (
-                    False,
-                    f"{trail}, but {confirm_label} did not appear and this grid has no click "
-                    f"point — set Portals · {which} in Settings > Debug > Click Points",
-                )
-            rect = self._rect()
-            if rect is None:
-                return (False, f"{trail}, then Roblox went away")
-            ok, message = self._click_client(rect, coord)
-            if not ok:
-                return (False, f"{trail}, but the result slot click failed: {message}")
-            trail += f", clicked slot 1 at {coord[0]},{coord[1]}"
+        # **Always click the filtered tile.** This used to look for the confirm first and skip
+        # the tile whenever it was already on screen — which it always was, so the tile was
+        # never clicked in either grid. That is not a saved click, it is the wrong portal: the
+        # confirm acts on whatever the panel currently has *selected*, and the search filtering
+        # the grid does not select the result. So the button being there proves nothing about
+        # which portal it would activate, and activating spends it.
+        coord = slot_coord(1, in_match=in_match)
+        if coord is None:
+            which = "In-match result slot 1" if in_match else "Bag result slot 1"
+            return (
+                False,
+                f"{trail}, but this grid has no click point — set Portals · {which} in "
+                "Settings > Debug > Click Points",
+            )
+        rect = self._rect()
+        if rect is None:
+            return (False, f"{trail}, then Roblox went away")
+        # The grid needs a moment to filter down to the typed name before the tile at slot 1 is
+        # the portal that was asked for. Same reasoning as `fade_wait` on an arriving control:
+        # no threshold can see a list mid-refilter, and clicking early takes whatever was there.
+        time.sleep(self.panel_fade_wait)
+        ok, message = self._click_client(rect, coord)
+        if not ok:
+            return (False, f"{trail}, but the result slot click failed: {message}")
+        trail += f", clicked slot 1 at {coord[0]},{coord[1]}"
 
         ok, message = self._find_click(
             confirm_path,
