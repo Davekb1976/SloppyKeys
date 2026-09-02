@@ -101,6 +101,9 @@ def navigator(on_result_screen: bool, task: dict | None = None) -> tuple[FakeNav
     ctrl._settings = FakeSettings()
     ctrl._current_task = task or {}
     ctrl.run_camera = lambda: None
+    # Nothing has pitched yet, so `_ensure_camera` must actually reach `run_camera` here —
+    # leaving this True would make the chain look correct while skipping the camera.
+    ctrl._camera_set = False
     assert ctrl._navigate_lobby("Story", "Flower Forest", "Act 1") is True
     return ctrl._nav, logs
 

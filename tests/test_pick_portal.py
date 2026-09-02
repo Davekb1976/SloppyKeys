@@ -10,9 +10,9 @@ which button is on screen is not an outcome signal and this no longer treats it 
 
 The tail also decides what the next match may skip, and the two halves of that are pinned
 apart because they do not agree. Repeat Stage keeps the character's position **and** the
-camera; Select Portal keeps only the camera and respawns you. Conflating them either walks a
-recording twice from the wrong spot or adds a second raw-delta pitch — see `_camera_set` and
-`_kept_position`.
+camera; Select Portal and Match Play keep only the camera and respawn you; Back to Lobby is
+the one route that resets both. Conflating them either walks a recording twice from the wrong
+spot or adds a second raw-delta pitch — see `_camera_set` and `_kept_position`.
 
 The refusals matter more than the happy paths. Confirming a portal consumes it, so a chain
 that types a repaired name or clicks an unmeasured coordinate spends the wrong item while the
@@ -196,45 +196,55 @@ class TailNav:
 
 
 def tail(select_portal: bool, again: bool, repeat: bool = True, task=None):
-    """Returns the fake navigator and the `_kept_position` flag left behind."""
+    """Returns the fake navigator and both flags left behind: `_kept_position`, `_camera_set`.
+
+    `_camera_set` starts True the way it would after any earlier match, so a route that leaves
+    it True is one that carried the pitch over.
+    """
     ctrl = MacroController.__new__(MacroController)
     nav = TailNav(select_portal, repeat=repeat)
     ctrl._nav = nav
     ctrl._log = lambda _m: None
     ctrl.run_camera = lambda: None
     ctrl._kept_position = False
+    ctrl._camera_set = True
     ctrl._portals_after_match(task if task is not None else {"search": "Summer"}, again=again)
-    return nav, ctrl._kept_position
+    return nav, ctrl._kept_position, ctrl._camera_set
 
 
 # Another rep to come: queue the next portal, never touch Repeat, never leave. Identical after a
 # win and after a loss — the outcome is not what this branches on.
-nav, kept = tail(select_portal=True, again=True)
+nav, kept, camera = tail(select_portal=True, again=True)
 assert nav.calls == ["select_portal", "pick:Summer", "wait_ready"], nav.calls
 # Select Portal loads that portal's stage fresh, so the character respawns and the walk is
-# required. Only the camera carries over, and that is `_camera_set`'s business, not this one's.
+# required — while the camera is untouched, which is the whole reason these are two flags.
 assert not kept, "Select Portal respawns — the next rep still has to walk"
+assert camera, "Select Portal never reaches the lobby, so the pitch carries over"
 
-# Select Portal missing: Repeat is the fallback, and Repeat Stage keeps the position.
-nav, kept = tail(select_portal=False, again=True)
+# Select Portal missing: Repeat is the fallback, and Repeat Stage keeps position and camera.
+nav, kept, camera = tail(select_portal=False, again=True)
 assert nav.calls == ["select_portal", "repeat"], nav.calls
 assert kept, "Repeat Stage drops you back in on the spot — no second walk"
+assert camera, "Repeat Stage never reaches the lobby either"
 
-# Neither button there: the lobby is the way out, and coming back in respawns.
-nav, kept = tail(select_portal=False, repeat=False, again=True)
+# Neither button there: the lobby is the way out. That is the one route that resets both.
+nav, kept, camera = tail(select_portal=False, repeat=False, again=True)
 assert nav.calls == ["select_portal", "repeat", "back_to_lobby"], nav.calls
 assert not kept, "leaving means the next run walks"
+assert not camera, "the lobby is where the camera resets — pitch it again on the way back in"
 
 # Last rep, either way: leave through the lobby without starting anything.
 for select_portal in (True, False):
-    nav, kept = tail(select_portal=select_portal, again=False)
+    nav, kept, camera = tail(select_portal=select_portal, again=False)
     assert nav.calls == ["back_to_lobby"], (select_portal, nav.calls)
     assert not kept, (select_portal, "the next task must not inherit a skipped walk")
+    assert not camera, (select_portal, "nor a camera flag from before the lobby trip")
 
 # No portal name on the task: nothing safe to type, so it cannot queue and falls back instead of
 # opening a picker it has nothing to put in.
-nav, continued = tail(select_portal=True, again=True, task={})
+nav, kept, camera = tail(select_portal=True, again=True, task={})
 assert nav.calls == ["repeat"], nav.calls
+assert kept, "the fallback is still Repeat Stage, so the position is still kept"
 
 # # The readers of both flags. A flag that is set and never read fails silently, so neither
 # # consumer is taken on trust.

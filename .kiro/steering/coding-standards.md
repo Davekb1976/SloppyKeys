@@ -63,6 +63,12 @@ These fail *plausibly* rather than loudly.
   60Hz and the click lands stale. Scale timings from `display.py`; never hard-code a settle
   that assumes one monitor. Placement coords are tied to `camera.PITCH_DELTA` — retuning the
   pitch invalidates all of them.
+- **The camera pitch is a raw delta, so setting it twice is as wrong as retuning it.** It
+  survives Repeat Stage, Select Portal and Match Play — none of those reach the lobby — and
+  resets only on Back to Lobby. Inside a run always go through
+  `controller._ensure_camera`/`_back_to_lobby`, never `run_camera` directly. Repeat Stage also
+  keeps the character's *position*, which is a separate flag (`_kept_position`) because Select
+  Portal and Match Play respawn you and still need the walk.
 
 `cv2.matchTemplate` is **not scale invariant**: a wrong-size crop can never match, and it
 fails intermittently, which reads as a tolerance problem. Wrong scale costs 0.253

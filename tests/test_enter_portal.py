@@ -100,7 +100,12 @@ class Ctrl(MacroController):
     def wait_for_match_ready(self, timeout=None):
         return (True, "loaded")
 
+    # `_ensure_camera` gates on this, and the bag chain must set the camera: entering from the
+    # bag means we were in the lobby, which is where the pitch resets.
+    _camera_set = False
+
     def run_camera(self):
+        self._camera_set = True
         return None
 
 

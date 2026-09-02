@@ -137,8 +137,8 @@ class MacroController:
         #
         # `_camera_set` — the camera has been pitched and nothing has been back to the lobby
         # since, so pitching again would double a raw delta (`camera.PITCH_DELTA`) and move the
-        # ground out from under every placement coordinate. Reset per run in `start`; every
-        # lobby chain ends by setting the camera, so nothing else has to clear it.
+        # ground out from under every placement coordinate. Read through `_ensure_camera`,
+        # cleared by `_back_to_lobby`, reset per run in `start`.
         self._camera_set = False
         # `_kept_position` — the last match ended with **Repeat Stage**, which drops you back
         # into the stage exactly where you stood, so the pre-start walk must not replay. Any
@@ -415,7 +415,7 @@ class MacroController:
                         # next rep (or the next task) navigates in from Play like a fresh run
                         # instead of the finished-match handover. Done after the last rep too:
                         # the queue must not hand the next task a stage still on screen.
-                        ok, msg = self._nav.back_to_lobby()
+                        ok, msg = self._back_to_lobby()
                         self._log(f"  Back to lobby: {msg}")
                     elif rep < repeat - 1:
                         # Click Repeat for next match
@@ -433,16 +433,7 @@ class MacroController:
         # Check if already in match
         if self._nav.in_match():
             self._log("  Already in a match — skipping lobby.")
-            # Reaching here means Repeat Stage or Select Portal put us straight into another
-            # match without a lobby trip, and the camera carries over from the last one. **The
-            # pitch is a raw-delta drag, not an angle** (`camera.PITCH_DELTA`), so setting it
-            # again adds a second 1000 and every placement coordinate then points at the wrong
-            # ground. Still set it if this is the first match of the run, which is the case
-            # where the macro was started with the game already in a match.
-            if self._camera_set:
-                self._log("  Camera: already set — carried over from the last match.")
-            else:
-                self.run_camera()
+            self._ensure_camera()
             return True
 
         # Standing on a finished match — a loss, or a win whose Repeat was not taken. Every
@@ -459,7 +450,7 @@ class MacroController:
             if self._nav.result_screen_up():
                 # The long way out, because `leave_match` + `change_gamemode` ends on the
                 # gamemode chooser, where there is no bag.
-                ok, msg = self._nav.back_to_lobby()
+                ok, msg = self._back_to_lobby()
                 self._log(f"  Back to lobby: {msg}")
                 if not ok:
                     return False
@@ -524,7 +515,7 @@ class MacroController:
                 return False
             time.sleep(self._nav.click_settle)
 
-        self.run_camera()
+        self._ensure_camera()
         return True
 
     def _navigate_portal(self) -> bool:
@@ -552,7 +543,7 @@ class MacroController:
         self._log(f"  Stage loaded: {msg}")
         if not ok:
             return False
-        self.run_camera()
+        self._ensure_camera()
         return True
 
     def _portals_after_match(self, task: dict, again: bool) -> None:
@@ -583,7 +574,7 @@ class MacroController:
             if ok:
                 self._kept_position = True
                 return
-        ok, msg = self._nav.back_to_lobby()
+        ok, msg = self._back_to_lobby()
         self._log(f"  Back to lobby: {msg}")
 
     def _portal_next_run(self, task: dict) -> bool:
@@ -643,12 +634,41 @@ class MacroController:
         self._log(f"  Stage loaded: {msg or ('ok' if ok else 'failed')}")
         if not ok:
             return False
-        self.run_camera()
+        self._ensure_camera()
         return True
+
+    def _ensure_camera(self) -> None:
+        """Set the camera unless it already is.
+
+        The pitch is a **raw-delta drag, not an angle** (`camera.PITCH_DELTA`), so running it
+        on a camera that is already pitched adds a second 1000 and every placement coordinate
+        then points at the wrong ground.
+
+        It survives more than it looks: Repeat Stage, Select Portal and **Match Play** all drop
+        straight into the next match with the camera untouched — Match Play only overlays the
+        gamemode chooser, it never puts the character in the lobby. `_back_to_lobby` does, and
+        is the only thing that clears the flag.
+        """
+        if self._camera_set:
+            self._log("  Camera: already set — carried over.")
+            return
+        self.run_camera()
+
+    def _back_to_lobby(self) -> tuple[bool, str]:
+        """Leave through Back to Lobby, recording that the camera is no longer set.
+
+        The one route that resets the camera, because it is the one route that actually lands
+        in the lobby. Every caller goes through here so none of them has to remember that.
+        """
+        ok, msg = self._nav.back_to_lobby()
+        if ok:
+            self._camera_set = False
+        return (ok, msg)
 
     def run_camera(self) -> None:
         """Camera setup — pitch down, then zoom out. Public because the Image Manager runs
-        it on its own to set the camera before a map reference is captured."""
+        it on its own to set the camera before a map reference is captured. Inside a run call
+        `_ensure_camera` instead: pitching twice is a bug, not a wasted 8 seconds."""
         from sloppykeys.macro.camera import camera_setup_script
 
         rect = self._rect()
@@ -1812,7 +1832,7 @@ class MacroController:
                 started = False
                 break
 
-            self.run_camera()
+            self._ensure_camera()
 
             # Load and run the macro operation
             op = load_operation(self._app_root, macro_name)
