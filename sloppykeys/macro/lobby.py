@@ -39,6 +39,8 @@ from sloppykeys.content.nav_images import (
     gamemode_image,
     match_play_image,
     play_image,
+    portal_search_image,
+    portal_select_portal_image,
     repeat_image,
     return_lobby_confirm_image,
     select_stage_image,
@@ -47,6 +49,7 @@ from sloppykeys.content.nav_images import (
     start_match_image,
     win_change_image,
 )
+from sloppykeys.content.portals import slot_coord
 from sloppykeys.content.nav_route import (
     KIND_CLICK,
     KIND_EXPECT,
@@ -65,7 +68,9 @@ from sloppykeys.core.image_search import (
 )
 
 
-from .input_scripts import move_script, nudge_click_script, scroll_script
+from sloppykeys.config.keybinds import sanitize_search_text
+
+from .input_scripts import move_script, nudge_click_script, scroll_script, type_text_script
 
 # screen-rect provider -> (x, y, w, h) of the Roblox client area, or None.
 RectProvider = Callable[[], "tuple[int, int, int, int] | None"]
@@ -889,6 +894,90 @@ class LobbyNavigator:
         so this replaces both `click_play` and `open_gamemode` for that mode.
         """
         return self._find_click(events_image(), "Events", timeout=self.search_timeout)
+
+    def click_select_portal(self) -> tuple[bool, str]:
+        """Click **Select Portal** on the victory screen, which reopens the portal picker.
+
+        Only a won Portals match offers it — a loss consumes nothing and ends on the defeat
+        screen — so a miss here is information, not a fault: it tells the caller to leave
+        through the lobby instead of queueing another run.
+        """
+        return self._find_click(
+            portal_select_portal_image(), "Select Portal", timeout=self.search_timeout
+        )
+
+    def pick_portal(
+        self, name: str, confirm_path: str, confirm_label: str
+    ) -> tuple[bool, str]:
+        """Type a portal's name into the picker's search field and confirm it.
+
+        The shared half of both portal chains: the bag reaches this picker through the
+        inventory and confirms with **Activate Portal**, the victory screen reaches it
+        through **Select Portal** and confirms with **Select**. Same field, same grid, so
+        only `confirm_path` differs.
+
+        Ordering is find-field, click, type, confirm — and the confirm is looked for
+        **before** the grid is touched. That is not an optimisation: nobody has confirmed
+        whether this panel needs the filtered tile clicked before its button lights up, and
+        this way both layouts work. If the button is already there the tile click never
+        happens; if it is not, the tile is clicked and the button is given the fade wait it
+        needs as an arriving control.
+
+        The name is sanitised **here** rather than trusted from the caller, because this is
+        the one method that hands it to `SendText`. A name that doesn't survive fails the
+        step: typing a repaired string could filter the grid to a different portal, and
+        confirming spends it.
+        """
+        wanted = sanitize_search_text(name)
+        if not wanted:
+            return (
+                False,
+                f"'{name}' is not a usable portal name — letters, digits, spaces, "
+                "apostrophes and hyphens only, up to 40 characters",
+            )
+
+        ok, message = self._find_click(
+            portal_search_image(), "Portal search", timeout=self.search_timeout
+        )
+        if not ok:
+            return (False, f"search field: {message}")
+        if not self._ahk.available():
+            return (False, "AutoHotkey v2 not found")
+        # The click above parked the cursor at the corner, which does not take focus off a
+        # text field — focus follows the click, not the pointer.
+        ok, message = self._ahk.run(type_text_script(wanted), wait=True, timeout=10)
+        if not ok:
+            return (False, f"typing '{wanted}' failed: {message}")
+        trail = f"typed '{wanted}'"
+
+        # The grid filters as the name is typed, so give the confirm one look before
+        # assuming a tile has to be selected.
+        match = self._find(confirm_path, timeout=self.panel_fade_wait)
+        if match is None:
+            coord = slot_coord(1)
+            if coord is None:
+                return (
+                    False,
+                    f"{trail}, but {confirm_label} did not appear and the result slot has "
+                    "no click point — set Portals · Bag grid in Settings > Debug > Click Points",
+                )
+            rect = self._rect()
+            if rect is None:
+                return (False, f"{trail}, then Roblox went away")
+            ok, message = self._click_client(rect, coord)
+            if not ok:
+                return (False, f"{trail}, but the result slot click failed: {message}")
+            trail += f", clicked slot 1 at {coord[0]},{coord[1]}"
+
+        ok, message = self._find_click(
+            confirm_path,
+            confirm_label,
+            timeout=self.search_timeout,
+            fade_wait=self.panel_fade_wait,
+        )
+        if not ok:
+            return (False, f"{trail}, but {message}")
+        return (True, f"{trail} → {message}")
 
     def route_step_budget(self, step: NavStep) -> float:
         """Wall-clock a route step can legitimately need, for the runner's timeout.

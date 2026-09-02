@@ -172,6 +172,18 @@ PORTALS_TAB_IMAGE = "portals_tab.png"
 PORTAL_SEARCH_IMAGE = "search.png"
 PORTAL_ACTIVATE_IMAGE = "activate.png"
 
+# # Queueing the next portal from the victory screen
+# A won Portals match ends on the victory screen with a **Select Portal** button, which opens
+# the same picker the bag does — same search field, same grid — but confirms with **Select**
+# instead of **Activate**. So it is two more crops, not a second chain: `pick_portal` serves
+# both and only the confirm template changes.
+#
+# `select_portal` is also the signal that this path is even available. A lost match consumes
+# nothing and ends on the defeat screen, which has no such button, so the search failing is
+# how the run knows to leave through the lobby instead.
+PORTAL_SELECT_PORTAL_IMAGE = "select_portal.png"
+PORTAL_SELECT_IMAGE = "select.png"
+
 # The end-of-match chooser: three portals, one of which must be picked before the victory
 # screen appears. Lives with the match templates because that is where it is seen, and
 # cropped from its **header** for the same reason as `exp_upgrade_card` — the three faces
@@ -354,6 +366,16 @@ def portal_activate_image() -> str:
     return os.path.join(IMAGES_DIR, PORTALS_DIR, PORTAL_ACTIVATE_IMAGE)
 
 
+def portal_select_portal_image() -> str:
+    """The victory screen's **Select Portal** button — opens the picker for the next run."""
+    return os.path.join(IMAGES_DIR, PORTALS_DIR, PORTAL_SELECT_PORTAL_IMAGE)
+
+
+def portal_select_image() -> str:
+    """**Select**, the victory-screen picker's confirm. `activate.png`'s counterpart."""
+    return os.path.join(IMAGES_DIR, PORTALS_DIR, PORTAL_SELECT_IMAGE)
+
+
 def portal_choice_image() -> str:
     """The end-of-match "pick one of three portals" header, before the victory screen."""
     return os.path.join(IMAGES_DIR, MATCH_DIR, PORTAL_CHOICE_IMAGE)
@@ -367,6 +389,8 @@ def portal_paths() -> list[str]:
         portal_search_image(),
         portal_activate_image(),
         portal_choice_image(),
+        portal_select_portal_image(),
+        portal_select_image(),
     ]
 
 

@@ -17,6 +17,17 @@ In the order a run meets them:
 - `search.png` — the search field. Clicked to focus it, then the portal name is typed.
 - `activate.png` — **Activate Portal**, on the selected portal's detail panel.
 
+And two more for queueing the next run without leaving the match:
+
+- `select_portal.png` — **Select Portal**, on the **victory screen**. It reopens the same
+  picker, so only the confirm button differs from the bag chain.
+- `select.png` — **Select**, that picker's confirm. `activate.png`'s counterpart.
+
+`select_portal.png` carries a second job: it is how the run tells a win from a loss without
+reading the banner. A lost match consumes nothing and ends on the defeat screen, which has no
+Select Portal — so the search failing is the signal to leave through the lobby and start the
+next rep from the bag.
+
 The Start button that appears after Activate has no file here on purpose:
 `lobby/start_match.png` is already a search rather than a coordinate, because that button
 moves with the panel it sits on. If a capture ever shows the two are different art, this is

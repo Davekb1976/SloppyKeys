@@ -39,6 +39,7 @@ from sloppykeys.content.nav_images import (
     exp_extract_confirm_image,
     exp_extract_image,
     exp_upgrade_card_image,
+    portal_select_image,
     start_game_image,
 )
 from sloppykeys.content.walk_paths import default_walk_path
@@ -360,7 +361,17 @@ class MacroController:
 
                     self._cycle += 1
 
-                    if mode == "Expedition":
+                    if mode == "Portals":
+                        # Portals' own Repeat: the victory screen offers Select Portal, which
+                        # reopens the picker so the next run is queued without a trip through
+                        # the lobby. Gated on there *being* a next rep, exactly like
+                        # click_repeat — the click starts a match, so taking it after the last
+                        # rep would begin a run the queue never asked for.
+                        again = rep < repeat - 1
+                        if not again or not self._portal_next_run(task):
+                            ok, msg = self._nav.back_to_lobby()
+                            self._log(f"  Back to lobby: {msg}")
+                    elif mode == "Expedition":
                         # Expedition's result screen has no Repeat. Leave through Back to
                         # Lobby and its confirmation, which lands in the lobby proper, so the
                         # next rep (or the next task) navigates in from Play like a fresh run
@@ -448,6 +459,42 @@ class MacroController:
                 return False
             time.sleep(self._nav.click_settle)
 
+        self.run_camera()
+        return True
+
+    def _portal_next_run(self, task: dict) -> bool:
+        """Queue the next Portals run from the victory screen. False = go via the lobby.
+
+        Select Portal → the picker's search field → type the portal's name → Select. The
+        chain after that is the ordinary handover: `wait_for_match_ready` polls for the
+        in-match Start Game, so if this panel needs a Start pressed in between, that poll is
+        what will say so rather than this returning a false success.
+
+        **A miss on Select Portal is not a failure.** A lost match consumes nothing and ends
+        on the defeat screen, which has no such button, so the search failing is exactly how
+        the run learns to leave the long way instead. Same for a portal name that no longer
+        matches anything the account owns — winning hands out a *different* portal, so the
+        name the task asks for may simply be gone.
+        """
+        name = task.get("search", "")
+        if not name:
+            self._log("  Portals: no portal name on this task — leaving through the lobby.")
+            return False
+
+        ok, msg = self._nav.click_select_portal()
+        self._log(f"  Select Portal: {msg}")
+        if not ok:
+            return False
+
+        ok, msg = self._nav.pick_portal(name, portal_select_image(), "Select")
+        self._log(f"  Pick portal: {msg}")
+        if not ok:
+            return False
+
+        ok, msg = self._nav.wait_for_match_ready()
+        self._log(f"  Stage loaded: {msg}")
+        if not ok:
+            return False
         self.run_camera()
         return True
 
