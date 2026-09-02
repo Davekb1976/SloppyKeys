@@ -419,8 +419,25 @@ class MacroController:
 
                     self._cycle += 1
 
+                    # **A challenge that is due must not be handed a match already in flight.**
+                    # The preempt runs at the top of the next rep, but the tail below would
+                    # have chained straight into another stage first — Select Portal or Repeat
+                    # both start one — so the detour arrived mid-match, where its navigation
+                    # cannot find anything and it gave up. Ending the rep at the result screen
+                    # (or the lobby) is what makes the preempt reachable. Costs nothing to ask:
+                    # `_challenge_wants_in` is wall-clock arithmetic over the last scan.
+                    more_reps = rep < repeat - 1
+                    if more_reps:
+                        pending = self._challenge_task(tasks)
+                        if pending is not None and self._challenge_wants_in(pending):
+                            more_reps = False
+                            self._log(
+                                "  Challenge is due — ending this rep here rather than "
+                                "starting the next match."
+                            )
+
                     if mode == "Portals":
-                        self._portals_after_match(task, again=rep < repeat - 1)
+                        self._portals_after_match(task, again=more_reps)
                     elif mode == "Expedition":
                         # Expedition's result screen has no Repeat. Leave through Back to
                         # Lobby and its confirmation, which lands in the lobby proper, so the
@@ -429,7 +446,7 @@ class MacroController:
                         # the queue must not hand the next task a stage still on screen.
                         ok, msg = self._back_to_lobby()
                         self._log(f"  Back to lobby: {msg}")
-                    elif rep < repeat - 1:
+                    elif more_reps:
                         # Click Repeat for next match
                         ok, msg = self._nav.click_repeat()
                         # Repeat Stage drops you back in standing where you already were, so
@@ -1993,11 +2010,27 @@ class MacroController:
         self._log(f"  Challenge: close gamemode menu — {msg}")
 
     def _navigate_to_challenge(self) -> bool:
-        """Navigate lobby to the challenge panel: Play → Challenge card → wait for panel."""
-        steps = [
-            ("Play", lambda: self._nav.click_play()),
-            ("Challenge", lambda: self._nav.open_gamemode("Challenge")),
-        ]
+        """Reach the challenge panel from wherever the run currently stands.
+
+        **Two starting points, because a detour is taken between matches.** From the lobby it
+        is Play → Challenge card. From a **finished match** the lobby's Play is not on screen
+        at all, so this used to fail every single time a challenge came due right after a
+        match — which is most of them, since the preempt runs between reps — and reported
+        "couldn't reach the challenge panel" while the result screen sat there with its own
+        Play in plain sight.
+
+        Leaving through Match Play lands on the post-match panel, and its Change gamemode
+        opens the *same* chooser the lobby's Play does. So only the first leg differs, and the
+        lobby's Play is skipped on that route rather than searched for on a screen it is not on
+        — the same shape as `_navigate_lobby`'s own handling.
+        """
+        steps: list[tuple[str, Callable[[], tuple[bool, str]]]] = []
+        if self._nav.result_screen_up():
+            steps.append(("Leave match", self._nav.leave_match))
+            steps.append(("Change gamemode", self._nav.change_gamemode))
+        else:
+            steps.append(("Play", self._nav.click_play))
+        steps.append(("Challenge", lambda: self._nav.open_gamemode("Challenge")))
         for name, action in steps:
             if self._checkpoint():
                 return False
