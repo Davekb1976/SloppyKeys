@@ -391,6 +391,16 @@
   // read back out of the DOM, so `saveCurrentTask` knows which fields mean anything without
   // inspecting `style.display`.
   let tbModeFields = {};
+  // The same answer for every mode, fetched once. `renderTaskList` needs it **synchronously**
+  // for every card, not just the selected task, and it cannot change while the app runs — it
+  // is derived from the `content/` tables.
+  let modeFields = {};
+
+  async function loadModeFields() {
+    if (!window.pywebview || !pywebview.api) return;
+    const modes = await pywebview.api.get_gamemodes();
+    for (const mode of modes) modeFields[mode] = await pywebview.api.get_mode_fields(mode);
+  }
 
   function renderTaskList() {
     queueCount.textContent = tasks.length + " task" + (tasks.length !== 1 ? "s" : "");
@@ -399,15 +409,39 @@
       return;
     }
     taskList.innerHTML = tasks.map((t, i) => {
+      const fields = modeFields[t.mode] || {};
+      const isChallenge = t.mode === "Challenge";
       const title = [t.mode, t.map, t.stage].filter(Boolean).join(" · ") || "Unconfigured";
-      const meta = (t.difficulty || "") + " · ×" + (t.repeat || 1) + (t.macro ? " · " + t.macro : "");
+      // Only what this mode actually uses. Every card read "<difficulty> · ×<repeat>", which
+      // for Challenge named a difficulty it has no control for and a repeat the runner
+      // ignores — it plays one row per detour, however the number is set.
+      const bits = [];
+      if (isChallenge) {
+        const on = (t.challenge_slots || [true, true, true])
+          .map((enabled, n) => (enabled ? "#" + (n + 1) : null))
+          .filter(Boolean);
+        bits.push(on.length ? "slots " + on.join(" ") : "every slot off");
+        const assigned = Object.keys(t.challenge_macros || {}).filter((m) => t.challenge_macros[m]);
+        bits.push(assigned.length ? assigned.length + " map macro" + (assigned.length === 1 ? "" : "s") : "no macros assigned");
+      } else {
+        if (fields.difficulty && t.difficulty) bits.push(t.difficulty);
+        bits.push("×" + (t.repeat || 1));
+        if (fields.search_label && t.search) bits.push(t.search);
+        if (t.macro) bits.push(t.macro);
+      }
+      // Challenge is taken by availability, not by position, so the number on the left is
+      // misleading on its own — the badge is what stops it reading as "runs third".
+      const badge = isChallenge
+        ? `<span class="task-card-badge" data-tip="Runs before the other tasks whenever a challenge&#10;is available, wherever it sits in this queue.&#10;The maps re-roll every :00 and :30.">Priority</span>`
+        : "";
       const sel = t.id === selectedTaskId ? " selected" : "";
       return `<div class="task-card${sel}" data-id="${t.id}">
         <span class="task-card-index">${i + 1}</span>
         <div class="task-card-body">
           <div class="task-card-title">${title}</div>
-          <div class="task-card-meta">${meta}</div>
+          <div class="task-card-meta">${bits.join(" · ")}</div>
         </div>
+        ${badge}
       </div>`;
     }).join("");
     taskList.querySelectorAll(".task-card").forEach((card) => {
@@ -450,8 +484,13 @@
   // applied. Expedition's Stage could only ever say "—", and Raid, Events and Portals all
   // offered Easy/Hard with no toggle for the macro to click.
   async function applyModeFields(mode) {
-    if (!mode || !window.pywebview || !pywebview.api) return;
-    const f = await pywebview.api.get_mode_fields(mode);
+    if (!mode) return;
+    let f = modeFields[mode];
+    if (!f) {
+      if (!window.pywebview || !pywebview.api) return;
+      f = await pywebview.api.get_mode_fields(mode);
+      modeFields[mode] = f;
+    }
     tbModeFields = f || {};
     document.getElementById("tb-map-label").textContent = f.map_label || "Map";
     document.getElementById("tb-stage-label").textContent = f.target_label || "Stage";
@@ -1134,7 +1173,9 @@
     loadSettings();
     loadGameKeybinds();
     loadOperationList();
-    loadTasks();
+    // Before the queue, not beside it: `renderTaskList` reads `modeFields` synchronously to
+    // decide which parts of a card mean anything, so the cards would draw once without it.
+    loadModeFields().then(loadTasks);
     loadQueuePresets();
     loadVisionRegions();
     loadVisionPoints();

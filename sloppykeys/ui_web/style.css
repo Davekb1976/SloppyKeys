@@ -563,6 +563,14 @@ input:focus, select:focus {
 .task-card-body { flex: 1; min-width: 0; }
 .task-card-title { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .task-card-meta { font-size: 10px; color: var(--text-faint); margin-top: 1px; }
+/* Challenge runs by availability rather than queue position, so its card says so — the index
+   on the left would otherwise read as the order it goes in. */
+.task-card-badge {
+  flex-shrink: 0;
+  font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+  padding: 2px 8px; color: var(--accent); background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+}
 .task-builder { display: flex; flex-direction: column; gap: var(--space-3); }
 .task-builder-actions { display: flex; justify-content: flex-end; margin-top: var(--space-3); }
 
