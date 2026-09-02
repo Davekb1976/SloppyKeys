@@ -42,6 +42,38 @@ GAME_DEFAULTS: dict[str, str] = {
 }
 
 
+# What may appear in a string the macro *types* into a game search field. Letters, digits,
+# space, apostrophe and hyphen — enough for any item name the game shows, and inert inside
+# an AutoHotkey double-quoted string.
+SEARCH_TEXT_ALLOWED = set(
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 '-"
+)
+# Longer than any item name, short enough that a pasted paragraph can't become a script.
+SEARCH_TEXT_MAX = 40
+
+
+def sanitize_search_text(raw: object) -> str:
+    """Reduce a typed search string to something safe for `SendText`, or "" if it isn't.
+
+    Same trust boundary as `sanitize_game_key`, and the same answer: a generated AutoHotkey
+    script *is* code, so this whitelists and **rejects rather than repairs**. One character
+    outside the set fails the whole string.
+
+    Rejecting matters more here than tidying would. Backtick is still special inside an
+    AHK string even in text mode, and quotes end the literal — but the reason not to just
+    drop the offending characters is the game, not the script: a portal is consumed when it
+    is activated, so typing a *different* string than the user asked for can filter the list
+    to the wrong item and spend it. A step that refuses and says why costs a run; a step
+    that silently searches for something else costs the item.
+    """
+    text = str(raw or "").strip()
+    if not text or len(text) > SEARCH_TEXT_MAX:
+        return ""
+    if any(char not in SEARCH_TEXT_ALLOWED for char in text):
+        return ""
+    return text
+
+
 def sanitize_game_key(raw: object) -> str:
     """Reduce input to one safe key character, or "" if it isn't usable.
 

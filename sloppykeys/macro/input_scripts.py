@@ -325,6 +325,31 @@ Loop {times} {{
     return f"{_header(80)}{body}ExitApp(0)\n"
 
 
+def type_text_script(text: str) -> str:
+    """Type a string into whatever field the game currently has focused.
+
+    Callers must pass text already validated by `config.keybinds.sanitize_search_text` —
+    this interpolates it into a `SendText()`, and an AHK string is code. `sanitize_search_text`
+    rejects rather than escapes, so nothing here has to quote anything.
+
+    **`SendText`, not `Send`.** It sends Unicode character packets rather than keystrokes, so
+    `{`, `!`, `^` and `+` are literal instead of being read as key names and modifiers, and a
+    character that would normally need Shift arrives without the game seeing a modifier held.
+
+    **Nothing here proves a field is focused**, and that is the whole risk: with no caret in a
+    search box these characters land in the game world, where `r`, `t` and `x` are priority,
+    upgrade and sell. The caller must have clicked a *searched* field first — see
+    `assets/portals/README.md`.
+
+    No mouse, so no nudge and no park; no trailing sleep, since the caller's next step is a
+    search that polls on a deadline.
+    """
+    return f"""{_header()}
+SendText("{text}")
+ExitApp(0)
+"""
+
+
 def drag_script(x: int, y: int, to_x: int, to_y: int, button: str = "left") -> str:
     """Press at (x, y), glide to (to_x, to_y), release. Absolute coordinates, so
     this is for UI dragging — camera rotation uses raw deltas (see camera.py)."""
