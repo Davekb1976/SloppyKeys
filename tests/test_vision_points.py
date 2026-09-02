@@ -74,9 +74,12 @@ with tempfile.TemporaryDirectory() as root:
         "In-match result slot 1",
     ], [p["label"] for p in portal_points]
     assert (portal_points[0]["x"], portal_points[0]["y"]) == (394, 253)
-    assert (portal_points[1]["x"], portal_points[1]["y"]) == (0, 0)
+    assert (portal_points[1]["x"], portal_points[1]["y"]) == (294, 253)
     assert slot_coord(1) == (394, 253), slot_coord(1)
-    assert slot_coord(1, in_match=True) is None, "the in-match grid must not borrow the bag's"
+    # Same row, 100px apart. Distinct is the whole point: equal here would mean one grid is
+    # silently clicking the other's tile.
+    assert slot_coord(1, in_match=True) == (294, 253), slot_coord(1, in_match=True)
+    assert slot_coord(1) != slot_coord(1, in_match=True)
     # Portals keeps its own override dict, so this is deliberately not the `apply_point_overrides`
     # imported above — that one belongs to `content.acts`.
     apply_portal_overrides({slot_key(1): UNSET, slot_key(1, True): (700, 410)})

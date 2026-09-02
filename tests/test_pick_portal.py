@@ -134,24 +134,35 @@ assert "Bag result slot 1" in message, "the refusal must name which grid to meas
 assert "typed 'Summer Portal'" in message, message
 assert not nav.slot_clicked, "an unset point must not become a click"
 
-# # The in-match grid is a **different** point, and it ships unmeasured — so the result
-# # screen's picker refuses even though the bag's is set. Sharing one coordinate across both
-# # would click whichever tile the other screen happens to have there and spend that portal.
-reset_slot((640, 300))
+# # The in-match grid is a **different** point. Both ship measured now, so what matters is
+# # that `in_match` reaches the right one — the two differ only in x, so a chain that ignored
+# # the flag would click a tile 100px away and spend whatever portal is sitting there.
+reset_slot()
+assert portals_table.slot_coord(1) == (394, 253), "the bag's shipped default"
+assert portals_table.slot_coord(1, in_match=True) == (294, 253), "the in-match one"
 nav = navigator(confirm_after_typing=False)
-ok, message = nav.pick_portal("Summer Portal", CONFIRM, "Select", in_match=True)
-assert not ok, "the in-match grid has no default, so it cannot borrow the bag's"
-assert "In-match result slot 1" in message, message
-assert not nav.slot_clicked
-# Measured, and it is read back from its own key rather than the bag's.
-portals_table.apply_point_overrides(
-    {portals_table.slot_key(1): (640, 300), portals_table.slot_key(1, True): (700, 410)}
-)
-assert portals_table.slot_coord(1) == (640, 300)
+assert nav.pick_portal("Summer Portal", CONFIRM, "Select", in_match=True)[0]
+assert nav.trail == ["click:Portal search", "slot:294,253", "click:Select"], nav.trail
+# Same call without the flag takes the bag's tile, from the same shipped tables.
+nav = navigator(confirm_after_typing=False)
+assert nav.pick_portal("Summer Portal", CONFIRM, "Activate Portal")[0]
+assert nav.trail == ["click:Portal search", "slot:394,253", "click:Activate Portal"], nav.trail
+
+# # Each grid reads its own stored key, so measuring one cannot move the other.
+portals_table.apply_point_overrides({portals_table.slot_key(1, True): (700, 410)})
+assert portals_table.slot_coord(1) == (394, 253), "the bag falls back to its own default"
 assert portals_table.slot_coord(1, in_match=True) == (700, 410)
 nav = navigator(confirm_after_typing=False)
 assert nav.pick_portal("Summer Portal", CONFIRM, "Select", in_match=True)[0]
 assert nav.trail == ["click:Portal search", "slot:700,410", "click:Select"], nav.trail
+
+# # An in-match slot stored as UNSET still refuses and names its own row, not the bag's.
+portals_table.apply_point_overrides({portals_table.slot_key(1, True): portals_table.UNSET})
+nav = navigator(confirm_after_typing=False)
+ok, message = nav.pick_portal("Summer Portal", CONFIRM, "Select", in_match=True)
+assert not ok
+assert "In-match result slot 1" in message, message
+assert not nav.slot_clicked, "an unset point must not fall back to the other grid's"
 
 # # A name that cannot be typed safely never reaches SendText
 reset_slot((640, 300))

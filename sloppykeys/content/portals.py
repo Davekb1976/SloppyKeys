@@ -15,11 +15,11 @@ and its own stored point. Sharing one coordinate across both clicks the wrong ti
 whichever context was not measured — and the log still reads like a working run, which is the
 failure this module is built around.
 
-The bag's slot 1 ships a **measured** default, like `ACT_COORDS` and `START_COORDS` do. What
-this module refuses to ship is a *guessed* one: activating a portal consumes it, so a click
-40px out spends the wrong item. That is why `UNSET` and `slot_coord`'s `None` stay — the
-in-match grid is unmeasured, so it refuses, and the run step is expected to stop and say so
-rather than click the bag's coordinate and hope.
+Both grids now ship a **measured** default, like `ACT_COORDS` and `START_COORDS` do. What this
+module refuses to ship is a *guessed* one: activating a portal consumes it, so a click 40px out
+spends the wrong item and the log still reads like a working run. That is why `UNSET` and
+`slot_coord`'s `None` stay — a slot stored as (0, 0), or a slot added to a table before anyone
+measures it, still refuses instead of clicking empty ground.
 """
 
 from __future__ import annotations
@@ -40,13 +40,12 @@ SLOT_COORDS: dict[int, tuple[int, int]] = {
     # overrides it in Settings > Debug > Click Points.
     1: (394, 253),
 }
-# The **in-match** grid: the picker Select Portal opens on the result screen. A separate
-# table because the panel is not the bag's — measured on a different screen entirely, so the
-# bag's (394, 253) points at the wrong tile here. Unset until someone measures it: a wrong
-# click spends a portal, and this path is only reached when the confirm button does not light
-# up on its own, so it has never been exercised in game.
+# The **in-match** grid: the picker Select Portal opens on the result screen. A separate table
+# because the panel is not the bag's — measured by the user on that screen at the pinned
+# viewport, and it sits 100px to the left of the bag's tile on the same row. That the y matches
+# exactly is why one coordinate looked like it might serve both; the x is why it cannot.
 MATCH_SLOT_COORDS: dict[int, tuple[int, int]] = {
-    1: UNSET,
+    1: (294, 253),
 }
 
 # The mode these points belong to, for the editor's grouping.
