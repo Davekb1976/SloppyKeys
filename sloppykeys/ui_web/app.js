@@ -1074,7 +1074,9 @@
           const edited = !!overrides[s.key];
           return `<div class="vision-region-row">
             <span class="vr-label">${s.label}</span>
-            <span class="vr-flag">${edited ? '' : '<span class="vr-default">default</span>'}</span>
+            <span class="vr-flag">${edited
+              ? '<span class="vr-default vr-edited" data-tip="Your measurement, not the shipped box">edited</span>'
+              : '<span class="vr-default" data-tip="The shipped box — press Set to measure your own">default</span>'}</span>
             <input type="number" value="${val[0]}" data-vr-key="${s.key}" data-vr-idx="0" data-tip="X">
             <input type="number" value="${val[1]}" data-vr-key="${s.key}" data-vr-idx="1" data-tip="Y">
             <input type="number" value="${val[2]}" data-vr-key="${s.key}" data-vr-idx="2" data-tip="Width">

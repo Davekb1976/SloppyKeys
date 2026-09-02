@@ -367,10 +367,17 @@ input:focus, select:focus {
   flex: 0 0 150px; min-width: 0; color: var(--text-muted); font-weight: 600;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.vr-flag { flex: 0 0 50px; display: flex; align-items: center; min-width: 0; }
+.vr-flag { flex: 0 0 52px; display: flex; align-items: center; min-width: 0; }
 /* No left margin in here: the cell's own gap does that job, and the shared rule's margin is
    for the group header, where the badge really does follow text. */
 .vr-flag .vr-default { margin-left: 0; }
+/* Both states carry a badge, so the column is never blank. Showing one only for `default` read
+   as a broken panel once every row had been measured — which is the normal end state, and what
+   an install with all eleven boxes tuned actually looks like. */
+.vr-edited {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
 .vision-region-row input { flex: 0 0 50px; width: 50px; height: 22px; font-size: 10px; padding: 0 4px; background: var(--surface-sunken); color: var(--text); border: 1px solid var(--border); }
 .vr-thumb-cell { flex: 0 0 140px; display: flex; align-items: center; min-width: 0; overflow: hidden; }
 /* A preview is a state, not an absence: a fresh install has taken none, and an empty column
