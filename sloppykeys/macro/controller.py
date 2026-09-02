@@ -15,6 +15,7 @@ from __future__ import annotations
 import os
 import time
 import threading
+from datetime import datetime
 from typing import Callable
 
 from sloppykeys.config.delays import DelaysStore
@@ -63,6 +64,7 @@ from sloppykeys.macro.expedition import (
     ExpeditionMatch,
     extract_after_from_task,
 )
+from sloppykeys.macro.challenge import ChallengeTracker
 from sloppykeys.macro.lobby import LobbyNavigator
 from sloppykeys.macro.placement import UnitPlacer, OUTCOME_WON, OUTCOME_LOST
 
@@ -112,6 +114,11 @@ class MacroController:
             should_stop=lambda: self._stop_requested,
         )
         self._routes = RouteStore(app_root)
+        # What the run remembers about the challenge panel between matches: which rotation it
+        # last looked in, which rows it has played, and when those marks expire. One per
+        # controller, because the memory has to outlive a single match — a per-match tracker
+        # would forget every mark and send the run back to the panel after each one.
+        self._challenges = ChallengeTracker()
         self._delays = DelaysStore(app_root).all()
         self._stats = StatsTracker(app_root)
         self._nav.apply_delays(self._delays)
@@ -290,9 +297,12 @@ class MacroController:
 
                 self._log(f"Task {i}/{len(tasks)}: {mode} / {map_name} / {stage} × {repeat}")
 
-                # Challenge mode has its own flow
+                # Challenge mode has its own flow. Reaching it in the queue is not what makes
+                # it run — `_challenge_wants_in` does, below — so its own turn is just another
+                # opportunity, and it does nothing when the rotation is already spent.
                 if mode == "Challenge":
-                    self._run_challenge_task(task)
+                    if self._challenge_wants_in(task):
+                        self._run_challenge_task(task)
                     if self._checkpoint():
                         return (True, f"stopped after {self._cycle} cycles")
                     continue
@@ -300,6 +310,18 @@ class MacroController:
                 for rep in range(repeat):
                     if self._checkpoint():
                         return (True, f"stopped after {self._cycle} cycles")
+
+                    # **Before every match, not at the queue position.** A rotation lasts 30
+                    # minutes; a task with a high repeat count can hold the queue for hours,
+                    # so a challenge that waited its turn would miss rotation after rotation.
+                    # This is the check that answers "the maps re-rolled mid-match" — it runs
+                    # once the match that was in flight has finished, never interrupting one.
+                    challenge = self._challenge_task(tasks)
+                    if challenge is not None and self._challenge_wants_in(challenge):
+                        self._log("  Challenge available — taking it before this match.")
+                        self._run_challenge_task(challenge)
+                        if self._checkpoint():
+                            return (True, f"stopped after {self._cycle} cycles")
 
                     # Auto-reopen Roblox if it crashed
                     if not self._try_reopen_roblox():
@@ -1518,9 +1540,60 @@ class MacroController:
                     self._execute_block(eb)
                     time.sleep(TICK_SLEEP)
 
+    @staticmethod
+    def _challenge_task(tasks: list) -> dict | None:
+        """The queued Challenge task, or None. The first one wins — a second is the same
+        panel with different macro assignments, and honouring both would run the rotation
+        twice."""
+        for task in tasks:
+            if task.get("mode") == "Challenge":
+                return task
+        return None
+
+    def _challenge_playable(self, task: dict) -> list:
+        """Rows this task could run right now, from the last scan.
+
+        Not simply `tracker.candidates()`: a row the panel offers but *this task* declines —
+        its slot switched off, or no macro assigned for the map that was read — must not count
+        as work, or the run would detour to the panel before every single match, find nothing
+        it can do, and come back. The queue would never advance.
+        """
+        slots = task.get("challenge_slots", [True, True, True])
+        macros = task.get("challenge_macros", {})
+        playable = []
+        for read in self._challenges.candidates():
+            index = read.slot - 1
+            if index >= len(slots) or not slots[index]:
+                continue
+            if not macros.get(read.map_name or ""):
+                continue
+            playable.append(read)
+        return playable
+
+    def _challenge_wants_in(self, task: dict, now: datetime | None = None) -> bool:
+        """Should a challenge run before the next match?
+
+        **Challenge keeps its queue position for configuration, not for ordering.** The maps
+        re-roll every half hour while a target task can hold the queue for hours, so a
+        challenge that waited its turn would miss most rotations — which is the whole reason
+        the old design ignored its position too.
+
+        Costs nothing until it answers yes: `note_time` and `needs_rescan` are arithmetic on
+        the wall clock, no capture and no navigation. `note_time` returning True is the
+        mid-match re-roll — it has already cleared the played marks and the stale reads, so
+        the panel is worth another look.
+
+        `now` is injectable for the same reason every tracker method takes it: a rotation
+        boundary cannot be exercised against the wall clock.
+        """
+        self._challenges.note_time(now)
+        if self._challenges.needs_rescan(now):
+            return True
+        return bool(self._challenge_playable(task))
+
     def _run_challenge_task(self, task: dict) -> None:
         """Execute a Challenge task: scan the panel, pick a ready slot, run it."""
-        from sloppykeys.macro.challenge import ChallengeScanner, ChallengeTracker
+        from sloppykeys.macro.challenge import ChallengeScanner
         from sloppykeys.content.challenge import challenge_maps, SLOTS
 
         challenge_macros = task.get("challenge_macros", {})
@@ -1549,6 +1622,10 @@ class MacroController:
             time.sleep(0.5)
             reads, panel_open = scanner.scan_if_open()
 
+        # Told before the reads are trusted, so a panel that cannot be read costs **one**
+        # detour this rotation rather than one before every match.
+        self._challenges.note_scan_attempt()
+
         if not panel_open:
             self._log(
                 "  Challenge: the panel never read as open — not clicking a row blind. "
@@ -1558,6 +1635,7 @@ class MacroController:
         if not reads:
             self._log("  Challenge: panel scan returned nothing.")
             return
+        self._challenges.note_reads(reads)
 
         # Find a ready slot
         for read in reads:
@@ -1566,6 +1644,8 @@ class MacroController:
             slot_idx = read.slot - 1
             if slot_idx >= len(challenge_slots) or not challenge_slots[slot_idx]:
                 continue  # slot disabled by user
+            if self._challenges.is_skipped(read.slot):
+                continue  # already played this rotation
             # A property, not a method. Called as `is_candidate()` this raised
             # `TypeError: 'bool' object is not callable` on the first row every time, and
             # nothing catches it here — so the exception unwound the whole run and reported
@@ -1646,7 +1726,13 @@ class MacroController:
             self._run_match(battle_blocks, loop_a, loop_b)
 
             self._cycle += 1
-            break  # one challenge per pass
+            # Retired for this rotation whatever the result, and whatever went wrong getting
+            # here. Win or loss is the tracker's own rule — one run of each row per rotation,
+            # since replaying a row spends another of the day's ten either way. Marking it
+            # here rather than on a win also means a row that failed technically doesn't
+            # preempt every following match forever.
+            self._challenges.mark_done(read.slot)
+            break  # one challenge per detour
 
     def _navigate_to_challenge(self) -> bool:
         """Navigate lobby to the challenge panel: Play → Challenge card → wait for panel."""
