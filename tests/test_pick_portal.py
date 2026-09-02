@@ -1,12 +1,19 @@
-"""Runnable checks for the portal picker chain: search field, type, confirm.
+"""Runnable checks for the end of a Portals match: the picker chain, and the tail that
+decides between queueing the next run, repeating, and leaving.
 
-Shared by both entry points — the bag confirms with Activate Portal, the victory screen with
-Select — so this asserts the ordering and every refusal. Nothing here captures or clicks: the
-navigator is built with `__new__` and its find/click primitives are replaced.
+Two things are asserted. The picker chain (`pick_portal`) is shared by both entry points —
+the bag confirms with Activate Portal, the victory screen with Select — so its ordering and
+every refusal are pinned here. And the tail (`_portals_after_match`) reads the outcome purely
+from which button is on screen, because Portals is the only mode whose *victory* screen has
+no Repeat: a win consumes the portal and offers Select Portal, a loss keeps it and offers
+Repeat.
 
-The refusals matter more than the happy path. Confirming a portal consumes it, so a chain
-that types a repaired name or clicks an unmeasured coordinate spends the wrong item while
-the log still reads like a working run.
+The refusals matter more than the happy paths. Confirming a portal consumes it, so a chain
+that types a repaired name or clicks an unmeasured coordinate spends the wrong item while the
+log still reads like a working run.
+
+Nothing here captures or clicks: the navigator and controller are built with `__new__` and
+their primitives replaced.
 
 No framework, no input fired:
 `.venv\\Scripts\\python.exe tests\\test_pick_portal.py`
@@ -24,6 +31,7 @@ from sloppykeys.content.nav_images import (  # noqa: E402
     portal_search_image,
     portal_select_image,
 )
+from sloppykeys.macro.controller import MacroController  # noqa: E402
 from sloppykeys.macro.lobby import LobbyNavigator  # noqa: E402
 
 SEARCH = portal_search_image()
@@ -138,4 +146,68 @@ assert nav.pick_portal("Summer", CONFIRM, "Select")[0]
 assert seen == [SEARCH, CONFIRM], seen
 
 reset_slot()
+
+
+# # The tail: which button is on screen is the whole outcome signal
+class TailNav:
+    """Offers Select Portal on a win, Repeat on a loss, Back to Lobby always."""
+
+    def __init__(self, won: bool) -> None:
+        self.won = won
+        self.calls: list[str] = []
+
+    def click_select_portal(self):
+        self.calls.append("select_portal")
+        if self.won:
+            return (True, "clicked Select Portal")
+        return (False, "Select Portal not found (best 0.09 < 0.80)")
+
+    def pick_portal(self, name, confirm_path, confirm_label):
+        self.calls.append(f"pick:{name}")
+        return (True, "typed and confirmed")
+
+    def wait_for_match_ready(self, timeout=None):
+        self.calls.append("wait_ready")
+        return (True, "stage loaded")
+
+    def click_repeat(self, timeout=None):
+        self.calls.append("repeat")
+        if self.won:
+            # A won Portals screen has no Repeat at all — that asymmetry is the point.
+            return (False, "Repeat not found (best 0.07 < 0.80)")
+        return (True, "clicked Repeat")
+
+    def back_to_lobby(self):
+        self.calls.append("back_to_lobby")
+        return (True, "left the stage")
+
+
+def tail(won: bool, again: bool, task=None) -> TailNav:
+    ctrl = MacroController.__new__(MacroController)
+    nav = TailNav(won)
+    ctrl._nav = nav
+    ctrl._log = lambda _m: None
+    ctrl.run_camera = lambda: None
+    ctrl._portals_after_match(task if task is not None else {"search": "Summer"}, again=again)
+    return nav
+
+
+# A win with another rep to come: queue the next portal, never touch Repeat, never leave.
+nav = tail(won=True, again=True)
+assert nav.calls == ["select_portal", "pick:Summer", "wait_ready"], nav.calls
+
+# A loss with another rep to come: no Select Portal, so Repeat replays the portal it kept.
+nav = tail(won=False, again=True)
+assert nav.calls == ["select_portal", "repeat"], nav.calls
+
+# Last rep, either way: leave through the lobby without starting anything.
+for won in (True, False):
+    nav = tail(won=won, again=False)
+    assert nav.calls == ["back_to_lobby"], (won, nav.calls)
+
+# No portal name on the task: nothing to type, so it cannot queue — and on a win there is no
+# Repeat either, so it leaves rather than clicking blindly.
+nav = tail(won=True, again=True, task={})
+assert nav.calls == ["repeat", "back_to_lobby"], nav.calls
+
 print("pick portal: OK")

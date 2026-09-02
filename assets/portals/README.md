@@ -23,10 +23,19 @@ And two more for queueing the next run without leaving the match:
   picker, so only the confirm button differs from the bag chain.
 - `select.png` — **Select**, that picker's confirm. `activate.png`'s counterpart.
 
-`select_portal.png` carries a second job: it is how the run tells a win from a loss without
-reading the banner. A lost match consumes nothing and ends on the defeat screen, which has no
-Select Portal — so the search failing is the signal to leave through the lobby and start the
-next rep from the bag.
+`select_portal.png` carries a second job: **it is how the run tells a win from a loss**, with
+no banner template involved.
+
+Portals is the only mode whose victory screen has no Repeat. Winning consumes the portal and
+hands out a new one, so that screen offers Select Portal instead. A loss consumes nothing, so
+its screen keeps Repeat. The two outcomes therefore have completely disjoint controls, which
+is a stronger signal than matching the banner would be — so the run looks for Select Portal,
+and falling back to `match/repeat.png` *is* the loss path. Both consequences follow from that:
+
+- crop `select_portal.png` from something only the **won** screen shows, or a loss will be
+  read as a win and the chain will type into a picker that never opened;
+- a loss replays the same portal through Repeat, with no bag trip and nothing retyped, because
+  the portal is still owned.
 
 The Start button that appears after Activate has no file here on purpose:
 `lobby/start_match.png` is already a search rather than a coordinate, because that button

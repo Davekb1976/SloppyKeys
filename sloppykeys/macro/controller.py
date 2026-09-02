@@ -362,15 +362,7 @@ class MacroController:
                     self._cycle += 1
 
                     if mode == "Portals":
-                        # Portals' own Repeat: the victory screen offers Select Portal, which
-                        # reopens the picker so the next run is queued without a trip through
-                        # the lobby. Gated on there *being* a next rep, exactly like
-                        # click_repeat — the click starts a match, so taking it after the last
-                        # rep would begin a run the queue never asked for.
-                        again = rep < repeat - 1
-                        if not again or not self._portal_next_run(task):
-                            ok, msg = self._nav.back_to_lobby()
-                            self._log(f"  Back to lobby: {msg}")
+                        self._portals_after_match(task, again=rep < repeat - 1)
                     elif mode == "Expedition":
                         # Expedition's result screen has no Repeat. Leave through Back to
                         # Lobby and its confirmation, which lands in the lobby proper, so the
@@ -462,6 +454,35 @@ class MacroController:
         self.run_camera()
         return True
 
+    def _portals_after_match(self, task: dict, again: bool) -> None:
+        """Leave a finished Portals match, setting up the next rep if there is one.
+
+        **Portals is the only mode whose victory screen has no Repeat.** Winning consumes the
+        portal and hands out a new one, so that screen offers **Select Portal** instead. A loss
+        consumes nothing, so its screen *does* have Repeat — and taking it replays the same
+        portal with no trip through the bag and no name to retype.
+
+        So which button is on screen is how this learns how the match ended. Nothing reads the
+        banner and `_run_match` needs no change to report it: the two outcomes have disjoint
+        controls, which is a stronger signal than a template of the banner would be.
+
+        `again` gates both clicks for the same reason `click_repeat` is gated elsewhere — each
+        one starts a match, so taking either after the last rep begins a run the queue never
+        asked for. Neither available means leave through the lobby, so the next task is never
+        handed a stage still on screen.
+        """
+        if again:
+            if self._portal_next_run(task):
+                return
+            # No Select Portal, so this was a loss and the portal is still owned. Repeat is
+            # on that screen and replays it directly.
+            ok, msg = self._nav.click_repeat()
+            self._log(f"  Repeat: {msg}")
+            if ok:
+                return
+        ok, msg = self._nav.back_to_lobby()
+        self._log(f"  Back to lobby: {msg}")
+
     def _portal_next_run(self, task: dict) -> bool:
         """Queue the next Portals run from the victory screen. False = go via the lobby.
 
@@ -470,11 +491,10 @@ class MacroController:
         in-match Start Game, so if this panel needs a Start pressed in between, that poll is
         what will say so rather than this returning a false success.
 
-        **A miss on Select Portal is not a failure.** A lost match consumes nothing and ends
-        on the defeat screen, which has no such button, so the search failing is exactly how
-        the run learns to leave the long way instead. Same for a portal name that no longer
-        matches anything the account owns — winning hands out a *different* portal, so the
-        name the task asks for may simply be gone.
+        **A miss on Select Portal is not a failure**, it is the loss signal — see
+        `_portals_after_match`. A portal name that no longer matches anything the account owns
+        reads the same way: winning hands out a *different* portal, so the name the task asks
+        for may simply be gone, and the caller falls back rather than failing the run.
         """
         name = task.get("search", "")
         if not name:
@@ -482,9 +502,14 @@ class MacroController:
             return False
 
         ok, msg = self._nav.click_select_portal()
-        self._log(f"  Select Portal: {msg}")
         if not ok:
+            # The ordinary loss path, not a fault — so it is logged as the observation it is.
+            # It costs the full search timeout, and that is the right trade: reading a
+            # slow-drawing victory screen as a loss would give up the Select Portal path and
+            # spend a lobby trip, while waiting out a real loss only delays the Repeat click.
+            self._log(f"  No Select Portal — reading this as a loss ({msg}).")
             return False
+        self._log(f"  Select Portal: {msg}")
 
         ok, msg = self._nav.pick_portal(name, portal_select_image(), "Select")
         self._log(f"  Pick portal: {msg}")
