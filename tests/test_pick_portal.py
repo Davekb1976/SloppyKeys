@@ -2,11 +2,11 @@
 decides between queueing the next run, repeating, and leaving.
 
 Two things are asserted. The picker chain (`pick_portal`) is shared by both entry points —
-the bag confirms with Activate Portal, the victory screen with Select — so its ordering and
-every refusal are pinned here. And the tail (`_portals_after_match`) reads the outcome purely
-from which button is on screen, because Portals is the only mode whose *victory* screen has
-no Repeat: a win consumes the portal and offers Select Portal, a loss keeps it and offers
-Repeat.
+the bag confirms with Activate Portal, the result screen with Select — so its ordering and
+every refusal are pinned here. And the tail (`_portals_after_match`) takes Select Portal after
+**either** outcome: a run measured `Loss. (defeat screen 0.96)` followed by Select Portal at
+`1.00`, so which button is on screen is not an outcome signal and this no longer treats it as
+one. `click_repeat` is the fallback for not finding it, nothing more.
 
 The refusals matter more than the happy paths. Confirming a portal consumes it, so a chain
 that types a repaired name or clicks an unmeasured coordinate spends the wrong item while the
@@ -156,17 +156,19 @@ assert seen == [SEARCH, CONFIRM], seen
 reset_slot()
 
 
-# # The tail: which button is on screen is the whole outcome signal
+# # The tail: one path out, plus what the next rep is allowed to skip
 class TailNav:
-    """Offers Select Portal on a win, Repeat on a loss, Back to Lobby always."""
+    """A result screen. Which buttons it offers is the knob — deliberately *not* the outcome,
+    which this no longer infers from anything."""
 
-    def __init__(self, won: bool) -> None:
-        self.won = won
+    def __init__(self, select_portal: bool, repeat: bool = True) -> None:
+        self.select_portal = select_portal
+        self.repeat = repeat
         self.calls: list[str] = []
 
     def click_select_portal(self):
         self.calls.append("select_portal")
-        if self.won:
+        if self.select_portal:
             return (True, "clicked Select Portal")
         return (False, "Select Portal not found (best 0.09 < 0.80)")
 
@@ -180,42 +182,91 @@ class TailNav:
 
     def click_repeat(self, timeout=None):
         self.calls.append("repeat")
-        if self.won:
-            # A won Portals screen has no Repeat at all — that asymmetry is the point.
-            return (False, "Repeat not found (best 0.07 < 0.80)")
-        return (True, "clicked Repeat")
+        return (True, "clicked Repeat") if self.repeat else (False, "Repeat not found (0.07)")
 
     def back_to_lobby(self):
         self.calls.append("back_to_lobby")
         return (True, "left the stage")
 
 
-def tail(won: bool, again: bool, task=None) -> TailNav:
+def tail(select_portal: bool, again: bool, repeat: bool = True, task=None):
+    """Returns the fake navigator and the `_stage_continued` flag left behind."""
     ctrl = MacroController.__new__(MacroController)
-    nav = TailNav(won)
+    nav = TailNav(select_portal, repeat=repeat)
     ctrl._nav = nav
     ctrl._log = lambda _m: None
     ctrl.run_camera = lambda: None
+    ctrl._stage_continued = False
     ctrl._portals_after_match(task if task is not None else {"search": "Summer"}, again=again)
-    return nav
+    return nav, ctrl._stage_continued
 
 
-# A win with another rep to come: queue the next portal, never touch Repeat, never leave.
-nav = tail(won=True, again=True)
+# Another rep to come: queue the next portal, never touch Repeat, never leave. Identical after a
+# win and after a loss — the outcome is not what this branches on.
+nav, continued = tail(select_portal=True, again=True)
 assert nav.calls == ["select_portal", "pick:Summer", "wait_ready"], nav.calls
+# The next match starts in the world this one ended in, so its walk and camera must be skipped.
+# Without this flag the recording replays from where it already finished and the raw-delta pitch
+# is applied twice, which moves the ground out from under every placement coordinate.
+assert continued, "a run queued from the result screen continues in place"
 
-# A loss with another rep to come: no Select Portal, so Repeat replays the portal it kept.
-nav = tail(won=False, again=True)
+# Select Portal missing: Repeat is the fallback. It also starts the next match in place.
+nav, continued = tail(select_portal=False, again=True)
 assert nav.calls == ["select_portal", "repeat"], nav.calls
+assert continued, "Repeat replays the same stage without leaving it"
+
+# Neither button there: the lobby is the way out, and that *does* reset the world.
+nav, continued = tail(select_portal=False, repeat=False, again=True)
+assert nav.calls == ["select_portal", "repeat", "back_to_lobby"], nav.calls
+assert not continued, "leaving means the next run walks and sets the camera again"
 
 # Last rep, either way: leave through the lobby without starting anything.
-for won in (True, False):
-    nav = tail(won=won, again=False)
-    assert nav.calls == ["back_to_lobby"], (won, nav.calls)
+for select_portal in (True, False):
+    nav, continued = tail(select_portal=select_portal, again=False)
+    assert nav.calls == ["back_to_lobby"], (select_portal, nav.calls)
+    assert not continued, (select_portal, "the next task must not inherit a skipped walk")
 
-# No portal name on the task: nothing to type, so it cannot queue — and on a win there is no
-# Repeat either, so it leaves rather than clicking blindly.
-nav = tail(won=True, again=True, task={})
-assert nav.calls == ["repeat", "back_to_lobby"], nav.calls
+# No portal name on the task: nothing safe to type, so it cannot queue and falls back instead of
+# opening a picker it has nothing to put in.
+nav, continued = tail(select_portal=True, again=True, task={})
+assert nav.calls == ["repeat"], nav.calls
+
+# # The two readers of `_stage_continued`. A flag that is set and never read fails silently, so
+# # neither consumer is taken on trust.
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def walk_block(continued: bool) -> FakeAhk:
+    ctrl = MacroController.__new__(MacroController)
+    ctrl._ahk = FakeAhk()
+    ctrl._log = lambda _m: None
+    ctrl._app_root = REPO
+    ctrl._current_task = {"mode": "Portals", "map": "Summer", "stage": ""}
+    ctrl._stage_continued = continued
+    ctrl._execute_block({"type": "walk_path", "mode": "auto"})
+    return ctrl._ahk
+
+
+# Flag down, so the shipped Summer recording resolves through the table and replays. This half
+# is what keeps the other honest: without it a skip could pass for the wrong reason.
+assert walk_block(continued=False).scripts, "auto walk_path must resolve Portals/Summer"
+# Flag up: no script at all, not merely a shorter one.
+assert walk_block(continued=True).scripts == [], "a continued run must not walk a second time"
+
+
+def lobby_camera(continued: bool) -> bool:
+    """True when `_navigate_lobby`'s in-match shortcut ran the camera."""
+    ctrl = MacroController.__new__(MacroController)
+    ran: list[int] = []
+    ctrl._nav = type("InMatchNav", (), {"in_match": staticmethod(lambda: True)})()
+    ctrl._log = lambda _m: None
+    ctrl.run_camera = lambda: ran.append(1)
+    ctrl._stage_continued = continued
+    assert ctrl._navigate_lobby("Portals", "Summer", "") is True
+    return bool(ran)
+
+
+assert lobby_camera(continued=False), "an ordinary Repeat lands on a reset camera — set it"
+assert not lobby_camera(continued=True), "pitching an already-set camera doubles the raw delta"
 
 print("pick portal: OK")

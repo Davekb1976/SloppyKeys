@@ -131,6 +131,11 @@ class MacroController:
         self._running = False
         self._paused = False
         self._current_task: dict | None = None
+        # True for the one rep that follows a Portals run queued from the victory screen. That
+        # match starts in the world the last one ended in — the character never respawned and
+        # the camera was never reset — so the walk and the camera setup must not run again.
+        # See `_portals_after_match`.
+        self._stage_continued = False
         self._cycle = 0
         self._last_reopen_time = 0.0
 
@@ -360,6 +365,9 @@ class MacroController:
 
                     # Pre Start
                     self._run_phase_linear(phases.get("pre_start", []))
+                    # Consumed. Anything that continues in place sets it again on the way out,
+                    # so leaving it set would suppress the walk for the rest of the queue.
+                    self._stage_continued = False
                     if self._checkpoint():
                         return (True, f"stopped after {self._cycle} cycles")
 
@@ -409,7 +417,14 @@ class MacroController:
         # Check if already in match
         if self._nav.in_match():
             self._log("  Already in a match — skipping lobby.")
-            self.run_camera()
+            if self._stage_continued:
+                # **The pitch is a raw-delta drag, not an angle** (`camera.PITCH_DELTA`), so
+                # running it on a camera that is already set pitches down twice as far and
+                # every stored placement coordinate then points at the wrong ground. Safe to
+                # repeat only when the stage actually reloaded and reset the camera with it.
+                self._log("  Camera: already set — this run continued in place.")
+            else:
+                self.run_camera()
             return True
 
         # Standing on a finished match — a loss, or a win whose Repeat was not taken. Every
@@ -525,14 +540,14 @@ class MacroController:
     def _portals_after_match(self, task: dict, again: bool) -> None:
         """Leave a finished Portals match, setting up the next rep if there is one.
 
-        **Portals is the only mode whose victory screen has no Repeat.** Winning consumes the
-        portal and hands out a new one, so that screen offers **Select Portal** instead. A loss
-        consumes nothing, so its screen *does* have Repeat — and taking it replays the same
-        portal with no trip through the bag and no name to retype.
+        **Select Portal is on that screen after either outcome** — measured: a run logged as
+        `Loss. (defeat screen 0.96)` then matched Select Portal at 1.00. This used to claim the
+        two outcomes had disjoint controls and read a Select Portal miss as the loss signal;
+        they do not, and it does not. `_run_match` reads the win/loss banner and reports it,
+        which is the only outcome signal there is.
 
-        So which button is on screen is how this learns how the match ended. Nothing reads the
-        banner and `_run_match` needs no change to report it: the two outcomes have disjoint
-        controls, which is a stronger signal than a template of the banner would be.
+        So there is one path, not two: take Select Portal whenever another rep follows.
+        `click_repeat` stays only as the fallback for not finding it.
 
         `again` gates both clicks for the same reason `click_repeat` is gated elsewhere — each
         one starts a match, so taking either after the last rep begins a run the queue never
@@ -541,12 +556,13 @@ class MacroController:
         """
         if again:
             if self._portal_next_run(task):
+                # That match starts in the world this one ended in — see `_stage_continued`.
+                self._stage_continued = True
                 return
-            # No Select Portal, so this was a loss and the portal is still owned. Repeat is
-            # on that screen and replays it directly.
             ok, msg = self._nav.click_repeat()
             self._log(f"  Repeat: {msg}")
             if ok:
+                self._stage_continued = True
                 return
         ok, msg = self._nav.back_to_lobby()
         self._log(f"  Back to lobby: {msg}")
@@ -559,10 +575,10 @@ class MacroController:
         in-match Start Game, so if this panel needs a Start pressed in between, that poll is
         what will say so rather than this returning a false success.
 
-        **A miss on Select Portal is not a failure**, it is the loss signal — see
-        `_portals_after_match`. A portal name that no longer matches anything the account owns
-        reads the same way: winning hands out a *different* portal, so the name the task asks
-        for may simply be gone, and the caller falls back rather than failing the run.
+        **A miss on Select Portal is not a failure**, it is a fall back to the lobby. A portal
+        name that no longer matches anything the account owns reads the same way: winning hands
+        out a *different* portal, so the name the task asks for may simply be gone, and the
+        caller goes the long way round rather than failing the run.
         """
         name = task.get("search", "")
         if not name:
@@ -571,11 +587,10 @@ class MacroController:
 
         ok, msg = self._nav.click_select_portal()
         if not ok:
-            # The ordinary loss path, not a fault — so it is logged as the observation it is.
-            # It costs the full search timeout, and that is the right trade: reading a
-            # slow-drawing victory screen as a loss would give up the Select Portal path and
-            # spend a lobby trip, while waiting out a real loss only delays the Repeat click.
-            self._log(f"  No Select Portal — reading this as a loss ({msg}).")
+            # Not a fault, so it is logged as the observation it is. It costs the full search
+            # timeout, and that is the right trade: giving up early on a slow-drawing result
+            # screen spends a whole lobby trip, while waiting it out only delays the fallback.
+            self._log(f"  No Select Portal — falling back ({msg}).")
             return False
         self._log(f"  Select Portal: {msg}")
 
@@ -1464,6 +1479,16 @@ class MacroController:
             # The pinned pre-start walk. Auto resolves the task's target through the table;
             # Custom names a recording outright. Had no branch here at all, so both modes
             # were silently skipped.
+            if self._stage_continued:
+                # The character is still standing where the last walk left it, so replaying the
+                # recording from here walks that distance a second time and ends somewhere the
+                # placement coordinates do not describe. Evidence it never respawned: entering
+                # from the bag reported `stage loaded after 16 checks`, continuing from the
+                # result screen reported `after 2 checks` at the same 1.0s poll — the world was
+                # already up. This is the RUNS ONCE badge the Macro Manager draws on this
+                # block, honoured across reps that never left the map.
+                self._log("    [block] walk path: already walked — this run continued in place")
+                return
             task = self._current_task or {}
             if block.get("mode") == "custom":
                 path_name = str(block.get("pathName", "") or "")
@@ -1667,6 +1692,12 @@ class MacroController:
         challenge_slots = task.get("challenge_slots", [True, True, True])
 
         self._log("  Challenge: scanning panel...")
+
+        # A preempt lands between two Portals reps, so the "continued in place" flag the last
+        # one set may still be up — and this detour leaves that map for a Story one. Clearing
+        # it keeps the challenge's own walk, and the interrupted rep navigates in fresh
+        # afterwards because this moved the game somewhere else entirely.
+        self._stage_continued = False
 
         # Navigate to the challenge panel
         ok = self._navigate_to_challenge()
