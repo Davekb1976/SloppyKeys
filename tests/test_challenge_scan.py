@@ -7,6 +7,7 @@ No framework, no capture, no input fired:
 
 from __future__ import annotations
 
+import ast
 import os
 import sys
 from datetime import datetime, timedelta
@@ -249,5 +250,36 @@ assert TaskDirector(challenges=True).current_target() is None
 # what the panel might hold.
 empty = TaskDirector(tracker=ChallengeTracker(), challenges=True)
 assert empty.decide().kind == DO_NOTHING
+
+# # `is_candidate` is a property, and no caller may call it
+# It was called as `read.is_candidate()` in the run loop, which raises
+# `TypeError: 'bool' object is not callable` on the first row. Nothing catches it there, so
+# the exception unwound the whole run and surfaced only as "stopped unexpectedly" — every
+# Challenge task failed that way, silently, for as long as the code existed. A property read
+# as a call is invisible to `compileall` and to any test that doesn't reach the line, so this
+# guards the shape instead of the behaviour.
+assert isinstance(
+    ChallengeRead.__dict__["is_candidate"], property
+), "is_candidate is expected to stay a property"
+
+# Parsed, not grepped: the comment explaining this bug names the call form, and so will any
+# future note about it, so a text scan would flag its own documentation.
+_source_root = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "sloppykeys"
+)
+for folder, _dirs, files in os.walk(_source_root):
+    for name in sorted(files):
+        if not name.endswith(".py"):
+            continue
+        path = os.path.join(folder, name)
+        with open(path, "r", encoding="utf-8") as handle:
+            tree = ast.parse(handle.read(), filename=path)
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            assert not (
+                isinstance(func, ast.Attribute) and func.attr == "is_candidate"
+            ), f"{path}:{node.lineno} calls is_candidate, which is a property"
 
 print("challenge scan: OK")

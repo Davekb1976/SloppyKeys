@@ -1534,10 +1534,27 @@ class MacroController:
             self._log("  Challenge: couldn't reach the challenge panel.")
             return
 
-        # Scan the panel with OCR
+        # `scan_if_open`, not `scan`. Nothing proves the panel arrived — navigation ends by
+        # clicking the Challenge card, and there is no template for the panel because the
+        # whole thing is read by OCR. An unreadable limit box comes back `unknown`, which
+        # counts as *worth attempting*, so a scan taken on the wrong screen reports three
+        # challenges waiting and the row coordinate below then clicks into whatever is up.
+        # At least one limit parsing as `n/10` is the only available proof, so it is the wait.
         scanner = ChallengeScanner(self._engine, self._rect, log=self._log)
-        reads = scanner.scan()
+        deadline = time.monotonic() + max(1.0, self._nav.search_timeout)
+        reads, panel_open = scanner.scan_if_open()
+        while not panel_open and time.monotonic() < deadline:
+            if self._checkpoint():
+                return
+            time.sleep(0.5)
+            reads, panel_open = scanner.scan_if_open()
 
+        if not panel_open:
+            self._log(
+                "  Challenge: the panel never read as open — not clicking a row blind. "
+                "Check the limit boxes in Settings > OCR."
+            )
+            return
         if not reads:
             self._log("  Challenge: panel scan returned nothing.")
             return
@@ -1549,7 +1566,11 @@ class MacroController:
             slot_idx = read.slot - 1
             if slot_idx >= len(challenge_slots) or not challenge_slots[slot_idx]:
                 continue  # slot disabled by user
-            if not read.is_candidate():
+            # A property, not a method. Called as `is_candidate()` this raised
+            # `TypeError: 'bool' object is not callable` on the first row every time, and
+            # nothing catches it here — so the exception unwound the whole run and reported
+            # "stopped unexpectedly". No Challenge task had ever got past this line.
+            if not read.is_candidate:
                 self._log(f"  Challenge slot {read.slot}: not runnable ({read.summary()})")
                 continue
 
@@ -1641,8 +1662,10 @@ class MacroController:
             if not ok:
                 return False
             time.sleep(self._nav.click_settle)
-        # Wait for the challenge panel to appear (give it time to load)
-        time.sleep(2.0)
+        # No sleep waiting for the panel. The caller's `scan_if_open` loop polls until the
+        # panel reads as open, and a deadline search replaces a fixed sleep rather than
+        # following one — two seconds here was latency paid on every pass whether the panel
+        # had drawn or not, and it proved nothing either way.
         return True
 
     def _capture_screenshot(self) -> bytes | None:
