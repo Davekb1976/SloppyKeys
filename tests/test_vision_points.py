@@ -72,9 +72,15 @@ with tempfile.TemporaryDirectory() as root:
     assert [p["label"] for p in portal_points] == [
         "Bag result slot 1",
         "In-match result slot 1",
+        "Bag search field",
+        "In-match search field",
     ], [p["label"] for p in portal_points]
     assert (portal_points[0]["x"], portal_points[0]["y"]) == (394, 253)
     assert (portal_points[1]["x"], portal_points[1]["y"]) == (294, 253)
+    # The two search rows ship unset on purpose: unset means "click where the template matched",
+    # which is right for both panels until someone finds a panel where it is not.
+    assert (portal_points[2]["x"], portal_points[2]["y"]) == (0, 0)
+    assert (portal_points[3]["x"], portal_points[3]["y"]) == (0, 0)
     assert slot_coord(1) == (394, 253), slot_coord(1)
     # Same row, 100px apart. Distinct is the whole point: equal here would mean one grid is
     # silently clicking the other's tile.

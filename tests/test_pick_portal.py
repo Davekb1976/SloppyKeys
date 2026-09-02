@@ -33,14 +33,11 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sloppykeys.content import portals as portals_table  # noqa: E402
-from sloppykeys.content.nav_images import (  # noqa: E402
-    portal_search_image,
-    portal_select_image,
-)
+from sloppykeys.content.nav_images import portal_select_image  # noqa: E402
 from sloppykeys.macro.controller import MacroController  # noqa: E402
 from sloppykeys.macro.lobby import LobbyNavigator  # noqa: E402
 
-SEARCH = portal_search_image()
+# There is deliberately no SEARCH template any more — see the module docstring.
 CONFIRM = portal_select_image()
 
 
@@ -56,9 +53,25 @@ class FakeAhk:
         return (True, "ran")
 
 
+class FakeMatch:
+    """What `_find` hands back: absolute centre plus a score, and a label so the trail can
+    name which template was clicked without the click site knowing."""
+
+    def __init__(self, label: str, x: int, y: int, score: float = 0.99) -> None:
+        self.label = label
+        self.center_x = x
+        self.center_y = y
+        self.score = score
+
+
+# Where the fake search field is found. Not the tile and not the confirm, so a click landing
+# here is distinguishable from every other click in the chain.
+FIELD_AT = (500, 120)
+
+
 def navigator(confirm_after_typing: bool, ahk=None) -> LobbyNavigator:
     """A navigator whose confirm button appears either straight after typing or only
-    after the result slot is clicked."""
+    after the result slot is clicked. The search field is always found — it is the gate."""
     nav = LobbyNavigator.__new__(LobbyNavigator)
     nav._ahk = ahk or FakeAhk()
     nav._log = lambda _m: None
@@ -77,25 +90,47 @@ def navigator(confirm_after_typing: bool, ahk=None) -> LobbyNavigator:
         return (True, f"clicked {label}")
 
     def _find(path, timeout=0.0, region=None):
-        if path == CONFIRM and (confirm_after_typing or nav.slot_clicked):
-            return object()  # any truthy match
+        # The confirm is found from the start: it is the gate proving *this* picker is open,
+        # and it really is on screen before the tile is touched — that is what the two
+        # releases of skipped tile clicks demonstrated.
+        if path == CONFIRM:
+            return FakeMatch("Select", 986, 643)
         return None
 
+    def _click(match):
+        nav.trail.append(f"click:{match.label}@{match.center_x},{match.center_y}")
+        return (True, f"clicked at {match.center_x},{match.center_y}")
+
     def _click_client(rect, coord, button="left", count=1):
-        nav.slot_clicked = True
-        nav.trail.append(f"slot:{coord[0]},{coord[1]}")
+        # The search field *and* the tile are both measured points now, so both arrive here and
+        # the trail records coordinates rather than names — that is what tells them apart.
+        nav.trail.append(f"blind:{coord[0]},{coord[1]}")
+        if tuple(coord) not in (BAG_FIELD, MATCH_FIELD):
+            nav.slot_clicked = True
         return (True, "clicked")
 
     nav._find_click = _find_click
     nav._find = _find
+    nav._click = _click
     nav._click_client = _click_client
     return nav
 
 
-def reset_slot(coord=None) -> None:
-    portals_table.apply_point_overrides(
-        {} if coord is None else {portals_table.slot_key(1): coord}
-    )
+# The search field is a **required** point now, one per panel, so every case has to supply one
+# or it refuses before reaching what the case is actually about.
+BAG_FIELD = (500, 120)
+MATCH_FIELD = (620, 140)
+
+
+def reset_slot(coord=None, bag_field=BAG_FIELD, match_field=MATCH_FIELD) -> None:
+    overrides: dict[str, tuple[int, int]] = {}
+    if coord is not None:
+        overrides[portals_table.slot_key(1)] = coord
+    if bag_field is not None:
+        overrides[portals_table.search_key()] = bag_field
+    if match_field is not None:
+        overrides[portals_table.search_key(True)] = match_field
+    portals_table.apply_point_overrides(overrides)
 
 
 # # The tile is clicked even when the confirm is already lit — that is the whole ordering.
@@ -108,7 +143,7 @@ ahk = FakeAhk()
 nav = navigator(confirm_after_typing=True, ahk=ahk)
 ok, message = nav.pick_portal("Summer Portal", CONFIRM, "Select")
 assert ok, message
-assert nav.trail == ["click:Portal search", "slot:394,253", "click:Select"], nav.trail
+assert nav.trail == ["blind:500,120", "blind:394,253", "click:Select"], nav.trail
 assert nav.slot_clicked, "the tile must be clicked before the portal is confirmed"
 # One SendText per character, paced — sent as one string the field dropped letters. The
 # characters and their order are what matter here; the pacing itself is pinned in
@@ -125,7 +160,7 @@ reset_slot((640, 300))
 nav = navigator(confirm_after_typing=False)
 ok, message = nav.pick_portal("Summer Portal", CONFIRM, "Select")
 assert ok, message
-assert nav.trail == ["click:Portal search", "slot:640,300", "click:Select"], nav.trail
+assert nav.trail == ["blind:500,120", "blind:640,300", "click:Select"], nav.trail
 
 # # Same case, but the slot reads as unmeasured: refuse and name the fix. The bag's slot 1
 # # ships a measured default, so the way to be unset is to store `UNSET`.
@@ -146,27 +181,68 @@ assert portals_table.slot_coord(1) == (394, 253), "the bag's shipped default"
 assert portals_table.slot_coord(1, in_match=True) == (294, 253), "the in-match one"
 nav = navigator(confirm_after_typing=False)
 assert nav.pick_portal("Summer Portal", CONFIRM, "Select", in_match=True)[0]
-assert nav.trail == ["click:Portal search", "slot:294,253", "click:Select"], nav.trail
-# Same call without the flag takes the bag's tile, from the same shipped tables.
+# Note the **field** differs too: each panel's field is its own point, which is the whole
+# reason the template had to go — the two fields are pixel-identical, so only position separates
+# them, and the in-match one was being matched at 1.00 on the wrong box.
+assert nav.trail == ["blind:620,140", "blind:294,253", "click:Select"], nav.trail
+# Same call without the flag takes the bag's field and the bag's tile.
 nav = navigator(confirm_after_typing=False)
 assert nav.pick_portal("Summer Portal", CONFIRM, "Activate Portal")[0]
-assert nav.trail == ["click:Portal search", "slot:394,253", "click:Activate Portal"], nav.trail
+assert nav.trail == ["blind:500,120", "blind:394,253", "click:Activate Portal"], nav.trail
 
 # # Each grid reads its own stored key, so measuring one cannot move the other.
-portals_table.apply_point_overrides({portals_table.slot_key(1, True): (700, 410)})
+reset_slot()
+portals_table.apply_point_overrides(
+    {
+        portals_table.slot_key(1, True): (700, 410),
+        portals_table.search_key(): BAG_FIELD,
+        portals_table.search_key(True): MATCH_FIELD,
+    }
+)
 assert portals_table.slot_coord(1) == (394, 253), "the bag falls back to its own default"
 assert portals_table.slot_coord(1, in_match=True) == (700, 410)
 nav = navigator(confirm_after_typing=False)
 assert nav.pick_portal("Summer Portal", CONFIRM, "Select", in_match=True)[0]
-assert nav.trail == ["click:Portal search", "slot:700,410", "click:Select"], nav.trail
+assert nav.trail == ["blind:620,140", "blind:700,410", "click:Select"], nav.trail
 
 # # An in-match slot stored as UNSET still refuses and names its own row, not the bag's.
-portals_table.apply_point_overrides({portals_table.slot_key(1, True): portals_table.UNSET})
+portals_table.apply_point_overrides(
+    {
+        portals_table.slot_key(1, True): portals_table.UNSET,
+        portals_table.search_key(True): MATCH_FIELD,
+    }
+)
 nav = navigator(confirm_after_typing=False)
 ok, message = nav.pick_portal("Summer Portal", CONFIRM, "Select", in_match=True)
 assert not ok
 assert "In-match result slot 1" in message, message
 assert not nav.slot_clicked, "an unset point must not fall back to the other grid's"
+
+# # An unmeasured search field refuses, and names which panel to measure
+# # The point is required, not an override: a guess focuses nothing, and the portal name then
+# # goes into the world where `r`, `t` and `x` are priority, upgrade and sell.
+for in_match, row in ((False, "Bag search field"), (True, "In-match search field")):
+    reset_slot(bag_field=None, match_field=None)
+    ahk = FakeAhk()
+    nav = navigator(confirm_after_typing=True, ahk=ahk)
+    ok, message = nav.pick_portal("Summer Portal", CONFIRM, "Select", in_match=in_match)
+    assert not ok, in_match
+    assert row in message, (in_match, message)
+    assert "Click Points" in message, message
+    assert nav.trail == [], "nothing may be clicked"
+    assert ahk.scripts == [], "and nothing typed"
+
+# # The **confirm button** is the gate now, not the field. Without it the picker never opened,
+# # so nothing is clicked and nothing is typed — this is what replaces the old template check.
+reset_slot()
+ahk = FakeAhk()
+closed = navigator(confirm_after_typing=True, ahk=ahk)
+closed._find = lambda path, timeout=0.0, region=None: None
+ok, message = closed.pick_portal("Summer Portal", CONFIRM, "Select", in_match=True)
+assert not ok, "a picker that never opened must not be typed into"
+assert "Select" in message and "never opened" in message, message
+assert closed.trail == [], "no click before the picker is proved to be up"
+assert ahk.scripts == [], "and no typing"
 
 # # A name that cannot be typed safely never reaches SendText
 reset_slot((640, 300))
@@ -179,21 +255,24 @@ for bad in ('Summer" MsgBox("x', "Summer`nMsgBox", "", "   ", "a" * 41):
     assert ahk.scripts == [], "a rejected name must fire no script at all"
     assert nav.trail == [], "and must not even open the search field"
 
-# # The search field is what the chain looks for first, by its own template
+# # What the chain searches for, and in what order. The **confirm** goes first: it is the proof
+# # the picker is open, and it is the only template involved now — the field and the tile are
+# # both measured points. A search for anything else before typing would be the old bug back.
 reset_slot((640, 300))
 nav = navigator(confirm_after_typing=True)
 seen: list[str] = []
-original = nav._find_click
+original_find = nav._find
 
 
-def spy(path, label, timeout=0.0, fade_wait=0.0):
+def spy(path, timeout=0.0, region=None):
     seen.append(path)
-    return original(path, label, timeout=timeout, fade_wait=fade_wait)
+    return original_find(path, timeout=timeout, region=region)
 
 
-nav._find_click = spy
+nav._find = spy
 assert nav.pick_portal("Summer", CONFIRM, "Select")[0]
-assert seen == [SEARCH, CONFIRM], seen
+assert seen and seen[0] == CONFIRM, seen
+assert set(seen) == {CONFIRM}, ("only the confirm is searched", seen)
 
 reset_slot()
 

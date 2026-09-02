@@ -43,7 +43,6 @@ from sloppykeys.content.nav_images import (
     play_image,
     portal_activate_image,
     portal_bag_image,
-    portal_search_image,
     portal_select_portal_image,
     portals_tab_image,
     repeat_image,
@@ -54,7 +53,7 @@ from sloppykeys.content.nav_images import (
     start_match_image,
     win_change_image,
 )
-from sloppykeys.content.portals import slot_coord
+from sloppykeys.content.portals import search_coord, slot_coord
 from sloppykeys.content.nav_route import (
     KIND_CLICK,
     KIND_EXPECT,
@@ -1025,17 +1024,44 @@ class LobbyNavigator:
                 "apostrophes and hyphens only, up to 40 characters",
             )
 
-        ok, message = self._find_click(
-            portal_search_image(), "Portal search", timeout=self.search_timeout
-        )
+        # # The gate on typing is the **confirm button**, not the search field
+        # Typing with nothing focused sends the portal name into the world, where `r`, `t` and
+        # `x` are priority, upgrade and sell — so something has to prove the picker is up first.
+        # That used to be `search.png`, and it cannot do the job: the in-match picker holds a
+        # second field **pixel-identical** to the bag's, so the template matched the wrong box
+        # at a full `1.00` and the name was typed into nothing. Two identical pictures are not
+        # separable by any threshold or recapture.
+        #
+        # `confirm_path` is `activate.png` for the bag and `select.png` in-match — one per panel,
+        # so finding it proves *which* picker is open rather than that some field exists. It is
+        # already on screen when the picker opens, which is exactly what the two releases of
+        # skipped tile clicks demonstrated.
+        if self._find(confirm_path, timeout=self.search_timeout) is None:
+            return (
+                False,
+                f"{confirm_label} is not on screen, so the picker never opened — "
+                "not typing a portal name into the game world",
+            )
+
+        # Where the field is, from Click Points. A measurement rather than a search, because the
+        # two fields look the same and only their position tells them apart.
+        field = search_coord(in_match=in_match)
+        if field is None:
+            which = "In-match search field" if in_match else "Bag search field"
+            return (
+                False,
+                f"the search field has no click point — set Portals · {which} in "
+                "Settings > Debug > Click Points",
+            )
+        rect = self._rect()
+        if rect is None:
+            return (False, "Roblox not found")
+        ok, message = self._click_client(rect, field)
         if not ok:
-            return (False, f"search field: {message}")
-        # **Kept in the trail.** This message used to be discarded on success and read only on
-        # failure, so the log jumped straight from Select Portal to the typing and the first
-        # click of the chain was invisible — which is indistinguishable from a stray click at
-        # the wrong place. The field is matched, not a stored coordinate, so where it landed is
-        # the fact that settles whether the in-match picker's field is somewhere else.
-        trail_parts = [message]
+            return (False, f"search field click failed: {message}")
+        # Kept in the trail: this step used to report nothing on success, so the chain's first
+        # click was invisible in the log — indistinguishable from a stray click.
+        trail_parts = [f"clicked the search field at {field[0]},{field[1]}"]
         if not self._ahk.available():
             return (False, "AutoHotkey v2 not found")
         # The click above parked the cursor at the corner, which does not take focus off a

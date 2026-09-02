@@ -48,6 +48,22 @@ MATCH_SLOT_COORDS: dict[int, tuple[int, int]] = {
     1: (294, 253),
 }
 
+# # The search field is a measured point, not a template
+# **Because the two panels hold identical fields.** `search.png` matched the wrong box on the
+# in-match picker at a full `1.00` — a pixel-identical second field — and the portal name was
+# then typed into nothing. Two identical pictures cannot be separated by a threshold, a
+# recapture or a search region; only position tells them apart, so position is what is stored.
+#
+# The bag's chain worked fine on the template, which is exactly what made this hard to see: one
+# panel had one field, the other had two.
+#
+# Both ship `UNSET` and the run **refuses** rather than guessing. A wrong guess here is not a
+# missed click: with nothing focused the name goes into the world, where `r`, `t` and `x` are
+# priority, upgrade and sell. What proves a picker is open is now its own confirm button —
+# `activate.png` for the bag, `select.png` in-match — which is unique per panel.
+SEARCH_COORDS: dict[int, tuple[int, int]] = {1: UNSET}
+MATCH_SEARCH_COORDS: dict[int, tuple[int, int]] = {1: UNSET}
+
 # The mode these points belong to, for the editor's grouping.
 GAMEMODE = "Portals"
 
@@ -61,6 +77,24 @@ def slot_key(slot: int, in_match: bool = False) -> str:
     keeps their value when the in-match grid arrives beside it.
     """
     return f"portal.{'match.' if in_match else ''}slot.{int(slot)}"
+
+
+def search_key(in_match: bool = False) -> str:
+    """The `points` storage key for a picker's search field, per panel."""
+    return f"portal.{'match.' if in_match else ''}search"
+
+
+def search_coord(in_match: bool = False) -> tuple[int, int] | None:
+    """Where to click a picker's search field, or None while it is unmeasured.
+
+    None is a refusal the caller must handle, like `slot_coord`'s: clicking a guess focuses
+    nothing, and the portal name then goes into the game world rather than the field.
+    """
+    table = MATCH_SEARCH_COORDS if in_match else SEARCH_COORDS
+    coord = _OVERRIDES.get(search_key(in_match), table.get(1))
+    if coord is None:
+        return None
+    return None if tuple(coord) == UNSET else (int(coord[0]), int(coord[1]))
 
 
 def apply_point_overrides(overrides: dict[str, tuple[int, int]]) -> None:
@@ -100,4 +134,7 @@ def point_specs() -> list[tuple[str, str, str, tuple[int, int]]]:
         (slot_key(slot, True), GAMEMODE, f"In-match result slot {slot}", coord)
         for slot, coord in MATCH_SLOT_COORDS.items()
     ]
+    # Unset by default, so these two rows read `default` and change nothing until measured.
+    specs.append((search_key(), GAMEMODE, "Bag search field", SEARCH_COORDS[1]))
+    specs.append((search_key(True), GAMEMODE, "In-match search field", MATCH_SEARCH_COORDS[1]))
     return specs

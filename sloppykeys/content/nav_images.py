@@ -178,21 +178,23 @@ WIN_CHANGE_IMAGE = "win_change.png"
 #
 #   bag          the lobby's inventory button
 #   portals_tab  the Portals section inside the bag
-#   search       the search field, clicked to focus it before the name is typed
 #   activate     Activate Portal, on the selected portal's detail panel
 #
-# `search` earns a template rather than a coordinate because it is the one click in this
-# project whose failure sends *characters into the game world*: the portal name is typed
-# next, and `r`, `t` and `x` are the priority, upgrade and sell keys. A focused field is
-# not matchable, but the field itself is, so this is the closest thing to proof available
-# and the typing is gated on it.
+# **There is no `search.png`.** The search field was a template for one release, on the
+# reasoning that it is the one click whose failure sends *characters into the game world* —
+# the portal name is typed next, and `r`, `t` and `x` are priority, upgrade and sell — so the
+# typing was gated on finding it. It could not do that job: the in-match picker holds a second
+# field **pixel-identical** to the bag's, so the template matched the wrong box at a full
+# `1.00` and the name went into nothing. Identical pictures are not separable by a threshold,
+# a recapture or a search region. The field is a measured point per panel now
+# (`content/portals.py::SEARCH_COORDS`), and the gate moved to the panel's own confirm button,
+# which *is* unique per panel.
 #
 # There is no `start.png` yet. The Start that appears after Activate may be the same art as
 # `lobby/start_match.png`, which is already searched rather than clicked blind precisely
 # because it moves per panel — so it is reused until a capture proves the two differ.
 PORTAL_BAG_IMAGE = "bag.png"
 PORTALS_TAB_IMAGE = "portals_tab.png"
-PORTAL_SEARCH_IMAGE = "search.png"
 PORTAL_ACTIVATE_IMAGE = "activate.png"
 
 # # Queueing the next portal from the victory screen
@@ -391,11 +393,6 @@ def portals_tab_image() -> str:
     return os.path.join(IMAGES_DIR, PORTALS_DIR, PORTALS_TAB_IMAGE)
 
 
-def portal_search_image() -> str:
-    """The portal search field. Clicked to focus it before the name is typed."""
-    return os.path.join(IMAGES_DIR, PORTALS_DIR, PORTAL_SEARCH_IMAGE)
-
-
 def portal_activate_image() -> str:
     """Activate Portal, on the selected portal's detail panel."""
     return os.path.join(IMAGES_DIR, PORTALS_DIR, PORTAL_ACTIVATE_IMAGE)
@@ -416,7 +413,6 @@ def portal_paths() -> list[str]:
     return [
         portal_bag_image(),
         portals_tab_image(),
-        portal_search_image(),
         portal_activate_image(),
         portal_select_portal_image(),
         portal_select_image(),

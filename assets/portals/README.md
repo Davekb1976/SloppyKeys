@@ -10,14 +10,15 @@ from Roblox's own screenshot gives the wrong pixel size and the template can nev
 see `assets/README.md`.
 
 The chain is `LobbyNavigator.enter_portal`: bag → Portals tab → search field → type the
-portal's name → Activate Portal → Start. In the order a run meets them:
+portal's name → Activate Portal → Start. The **search field is not a template** — it is a
+measured click point, for the reason below. In the order a run meets them:
 
 - `bag.png` — the lobby's inventory button. This is the run's entry point, the way
   `lobby/play.png` is for Story and `lobby/events.png` is for Events. Nothing in the Play
   chain applies to Portals, which is what `own_entry` on its gamemode row means.
 - `portals_tab.png` — the Portals section inside the bag.
-- `search.png` — the search field. Clicked to focus it, then the portal name is typed.
-- `activate.png` — **Activate Portal**, on the selected portal's detail panel.
+- `activate.png` — **Activate Portal**, on the selected portal's detail panel. Also the *gate*
+  on typing: see below.
 
 And two more for queueing the next run without leaving the match:
 
@@ -43,16 +44,33 @@ panel it sits on, which is exactly why one file serves Story, Raid, Expedition, 
 now Portals. Pressing it is what loads the stage, so a miss fails the run rather than being
 passed over.
 
-## `search.png` carries more weight than it looks
+## There is no `search.png` — two panels, two identical fields
 
-Every other template in this project fails safely: the search misses, the step reports it,
-the task is skipped. This one is different, because **the portal name is typed immediately
-after it**, and if the field never took focus those characters land in the game world where
-`r`, `t` and `x` are priority, upgrade and sell.
+The search field was a template for one release, and the reasoning was sound: it is the one
+click in this project whose failure sends *characters into the game world*, because the portal
+name is typed straight after it and `r`, `t` and `x` are priority, upgrade and sell. So the
+typing was gated on finding it.
 
-A focused field is not something a template can prove — the field itself is. So the typing
-is gated on this match, and if it stops matching after a game update the right fix is to
-recapture it, not to lower its threshold.
+It could not do that job. **The in-match picker holds a second field pixel-identical to the
+bag's**, and the template matched the wrong one at a full `1.00` — measured, from the log:
+
+```
+clicked Portal search at 544,324 (1.00) → typed 'summ', clicked slot 1 at 294,253
+```
+
+A perfect score on the wrong box. Nothing fixes that: identical pictures are not separable by
+a threshold, a recapture, or a search region. And it only failed on one of the two panels, so
+the bag chain worked throughout, which is what made it hard to see.
+
+So the field is a **measured point per panel** now — `content/portals.py::SEARCH_COORDS` and
+`MATCH_SEARCH_COORDS`, set in Settings → Debug → Click Points as *Bag search field* and
+*In-match search field*. Both ship unset and the run refuses rather than guessing, because a
+guess focuses nothing and the name goes into the world.
+
+The gate moved to the panel's **own confirm button** — `activate.png` for the bag, `select.png`
+in-match. That is unique per panel, so finding it proves *which* picker is open rather than
+that some field exists somewhere. It is already on screen when the picker opens, which is what
+the two releases of skipped tile clicks accidentally demonstrated.
 
 ## The name is typed one character at a time
 
