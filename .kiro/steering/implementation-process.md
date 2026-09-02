@@ -110,12 +110,12 @@ All implementation is our own; external products are studied for ideas and UX pa
 copied. **Commits and code comments name no other tool, product or inspiration source** — a commit
 message describes only the technical change in our code.
 
-**Prior art is credited in exactly one place: README's `## Credits`.** That is where this rule
-sends it, not an exception to it, so don't delete it as a violation.
-`Cweamy/Anime-Expeditions-Creams-Macro` is named there: several features started as ideas from it,
-its licence is MIT so its code *would* be free to reuse, and we don't — the implementation diverged
-(AHK input, a topmost overlay rather than a reparented child window, RapidOCR). If a substantial
-portion of someone else's code ever does land here, their licence notice ships beside it.
+**Prior art is credited in one place: README's `## Credits`.** That is where this rule directs it,
+not an exception to it — do not remove it as a violation.
+`Cweamy/Anime-Expeditions-Creams-Macro` is credited there, and the section states the
+architectural differences that make this an independent implementation. Keep it factual: what
+originated elsewhere, what is ours, and the licence position. If a substantial portion of anyone
+else's source is ever reused here, its copyright and licence notice ships alongside it.
 
 ## Shell
 

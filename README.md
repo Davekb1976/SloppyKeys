@@ -221,15 +221,19 @@ Bundled attribution: the `ponytail` steering guide is MIT, from
 
 ## Credits
 
-[Cweamy/Anime-Expeditions-Creams-Macro](https://github.com/Cweamy/Anime-Expeditions-Creams-Macro)
-came first, and several features here started as ideas from it — the task queue, the walk-path
-recorder, the block-based match plan, Discord match reports. Credit where it's due.
+This project follows
+[Cweamy/Anime-Expeditions-Creams-Macro](https://github.com/Cweamy/Anime-Expeditions-Creams-Macro),
+which established several of the capabilities built here: the task queue, the walk-path
+recorder, the block-based match plan, and Discord match reporting. That prior work is
+acknowledged with thanks.
 
-The code is ours: this is an independent implementation, and the load-bearing parts ended up
-different. Input goes out through AutoHotkey v2 rather than `SendInput`; Roblox rides the
-topmost band with its frame stripped instead of being reparented as a child window (we tried
-reparenting, it didn't hold); OCR is RapidOCR, which pip installs, rather than Tesseract. Their
-macro is MIT too, so either way there's nothing here you can't use.
+The implementation is independent. Input is delivered through AutoHotkey v2 rather than
+`SendInput`; the Roblox window is placed in the topmost band with its frame removed rather
+than reparented as a child window; text is read with RapidOCR rather than Tesseract.
+
+That project is MIT licensed. No portion of its source is included here, so it places no
+notice requirement on this repository. Were any of it reused, its copyright and licence
+notice would ship alongside it.
 
 ## Disclaimer
 
