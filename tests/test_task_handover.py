@@ -152,7 +152,38 @@ def park_run() -> tuple[FakePlacer, list[str]]:
 placer, logs = park_run()
 assert placer.parks == 1, f"parked {placer.parks} times, want exactly one retreat"
 assert placer.clicks >= 1, "no keep-alive click in 1.4s with a 1s floor"
-assert sum("parked" in line for line in logs) == 1, logs
+assert sum("Blocks finished" in line for line in logs) == 1, logs
+# The line names the screen being watched, not just that the blocks stopped — a match sits here
+# for the whole rest of the wave, and "Blocks finished" alone read as a hung run. No task here,
+# so this is the non-Portals wording.
+assert any("win or defeat banner" in line for line in logs), logs
 assert any("Win!" in line for line in logs), logs
+
+
+# # Portals names its own result screen, because that is the one the next rep is taken from
+def park_mode(mode: str) -> list[str]:
+    logs: list[str] = []
+    ctrl = MacroController.__new__(MacroController)
+    ctrl._stop_requested = False
+    ctrl._checkpoint = lambda: False
+    ctrl._placer = FakePlacer()
+    ctrl._current_task = {"mode": mode, "map": "Summer", "stage": ""}
+    ctrl._log = logs.append
+    ctrl._stats = type("S", (), {"record": lambda *_a, **_k: None})()
+    ctrl._send_webhook_result = lambda *_a: None
+    started = time.monotonic()
+    ctrl._check_outcome = lambda: (
+        (OUTCOME_WON, "test") if time.monotonic() - started > 0.2 else None
+    )
+    ctrl._run_match([], [], [])
+    return logs
+
+
+portals = " ".join(park_mode("Portals"))
+assert "Select Portal" in portals, portals
+# Story has no such button, so promising one would be a lie in the log.
+story = " ".join(park_mode("Story"))
+assert "Select Portal" not in story, story
+assert "win or defeat banner" in story, story
 
 print("task handover: OK")

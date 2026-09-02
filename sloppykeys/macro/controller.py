@@ -826,9 +826,22 @@ class MacroController:
                         self._placer.park()
                         parked = True
                         last_park_click = now
+                        # **Names the screen being watched.** "Blocks finished" alone was the
+                        # last thing a match said for the whole rest of the wave, and it
+                        # described what had stopped rather than what was now happening — a run
+                        # in this state reads as hung. Portals gets its own wording because
+                        # that result screen is the one the next rep is taken from, and Select
+                        # Portal is on it after either outcome (measured: a defeat screen at
+                        # 0.96 matched Select Portal at 1.00).
+                        mode = (self._current_task or {}).get("mode", "")
+                        waiting = (
+                            "the result screen with Select Portal on it"
+                            if mode == "Portals"
+                            else "the win or defeat banner"
+                        )
                         self._log(
-                            f"  Blocks finished — parked at the corner, clicking every "
-                            f"{park_interval:.0f}s until the match ends."
+                            f"  Blocks finished — nothing left to click. Watching for "
+                            f"{waiting}, keep-alive click every {park_interval:.0f}s."
                         )
                     elif now - last_park_click >= park_interval:
                         self._placer.park_click()
