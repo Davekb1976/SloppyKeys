@@ -829,10 +829,13 @@ class Api:
     _POINT_GROUPS = (
         ("acts", "Acts", "open the gamemode and a map, so the act list is on screen"),
         ("start", "Start panel", "select an act, so the Hard Mode / difficulty panel is up"),
+        # Two grids, one group: the row labels say which, because the screen to have open
+        # differs per row and a single hint cannot name both.
         (
             "portal",
-            "Bag grid",
-            "open the bag and the Portals tab, then search a portal so one result is showing",
+            "Portal grids",
+            "search a portal so one result shows — in the bag for the Bag row, in Select "
+            "Portal's picker on a finished match for the In-match row",
         ),
     )
 

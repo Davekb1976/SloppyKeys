@@ -565,9 +565,13 @@ class MacroController:
         """
         if again:
             if self._portal_next_run(task):
-                # Select Portal loads the portal's stage fresh, so this one *does* respawn and
-                # the walk is needed. Only the camera carries over.
-                self._kept_position = False
+                # Select Portal re-enters the **same playfield** without a lobby trip, and the
+                # lobby is what resets position and camera — so the character is still standing
+                # where the last walk left it. Measured wrong twice: first assumed it respawned
+                # like a fresh entry, and the walk ran every rep from a spot the recording was
+                # never authored from. Only Match Play changes the map, and only that needs the
+                # walk again.
+                self._kept_position = True
                 return
             ok, msg = self._nav.click_repeat()
             self._log(f"  Repeat: {msg}")
@@ -604,7 +608,11 @@ class MacroController:
             return False
         self._log(f"  Select Portal: {msg}")
 
-        ok, msg = self._nav.pick_portal(name, portal_select_image(), "Select")
+        # `in_match`: this is the result screen's picker, not the bag's, and its grid sits
+        # somewhere else. Sharing the bag's point clicked the wrong tile.
+        ok, msg = self._nav.pick_portal(
+            name, portal_select_image(), "Select", in_match=True
+        )
         self._log(f"  Pick portal: {msg}")
         if not ok:
             return False

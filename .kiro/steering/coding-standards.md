@@ -66,9 +66,12 @@ These fail *plausibly* rather than loudly.
 - **The camera pitch is a raw delta, so setting it twice is as wrong as retuning it.** It
   survives Repeat Stage, Select Portal and Match Play — none of those reach the lobby — and
   resets only on Back to Lobby. Inside a run always go through
-  `controller._ensure_camera`/`_back_to_lobby`, never `run_camera` directly. Repeat Stage also
-  keeps the character's *position*, which is a separate flag (`_kept_position`) because Select
-  Portal and Match Play respawn you and still need the walk.
+  `controller._ensure_camera`/`_back_to_lobby`, never `run_camera` directly.
+- **The lobby is what resets the character's position too**, so Repeat Stage and Select Portal
+  both drop you back in exactly where you stood and the pre-start walk must not replay
+  (`_kept_position`). Only **Match Play** needs it again, because that is the one in-match
+  route that lands on a *different* map. Replaying a walk from where it already finished ends
+  somewhere no placement coordinate describes.
 
 `cv2.matchTemplate` is **not scale invariant**: a wrong-size crop can never match, and it
 fails intermittently, which reads as a tolerance problem. Wrong scale costs 0.253

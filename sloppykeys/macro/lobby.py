@@ -991,14 +991,19 @@ class LobbyNavigator:
         )
 
     def pick_portal(
-        self, name: str, confirm_path: str, confirm_label: str
+        self, name: str, confirm_path: str, confirm_label: str, in_match: bool = False
     ) -> tuple[bool, str]:
         """Type a portal's name into the picker's search field and confirm it.
 
         The shared half of both portal chains: the bag reaches this picker through the
-        inventory and confirms with **Activate Portal**, the victory screen reaches it
-        through **Select Portal** and confirms with **Select**. Same field, same grid, so
-        only `confirm_path` differs.
+        inventory and confirms with **Activate Portal**, the result screen reaches it through
+        **Select Portal** and confirms with **Select**. Same field and the same search, so
+        the typing is shared.
+
+        **The grid is not shared**, which is what `in_match` is for. The two pickers sit in
+        different panels, so the tile is in a different place and each has its own measured
+        point — passing the wrong one clicks a tile the user did not ask for, and confirming
+        spends it.
 
         Ordering is find-field, click, type, confirm — and the confirm is looked for
         **before** the grid is touched. That is not an optimisation: nobody has confirmed
@@ -1042,12 +1047,13 @@ class LobbyNavigator:
         # assuming a tile has to be selected.
         match = self._find(confirm_path, timeout=self.panel_fade_wait)
         if match is None:
-            coord = slot_coord(1)
+            coord = slot_coord(1, in_match=in_match)
             if coord is None:
+                which = "In-match result slot 1" if in_match else "Bag result slot 1"
                 return (
                     False,
-                    f"{trail}, but {confirm_label} did not appear and the result slot has "
-                    "no click point — set Portals · Bag grid in Settings > Debug > Click Points",
+                    f"{trail}, but {confirm_label} did not appear and this grid has no click "
+                    f"point — set Portals · {which} in Settings > Debug > Click Points",
                 )
             rect = self._rect()
             if rect is None:

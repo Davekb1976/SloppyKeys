@@ -8,11 +8,11 @@ every refusal are pinned here. And the tail (`_portals_after_match`) takes Selec
 which button is on screen is not an outcome signal and this no longer treats it as one.
 `click_repeat` is the fallback for not finding it, nothing more.
 
-The tail also decides what the next match may skip, and the two halves of that are pinned
-apart because they do not agree. Repeat Stage keeps the character's position **and** the
-camera; Select Portal and Match Play keep only the camera and respawn you; Back to Lobby is
-the one route that resets both. Conflating them either walks a recording twice from the wrong
-spot or adds a second raw-delta pitch — see `_camera_set` and `_kept_position`.
+The tail also decides what the next match may skip. Repeat Stage and Select Portal both
+re-enter without a lobby trip, and the lobby is what resets position and camera — so both keep
+**both**, and neither the walk nor the pitch may run again. Back to Lobby is the route that
+resets them. Getting this wrong walked the Summer recording from the spot it had already
+finished on, every rep.
 
 The refusals matter more than the happy paths. Confirming a portal consumes it, so a chain
 that types a repaired name or clicks an unmeasured coordinate spends the wrong item while the
@@ -123,16 +123,35 @@ ok, message = nav.pick_portal("Summer Portal", CONFIRM, "Select")
 assert ok, message
 assert nav.trail == ["click:Portal search", "slot:640,300", "click:Select"], nav.trail
 
-# # Same case, but the slot reads as unmeasured: refuse and name the fix. Slot 1 ships a
-# # measured default now, so the way to be unset is to store `UNSET` — which a user can do, and
-# # which is what a future slot with no default looks like.
+# # Same case, but the slot reads as unmeasured: refuse and name the fix. The bag's slot 1
+# # ships a measured default, so the way to be unset is to store `UNSET`.
 reset_slot(portals_table.UNSET)
 nav = navigator(confirm_after_typing=False)
 ok, message = nav.pick_portal("Summer Portal", CONFIRM, "Select")
 assert not ok
 assert "Click Points" in message, message
+assert "Bag result slot 1" in message, "the refusal must name which grid to measure"
 assert "typed 'Summer Portal'" in message, message
 assert not nav.slot_clicked, "an unset point must not become a click"
+
+# # The in-match grid is a **different** point, and it ships unmeasured — so the result
+# # screen's picker refuses even though the bag's is set. Sharing one coordinate across both
+# # would click whichever tile the other screen happens to have there and spend that portal.
+reset_slot((640, 300))
+nav = navigator(confirm_after_typing=False)
+ok, message = nav.pick_portal("Summer Portal", CONFIRM, "Select", in_match=True)
+assert not ok, "the in-match grid has no default, so it cannot borrow the bag's"
+assert "In-match result slot 1" in message, message
+assert not nav.slot_clicked
+# Measured, and it is read back from its own key rather than the bag's.
+portals_table.apply_point_overrides(
+    {portals_table.slot_key(1): (640, 300), portals_table.slot_key(1, True): (700, 410)}
+)
+assert portals_table.slot_coord(1) == (640, 300)
+assert portals_table.slot_coord(1, in_match=True) == (700, 410)
+nav = navigator(confirm_after_typing=False)
+assert nav.pick_portal("Summer Portal", CONFIRM, "Select", in_match=True)[0]
+assert nav.trail == ["click:Portal search", "slot:700,410", "click:Select"], nav.trail
 
 # # A name that cannot be typed safely never reaches SendText
 reset_slot((640, 300))
@@ -180,8 +199,10 @@ class TailNav:
             return (True, "clicked Select Portal")
         return (False, "Select Portal not found (best 0.09 < 0.80)")
 
-    def pick_portal(self, name, confirm_path, confirm_label):
-        self.calls.append(f"pick:{name}")
+    def pick_portal(self, name, confirm_path, confirm_label, in_match=False):
+        # `in_match` recorded, not ignored: the result screen's grid is a different point, and
+        # passing the bag's would click a tile the task never asked for.
+        self.calls.append(f"pick:{name}:{'match' if in_match else 'bag'}")
         return (True, "typed and confirmed")
 
     def wait_for_match_ready(self, timeout=None):
@@ -217,10 +238,10 @@ def tail(select_portal: bool, again: bool, repeat: bool = True, task=None):
 # Another rep to come: queue the next portal, never touch Repeat, never leave. Identical after a
 # win and after a loss — the outcome is not what this branches on.
 nav, kept, camera = tail(select_portal=True, again=True)
-assert nav.calls == ["select_portal", "pick:Summer", "wait_ready"], nav.calls
-# Select Portal loads that portal's stage fresh, so the character respawns and the walk is
-# required — while the camera is untouched, which is the whole reason these are two flags.
-assert not kept, "Select Portal respawns — the next rep still has to walk"
+assert nav.calls == ["select_portal", "pick:Summer:match", "wait_ready"], nav.calls
+# Same playfield, no lobby in between, so the character never moved and the camera never reset.
+# This asserted the opposite for one release and the walk ran on every rep because of it.
+assert kept, "Select Portal re-enters in place — the next rep must not walk"
 assert camera, "Select Portal never reaches the lobby, so the pitch carries over"
 
 # Select Portal missing: Repeat is the fallback, and Repeat Stage keeps position and camera.

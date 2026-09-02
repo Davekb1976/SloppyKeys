@@ -63,18 +63,25 @@ with tempfile.TemporaryDirectory() as root:
     # Story's pair is the Hard Mode toggle; Expedition's is the cycling button.
     assert [p["label"] for p in groups["start.Story"]["points"]] == ["Hard Mode toggle"]
     assert [p["label"] for p in groups["start.Expedition"]["points"]] == ["Difficulty cycle"]
-    # The portal grid's slot ships the **measured** default, so Portals works on a fresh
-    # install instead of only on the account that measured it. What is still refused is a
-    # *guess*: activating a portal consumes it, so `slot_coord` answers None for `UNSET`
-    # rather than handing back (0, 0), which is empty ground the click would look fine on.
-    assert [p["label"] for p in groups["portal.Portals"]["points"]] == ["Result slot 1"]
-    assert (groups["portal.Portals"]["points"][0]["x"],
-            groups["portal.Portals"]["points"][0]["y"]) == (394, 253)
+    # **Two** portal grids, both listed — the row is what whitelists a key, so a grid with no
+    # row here could never be measured and its run step would refuse forever. The bag's ships
+    # the measured default so Portals works on a fresh install; the in-match one ships unset
+    # because nobody has measured it, and `slot_coord` answers None rather than handing back
+    # (0, 0) or quietly borrowing the bag's. Activating a portal consumes it.
+    portal_points = groups["portal.Portals"]["points"]
+    assert [p["label"] for p in portal_points] == [
+        "Bag result slot 1",
+        "In-match result slot 1",
+    ], [p["label"] for p in portal_points]
+    assert (portal_points[0]["x"], portal_points[0]["y"]) == (394, 253)
+    assert (portal_points[1]["x"], portal_points[1]["y"]) == (0, 0)
     assert slot_coord(1) == (394, 253), slot_coord(1)
+    assert slot_coord(1, in_match=True) is None, "the in-match grid must not borrow the bag's"
     # Portals keeps its own override dict, so this is deliberately not the `apply_point_overrides`
     # imported above — that one belongs to `content.acts`.
-    apply_portal_overrides({slot_key(1): UNSET})
+    apply_portal_overrides({slot_key(1): UNSET, slot_key(1, True): (700, 410)})
     assert slot_coord(1) is None, "a slot stored as (0, 0) must still refuse"
+    assert slot_coord(1, in_match=True) == (700, 410), "each grid reads its own key"
     apply_portal_overrides({})
     for group in groups.values():
         assert group["where"], group["key"]  # the screen that must be up, shown on the row
