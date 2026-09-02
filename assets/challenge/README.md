@@ -28,7 +28,7 @@ desaturated:
 
 Matching in this project is grayscale, and colour is the *only* difference between an
 active star and a greyed one — so the crop matched **every** star at 0.999. A colour match
-does separate, but 0.828 for an active star is above the engine's 0.70 default and would
+does separate, but 0.828 for an active star sits right on the engine's default and would
 need a hand-picked threshold plus a colour path the engine doesn't have.
 
 Worse than the bad margin: that check ran *first* and returned before reading the limit,

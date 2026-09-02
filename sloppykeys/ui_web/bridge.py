@@ -312,6 +312,33 @@ class Api:
             return RouteStore(self._app_root).acts(map_name)
         return targets_for(gamemode, map_name)
 
+    def get_mode_fields(self, gamemode: str) -> dict:
+        """Which Task Builder rows this gamemode can actually use.
+
+        One call instead of the page hard-coding mode names: every answer is derived from
+        `content/`, so a mode that gains an act list or a Hard Mode coordinate gains its row
+        with no change here or in `app.js`.
+
+        A row that does nothing is worse than a missing one — it reads as a setting that was
+        applied. Expedition's Stage dropdown could only ever say "—" (it has no act
+        dimension), and Raid, Events and Portals all offered Easy/Hard with no toggle for the
+        macro to click.
+        """
+        from sloppykeys.content.gamemodes import has_targets, labels_for, search_label
+        from sloppykeys.content.start_stage import has_difficulty
+
+        map_label, target_label = labels_for(gamemode)
+        return {
+            "map_label": map_label,
+            "target_label": target_label,
+            # `has_targets` is True for a custom mode even with an empty table: Events reads
+            # its acts from routes.json.
+            "stage": has_targets(gamemode),
+            "difficulty": has_difficulty(gamemode),
+            "extract": gamemode == "Expedition",
+            "search_label": search_label(gamemode),
+        }
+
     def get_priority_options(self) -> list:
         """Targeting priorities **in the game's cycle order**, so the planner's dropdown
         and the runner's press count come from one list. A dropdown that omitted an entry
@@ -778,23 +805,31 @@ class Api:
     _POINT_GROUPS = (
         ("acts", "Acts", "open the gamemode and a map, so the act list is on screen"),
         ("start", "Start panel", "select an act, so the Hard Mode / difficulty panel is up"),
+        (
+            "portal",
+            "Bag grid",
+            "open the bag and the Portals tab, then search a portal so one result is showing",
+        ),
     )
 
     @staticmethod
     def _point_tables():
         from sloppykeys.content import acts as _acts
+        from sloppykeys.content import portals as _portals
         from sloppykeys.content import start_stage as _start
 
-        return {"acts": _acts, "start": _start}
+        return {"acts": _acts, "start": _start, "portal": _portals}
 
     @staticmethod
     def _point_specs() -> list[tuple[str, str, str, str, tuple[int, int]]]:
         """(kind, key, gamemode, label, default) for every editable click point."""
         from sloppykeys.content.acts import act_specs
+        from sloppykeys.content.portals import point_specs as portal_specs
         from sloppykeys.content.start_stage import point_specs
 
         rows = [("acts", *spec) for spec in act_specs()]
         rows += [("start", *spec) for spec in point_specs()]
+        rows += [("portal", *spec) for spec in portal_specs()]
         return rows
 
     def list_vision_points(self) -> dict:
@@ -1535,9 +1570,15 @@ class Api:
         # entry here is dropped silently and its card never appears to capture into.
 
         # Read current thresholds from settings
+        from sloppykeys.core.image_search import DEFAULT_CONFIDENCE
+
         settings = UnifiedSettings(self._app_root)
         thresholds = settings.get("image_thresholds", {})
-        default_threshold = 0.70
+        # From the engine, not a copy. This was three hardcoded 0.70s — here, in
+        # `set_image_threshold` and in `test_image_search` — so raising the engine's default
+        # would have left every slider, every "is this an override" test and the Test button
+        # all reporting against the old number.
+        default_threshold = DEFAULT_CONFIDENCE
 
         categories = []
         images_root = os.path.join(self._app_root, "assets")
@@ -1649,7 +1690,9 @@ class Api:
         thresholds = settings.get("image_thresholds", {})
         if not isinstance(thresholds, dict):
             thresholds = {}
-        default = 0.70
+        from sloppykeys.core.image_search import DEFAULT_CONFIDENCE
+
+        default = DEFAULT_CONFIDENCE
         if abs(float(value) - default) < 0.01:
             thresholds.pop(key, None)
         else:
@@ -1665,7 +1708,12 @@ class Api:
         """Test-search one image against the live Roblox screen. Returns match info."""
         if not self._app_root:
             return {"ok": False, "best": 0}
-        from sloppykeys.core.image_search import ImageProfile, ImageSearchEngine, best_score
+        from sloppykeys.core.image_search import (
+            DEFAULT_CONFIDENCE,
+            ImageProfile,
+            ImageSearchEngine,
+            best_score,
+        )
         from sloppykeys.core.win32.roblox_window import find_roblox_window, client_to_screen, client_size
 
         hwnd = find_roblox_window()
@@ -1689,7 +1737,7 @@ class Api:
         thresholds = settings.get("image_thresholds", {})
         key = str(image_path).replace("\\", "/").strip()
         name = os.path.splitext(os.path.basename(image_path))[0]
-        threshold = float(thresholds.get(key, 0.70))
+        threshold = float(thresholds.get(key, DEFAULT_CONFIDENCE))
 
         # Use the controller's engine if available, else create a temporary one
         engine = self._ctrl._engine if self._ctrl else ImageSearchEngine(self._app_root)

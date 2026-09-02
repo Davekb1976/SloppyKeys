@@ -17,7 +17,12 @@ import cv2  # type: ignore[import-not-found]
 import mss  # type: ignore[import-not-found]
 import numpy as np  # type: ignore[import-not-found]
 
-DEFAULT_CONFIDENCE = 0.70
+# Raised from 0.70 after 0.70 was measured accepting the wrong screen where two templates
+# look alike but differ — the discrimination this number buys matters more than the few
+# hundredths of headroom it costs, because a false match acts on a screen that isn't there
+# and a missed one only retries. A template that cannot clear this is usually the wrong crop;
+# the escape hatch is a per-template override in the Image Manager, never a lower default.
+DEFAULT_CONFIDENCE = 0.80
 CONFIDENCE_MIN = 0.50
 CONFIDENCE_MAX = 0.99
 # The floor a *user* may set, still above `CONFIDENCE_MIN` (which exists for `best_score`'s

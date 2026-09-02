@@ -137,7 +137,7 @@ runtime multi-scale matching (~24× cost, hides bad templates) ·
 `RegionMemory`/`image_regions.json` auto-learned regions · the OCR-template fallback
 (`core/text_locate.py`) · per-gamemode `STAGE_SEARCH_REGIONS` (hand-measured, stale after any
 resize, and a band shorter than its template can't match) · a **global** match tolerance (drifted
-to 0.57 and matched wrong screens; tolerance is per-template — `DEFAULT_CONFIDENCE` 0.70, bounds
+to 0.57 and matched wrong screens; tolerance is per-template — `DEFAULT_CONFIDENCE` 0.80, bounds
 `CONFIDENCE_USER_MIN`/`CONFIDENCE_MAX`, no auto-calibrate).
 
 ## Python

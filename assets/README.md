@@ -79,28 +79,33 @@ exports (`match/back_lobby.png`, `match/return_lobby_confirm.png`, `match/settin
 they still match at 1.000.
 
 Set 24/32-bit anyway, because it costs nothing and removes a variable — Auto choosing a *very*
-low depth on a simple crop is the one case that would bite (0.10 is a real dent when the
-threshold is 0.70). But if a template is failing, **this is not why**. Check the scale first;
+low depth on a simple crop is the one case that would bite (0.10 is a real dent against a
+0.80 threshold). But if a template is failing, **this is not why**. Check the scale first;
 that is worth ~250x more.
 
-## 3. There is no tolerance to tune
+## 3. The tolerance is per template, and the default is 0.80
 
-The match threshold is a fixed **0.70** and is not configurable. A user-facing "match
-tolerance" existed and was removed: it drifted to 0.95 (a good match scores 0.95-1.00, so
-almost nothing passed) and to 0.57 (false matches), and each value broke the next run while
-looking like a bad template.
+Each template carries its own threshold, on its Image Manager card. The default is **0.80**,
+raised from 0.70 after 0.70 was seen accepting the wrong screen where two templates look
+alike but mean different things. That trade is deliberate: a false match acts on a screen
+that isn't there, while a missed one only retries.
 
-A failed search logs the score it reached — `Play not found (best 0.66 < 0.70)`. Read that
-number: it says whether the crop is nearly right or nothing like the screen. It is never a
-reason to lower a threshold, because the fix for a template that can't reach 0.70 is to
-recapture it.
+There is deliberately **no global tolerance**. That setting existed and was removed — it
+drifted to 0.95 (a good match scores 0.95-1.00, so almost nothing passed) and to 0.57 (false
+matches everywhere), and each value broke the next run while looking like a bad template.
+Per-template is the replacement, so one stubborn image can't drag the rest down.
+
+A failed search logs the score it reached — `Play not found (best 0.66 < 0.80)`. Read that
+number: it says whether the crop is nearly right or nothing like the screen. It is rarely a
+reason to lower that template's threshold, because a crop that can't reach the default is
+usually the wrong crop; recapture it first.
 
 ## Checking your templates
 
 **Image Manager (F6) → the card's `Test` button**, standing on the screen that template
 belongs to. It searches the live client and logs either the score and where it matched, or
 the best score it reached and the threshold that rejected it. That number is the diagnosis:
-`best 0.66 < 0.70` means the crop is nearly right, `best 0.08` means this isn't the screen.
+`best 0.66 < 0.80` means the crop is nearly right, `best 0.08` means this isn't the screen.
 
 **There is no scale checker.** The old one swept every template from 0.80x to 1.26x and
 reported any whose best score peaked somewhere other than 1.00x — the check that caught the

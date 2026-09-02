@@ -115,11 +115,11 @@ class LobbyNavigator:
         # Client-space; top-left corner is usually empty of stage cards.
         self.park_client = (8, 8)
         # No `self.confidence`. The threshold is **per template**, resolved inside
-        # `find_until` by `image_search.confidence_for(path)`: `DEFAULT_CONFIDENCE` (0.70)
-        # unless Settings > Vision overrides that one image. The *global* tolerance setting
+        # `find_until` by `image_search.confidence_for(path)`: `DEFAULT_CONFIDENCE` (0.80)
+        # unless the Image Manager overrides that one image. The *global* tolerance setting
         # that used to live here was removed for good reason — it drifted to 0.57 and
-        # matched wrong screens — so the per-image floor is 0.60 and there is no auto
-        # calibrate. A template that can't clear 0.70 is usually still the wrong crop.
+        # matched wrong screens — and there is no auto calibrate. A template that can't clear
+        # the default is usually still the wrong crop.
 
 
     def apply_delays(self, delays: dict[str, float]) -> None:
@@ -1010,7 +1010,7 @@ class LobbyNavigator:
                 f"({match.score:.2f}{waited})",
             )
         # The score goes in the message because these templates are small text crops
-        # (`challenge.png` is 67x12) searched over the whole client at 0.70, so a weak
+        # (`challenge.png` is 67x12) searched over the whole client, so a weak
         # hit is a plausible false positive — and a click reported without its score
         # can't be told apart from a good one after the fact.
         return (

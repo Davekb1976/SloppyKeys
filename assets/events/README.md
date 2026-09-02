@@ -37,4 +37,4 @@ matches at any confidence.
 
 Crop tight to something that only appears on the screen you mean — an event card cropped to
 include the "Ends Update 1" line will match several other cards. Each template carries its own
-threshold (0.70 by default), tunable on its Image Manager card.
+threshold (0.80 by default), tunable on its Image Manager card.

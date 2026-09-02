@@ -295,7 +295,7 @@ class ChallengeScanner:
         greyed one are the same shape, matching in this project is grayscale, and the crop
         scored **0.999 on all three active stars** — no separation at all. Matching the same
         crop *in colour* does separate (0.999 greyed vs 0.828 active) but leaves a 0.17
-        margin, needs a hand-tuned threshold well above the engine's 0.70 default, and
+        margin, needs a hand-tuned threshold sitting right on the engine's default, and
         needs a colour path the engine doesn't have. Saturation reads 6 on the user's real
         greyed crop against 242-243 on live active stars, so it is the same question asked
         in the one way that isn't marginal.
