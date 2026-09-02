@@ -418,6 +418,21 @@ class MacroController:
         # That chooser *is* where the cards are, so the lobby's Play is skipped rather than
         # searched for on a screen it is not on. One look to decide, so being in the lobby
         # costs ~17ms and no click.
+        # Portals is entered from the inventory bag, which is in the **lobby** — not on the
+        # gamemode panel that `leave_match` lands on, and not behind a card in the
+        # intermission menu. So it shares none of the chain below: falling through to it
+        # clicked Play and then hunted for a `gamemodes/portals.png` that does not exist.
+        if mode == "Portals":
+            if self._nav.result_screen_up():
+                # The long way out, because `leave_match` + `change_gamemode` ends on the
+                # gamemode chooser, where there is no bag.
+                ok, msg = self._nav.back_to_lobby()
+                self._log(f"  Back to lobby: {msg}")
+                if not ok:
+                    return False
+                time.sleep(self._nav.click_settle)
+            return self._navigate_portal()
+
         from_gamemode_panel = False
         if self._nav.result_screen_up():
             ok, msg = self._nav.leave_match()
@@ -476,6 +491,34 @@ class MacroController:
                 return False
             time.sleep(self._nav.click_settle)
 
+        self.run_camera()
+        return True
+
+    def _navigate_portal(self) -> bool:
+        """Walk the bag chain into a Portals run. Returns True once the stage is up.
+
+        The portal comes from the task's typed name, so a task with an empty Portal field
+        fails here rather than opening the bag and guessing — activating the wrong portal
+        consumes it.
+        """
+        task = self._current_task or {}
+        name = task.get("search", "")
+        if not name:
+            self._log(
+                "  Portals: this task has no portal name — set the Portal field in the "
+                "Task Builder."
+            )
+            return False
+
+        ok, msg = self._nav.enter_portal(name)
+        self._log(f"  Enter portal: {msg}")
+        if not ok:
+            return False
+
+        ok, msg = self._nav.wait_for_match_ready()
+        self._log(f"  Stage loaded: {msg}")
+        if not ok:
+            return False
         self.run_camera()
         return True
 

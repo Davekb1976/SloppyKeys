@@ -39,8 +39,11 @@ from sloppykeys.content.nav_images import (
     gamemode_image,
     match_play_image,
     play_image,
+    portal_activate_image,
+    portal_bag_image,
     portal_search_image,
     portal_select_portal_image,
+    portals_tab_image,
     repeat_image,
     return_lobby_confirm_image,
     select_stage_image,
@@ -894,6 +897,50 @@ class LobbyNavigator:
         so this replaces both `click_play` and `open_gamemode` for that mode.
         """
         return self._find_click(events_image(), "Events", timeout=self.search_timeout)
+
+    def enter_portal(self, name: str) -> tuple[bool, str]:
+        """Lobby → bag → Portals tab → search the portal → Activate → Start.
+
+        Portals has no card in the intermission menu, so none of the `click_play` chain
+        applies: this is the whole route in, and it is why the mode is `own_entry`.
+
+        The Portals tab arrives from the bag click and Activate from the picker, so both get
+        `fade_wait` — found is not clickable while a panel is still fading.
+
+        **Start is not fatal.** Nobody has confirmed whether Activate begins the run on its
+        own or reveals a Start to press, so a miss here is reported and the caller's
+        `wait_for_match_ready` becomes the judge: if Activate started it, Start Game shows up
+        and the run carries on; if a press really was needed, that poll times out and says so.
+        Better than failing the task on a button that may not exist.
+        """
+        trail: list[str] = []
+        ok, message = self._find_click(
+            portal_bag_image(), "Bag", timeout=self.search_timeout
+        )
+        if not ok:
+            return (False, f"bag: {message}")
+        trail.append(message)
+
+        ok, message = self._find_click(
+            portals_tab_image(),
+            "Portals tab",
+            timeout=self.search_timeout,
+            fade_wait=self.panel_fade_wait,
+        )
+        if not ok:
+            return (False, f"portals tab: {message}")
+        trail.append(message)
+
+        ok, message = self.pick_portal(name, portal_activate_image(), "Activate Portal")
+        if not ok:
+            return (False, f"pick: {message}")
+        trail.append(message)
+
+        ok, message = self.click_start_match(fade_wait=self.panel_fade_wait)
+        trail.append(
+            message if ok else f"no Start after Activate ({message}) — waiting for the stage"
+        )
+        return (True, " \u2192 ".join(trail))
 
     def click_select_portal(self) -> tuple[bool, str]:
         """Click **Select Portal** on the victory screen, which reopens the portal picker.

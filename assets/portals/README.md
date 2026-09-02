@@ -9,10 +9,12 @@ the matcher reads at the pinned client size and writes them to the right filenam
 from Roblox's own screenshot gives the wrong pixel size and the template can never match —
 see `assets/README.md`.
 
-In the order a run meets them:
+The chain is `LobbyNavigator.enter_portal`: bag → Portals tab → search field → type the
+portal's name → Activate Portal → Start. In the order a run meets them:
 
 - `bag.png` — the lobby's inventory button. This is the run's entry point, the way
-  `lobby/play.png` is for Story and `lobby/events.png` is for Events.
+  `lobby/play.png` is for Story and `lobby/events.png` is for Events. Nothing in the Play
+  chain applies to Portals, which is what `own_entry` on its gamemode row means.
 - `portals_tab.png` — the Portals section inside the bag.
 - `search.png` — the search field. Clicked to focus it, then the portal name is typed.
 - `activate.png` — **Activate Portal**, on the selected portal's detail panel.
