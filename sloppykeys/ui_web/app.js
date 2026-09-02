@@ -1219,6 +1219,36 @@
     return block ? { ph, idx, parent, branch, block } : null;
   }
 
+  // Where a drop lands in a phase, read off the placeholder the row `dragover` handlers
+  // positioned. Null means there is no placeholder — a drop on empty space, which appends.
+  //
+  // **The placeholder is what the user is aiming at.** It is a real 36px element that opens a
+  // gap between two rows, so the cursor at the moment of release is usually over *it* rather
+  // than over any row. Both drop handlers used to ignore it and `push`, which is why a block
+  // aimed between block 1 and block 2 landed under block 2.
+  //
+  // Counts direct children only, so the rows nested inside a detect branch (which live in a
+  // `.detect-dropzone` inside a `.block-row`) don't shift the index.
+  function dropIndexFrom(zone) {
+    const placeholder = zone.querySelector(".drop-placeholder");
+    if (!placeholder) return null;
+    let idx = 0;
+    for (const child of zone.children) {
+      if (child === placeholder) return idx;
+      if (child.classList.contains("block-row")) idx++;
+    }
+    return null;
+  }
+
+  // Clear every drag affordance. Shared because a drag can end in three ways — dropped,
+  // cancelled with Escape, or released outside a zone — and a placeholder left behind is not
+  // just cosmetic: it becomes the insertion point the *next* drop reads.
+  function clearDragState() {
+    document.querySelectorAll(".drop-placeholder").forEach((p) => p.remove());
+    document.querySelectorAll(".phase-section.drag-active").forEach((s) => s.classList.remove("drag-active"));
+    document.querySelectorAll(".phase-dropzone.drag-over").forEach((z) => z.classList.remove("drag-over"));
+  }
+
   // A block inside a detect branch. Same fields as a top-level row — it only showed a
   // type name and an ✕ before, so a nested block could never be configured. The id key
   // encodes the nesting so it stays unique against the outer rows.
@@ -1494,9 +1524,7 @@
         });
         row.addEventListener("dragend", () => {
           row.classList.remove("dragging");
-          document.querySelectorAll(".drop-placeholder").forEach((p) => p.remove());
-          document.querySelectorAll(".phase-section.drag-active").forEach((s) => s.classList.remove("drag-active"));
-          document.querySelectorAll(".phase-dropzone.drag-over").forEach((z) => z.classList.remove("drag-over"));
+          clearDragState();
         });
         row.addEventListener("dragover", (e) => {
           e.preventDefault();
@@ -1525,11 +1553,15 @@
         });
         row.addEventListener("drop", (e) => {
           e.preventDefault();
+          const raw = e.dataTransfer.getData("application/x-block-move");
+          // A palette drop carries no move payload, and this handler cannot serve it. Let it
+          // bubble to the zone, which inserts at the placeholder. Stopping propagation up
+          // front — as this did — swallowed the event, so a *new* block dropped squarely on a
+          // row was discarded without a trace, and the placeholder went with it.
+          if (!raw) return;
           e.stopPropagation();
           const ph = zone.querySelector(".drop-placeholder");
           if (ph) ph.remove();
-          const raw = e.dataTransfer.getData("application/x-block-move");
-          if (!raw) return;
           const src = JSON.parse(raw);
           const rect = row.getBoundingClientRect();
           const midY = rect.top + rect.height / 2;
@@ -1653,6 +1685,10 @@
     el.addEventListener("dragstart", (e) => {
       e.dataTransfer.setData("text/plain", el.dataset.type);
     });
+    // Only the row drags cleaned up after themselves, so a palette drag released outside a
+    // zone (or cancelled with Escape) left its placeholder open — and that stale placeholder
+    // is where the next drop would have inserted.
+    el.addEventListener("dragend", clearDragState);
   });
 
   PHASES.forEach((phase) => {
@@ -1673,6 +1709,10 @@
       e.preventDefault();
       zone.classList.remove("drag-over");
       if (section) section.classList.remove("drag-active");
+      // Read the position **before** the placeholder is removed, or there is nothing left to
+      // read and every drop lands at the end.
+      const at = dropIndexFrom(zone);
+      const append = at === null;
       const ph = zone.querySelector(".drop-placeholder");
       if (ph) ph.remove();
 
@@ -1682,7 +1722,11 @@
         const src = JSON.parse(moveRaw);
         const [moved] = opPhases[src.phase].splice(src.idx, 1);
         if (moved) {
-          opPhases[phase].push(moved);
+          let insertAt = append ? opPhases[phase].length : at;
+          // Taking the block out first shifted everything after it down one, so a target
+          // below its old position is now one place lower. Same rule the row handler uses.
+          if (src.phase === phase && src.idx < insertAt) insertAt--;
+          opPhases[phase].splice(insertAt, 0, moved);
           opDirty = true;
           renderPhases();
         }
@@ -1692,7 +1736,7 @@
       // New block from palette
       const type = e.dataTransfer.getData("text/plain");
       if (!type) return;
-      opPhases[phase].push(newBlock(type));
+      opPhases[phase].splice(append ? opPhases[phase].length : at, 0, newBlock(type));
       opDirty = true;
       renderPhases();
     });
