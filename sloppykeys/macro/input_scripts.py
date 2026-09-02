@@ -128,6 +128,26 @@ SPREAD_TIGHT = 3
 # Only applied between clicks — see nudge_click_script.
 CLICK_GAP_MS = 120
 
+# How long to hold between two typed characters. **A frame count, like NUDGE_SETTLE_FRAMES**,
+# and for the same reason: Roblox handles input on its rendered frames, so a character that
+# arrives inside the frame the previous one is still being read is dropped.
+#
+# `SendText` goes out through SendInput, where AutoHotkey applies *no* delay between
+# characters at all and `SetKeyDelay` is ignored — so the whole name landed as one packet and
+# the field showed "summr", "smmer", "smr" from the same string. Two frames rather than one
+# because a single frame is the floor at which a character can be seen, not a margin.
+TYPE_GAP_FRAMES = 2
+# The floor covers a monitor that reports a silly refresh rate; the ceiling keeps a 40
+# character name from taking most of a minute.
+TYPE_GAP_MIN_MS = 25
+TYPE_GAP_MAX_MS = 80
+
+
+def type_gap_ms(hz: int | None = None) -> int:
+    """`TYPE_GAP_FRAMES` worth of milliseconds at the game monitor's refresh rate."""
+    rate = max(1, int(_refresh_hz if hz is None else hz))
+    return max(TYPE_GAP_MIN_MS, min(TYPE_GAP_MAX_MS, round(TYPE_GAP_FRAMES * 1000 / rate)))
+
 
 def _nudge(x: int, y: int, spread: int = SPREAD_WIDE) -> str:
     """Move onto the point, with or without the wiggle (see USE_NUDGE).
@@ -341,11 +361,21 @@ def type_text_script(text: str) -> str:
     upgrade and sell. The caller must have clicked a *searched* field first — see
     `assets/portals/README.md`.
 
-    No mouse, so no nudge and no park; no trailing sleep, since the caller's next step is a
-    search that polls on a deadline.
+    **One character per `SendText`, paced by `type_gap_ms`.** A single call with the whole
+    string dropped letters — "summer" arrived as "summr", "smmer", even "smr". `SendText` is
+    delivered through SendInput, which applies no gap between characters and ignores
+    `SetKeyDelay`, so the field was handed the lot inside one frame and kept whichever
+    characters it happened to read. Same failure as a click landing on a stale cursor
+    position, and the same fix: give the game frames, not milliseconds.
+
+    No mouse, so no nudge and no park. The gap goes *between* characters, never after the
+    last — a trailing sleep would only delay `ExitApp` while Python already waits on the
+    process.
     """
+    gap = type_gap_ms()
+    body = f"\nSleep({gap})\n".join(f'SendText("{character}")' for character in text)
     return f"""{_header()}
-SendText("{text}")
+{body}
 ExitApp(0)
 """
 

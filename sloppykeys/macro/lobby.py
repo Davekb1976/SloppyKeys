@@ -993,7 +993,11 @@ class LobbyNavigator:
             return (False, "AutoHotkey v2 not found")
         # The click above parked the cursor at the corner, which does not take focus off a
         # text field — focus follows the click, not the pointer.
-        ok, message = self._ahk.run(type_text_script(wanted), wait=True, timeout=10)
+        # The timeout has to cover the script's own sleeps: it types one character at a time
+        # with a gap between, so a long name legitimately takes longer than a short one.
+        ok, message = self._ahk.run(
+            type_text_script(wanted), wait=True, timeout=10.0 + len(wanted) * 0.1
+        )
         if not ok:
             return (False, f"typing '{wanted}' failed: {message}")
         trail = f"typed '{wanted}'"

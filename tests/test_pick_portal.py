@@ -100,7 +100,15 @@ ok, message = nav.pick_portal("Summer Portal", CONFIRM, "Select")
 assert ok, message
 assert nav.trail == ["click:Portal search", "click:Select"], nav.trail
 assert not nav.slot_clicked, "the tile must not be clicked when the confirm is already up"
-assert 'SendText("Summer Portal")' in "".join(ahk.scripts), ahk.scripts
+# One SendText per character, paced — sent as one string the field dropped letters. The
+# characters and their order are what matter here; the pacing itself is pinned in
+# tests/test_search_text.py.
+typed = "".join(
+    line[10:-2]
+    for line in "\n".join(ahk.scripts).splitlines()
+    if line.startswith("SendText(")
+)
+assert typed == "Summer Portal", typed
 
 # # The confirm only appears once the filtered tile is selected
 reset_slot((640, 300))

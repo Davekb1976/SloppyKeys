@@ -57,6 +57,18 @@ A focused field is not something a template can prove — the field itself is. S
 is gated on this match, and if it stops matching after a game update the right fix is to
 recapture it, not to lower its threshold.
 
+## The name is typed one character at a time
+
+Sent as one string it arrived as "summr", "smmer", even "smr". `SendText` is delivered
+through SendInput, which puts no gap between characters and ignores `SetKeyDelay`, so the
+field received the whole name inside a single rendered frame and kept whichever characters it
+happened to read — the same class of failure as a click landing on a stale cursor position.
+
+`input_scripts.TYPE_GAP_FRAMES` is the gap, in **frames** rather than milliseconds, because
+that is what the game is counting: two frames is 33ms at 60Hz and 8ms at 240Hz. If letters
+still go missing, raise that number — it is the one knob, and it is the first thing to try
+before suspecting the field or the template.
+
 ## The end-of-match chooser is not here
 
 `assets/match/portal_choice.png` — three portals appear before the victory screen and one

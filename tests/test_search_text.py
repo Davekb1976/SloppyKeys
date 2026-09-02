@@ -20,7 +20,12 @@ from sloppykeys.config.keybinds import (  # noqa: E402
     SEARCH_TEXT_MAX,
     sanitize_search_text,
 )
-from sloppykeys.macro.input_scripts import type_text_script  # noqa: E402
+from sloppykeys.macro.input_scripts import (  # noqa: E402
+    TYPE_GAP_MAX_MS,
+    TYPE_GAP_MIN_MS,
+    type_gap_ms,
+    type_text_script,
+)
 
 
 # # Accepted: anything a game item name plausibly is
@@ -68,13 +73,30 @@ assert sanitize_search_text("a" * (SEARCH_TEXT_MAX + 1)) == ""
 
 
 # # The script the accepted text lands in
-script = type_text_script(sanitize_search_text("King's Tomb"))
-assert 'SendText("King\'s Tomb")' in script, script
-# One statement on the SendText line, and the line count is fixed: if a name could carry a
-# newline this is the assertion that would fail.
+name = sanitize_search_text("King's Tomb")
+script = type_text_script(name)
+
+# **One character per SendText, with a gap between.** Sent as one string it arrived as
+# "summr" / "smmer" / "smr": SendText goes through SendInput, which puts no delay between
+# characters and ignores SetKeyDelay, so the field was handed the lot inside a single frame.
 send_lines = [line for line in script.splitlines() if "SendText" in line]
-assert len(send_lines) == 1, send_lines
-assert send_lines[0].strip().endswith('")'), send_lines[0]
+assert len(send_lines) == len(name), (len(send_lines), len(name))
+assert send_lines[0] == 'SendText("K")', send_lines[0]
+assert send_lines[4] == 'SendText("\'")', send_lines[4]
+assert send_lines[6] == 'SendText(" ")', send_lines[6]
+assert "".join(line[10:-2] for line in send_lines) == name, send_lines
+for line in send_lines:
+    # One statement per line. If a name could carry a newline this is what would fail.
+    assert line.strip().endswith('")'), line
+
+# Gaps go *between* characters, never after the last: a trailing sleep only delays ExitApp
+# while Python is already waiting on the process.
+sleeps = [line for line in script.splitlines() if line.startswith("Sleep(")]
+assert len(sleeps) == len(name) - 1, (len(sleeps), len(name))
+assert script.rstrip().endswith("ExitApp(0)"), script[-40:]
+assert TYPE_GAP_MIN_MS <= type_gap_ms() <= TYPE_GAP_MAX_MS, type_gap_ms()
+# A frame count, so a slower monitor waits longer per character rather than the same time.
+assert type_gap_ms(30) > type_gap_ms(240), (type_gap_ms(30), type_gap_ms(240))
 # Activates Roblox first, and exits 0 — the same contract every other builder has, so
 # `AhkBridge.run(wait=True)` reads success the same way.
 assert "WinActivate" in script and "ExitApp(0)" in script
