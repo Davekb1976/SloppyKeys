@@ -35,7 +35,10 @@ DEFAULTS: dict[str, Any] = {
     # New settings
     "start_minimized": False,
     "auto_reopen_roblox": True,
-    "action_delay_ms": 0,
+    # There is no `action_delay_ms`. It was a General-tab number box promising an extra pause
+    # after every click, and nothing in this tree ever read it. A stored value is ignored
+    # harmlessly — `UnifiedSettings.get` only answers for keys this table declares. Real
+    # per-step waits live in `config/delays.py::DELAY_SPEC`, which the Delays tab builds itself.
     "debug_screenshots": False,
     # Image thresholds (per-name overrides, dict)
     "image_thresholds": {},

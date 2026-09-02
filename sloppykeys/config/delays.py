@@ -54,13 +54,13 @@ DELAY_SPEC: dict[str, tuple[str, float]] = {
     # under it animate in afterwards, so a capture with no wait catches a
     # half-drawn panel. Raise it if the rewards are still missing.
     "result_screenshot_delay": ("Result screenshot delay", 1.0),
-    # How long an Events task waits for the lobby after firing the private-server deep
-    # link. Not a settle — a **deadline** on a poll that returns the instant the lobby's
-    # Events button appears, so a generous value costs nothing when the join is quick. It
-    # has to cover a cold client start: Roblox launching, updating, loading the place and
-    # spawning you in, which on a slow disk or connection is minutes rather than seconds.
-    # This is the one wait a user cannot shorten by tuning anything else, because none of
-    # it is ours to speed up.
+    # How long a mid-run relaunch waits for the Roblox window after firing the private-server
+    # deep link (`controller._try_reopen_roblox`). Not a settle — a **deadline** on a poll that
+    # returns the instant the window appears, so a generous value costs nothing when the join
+    # is quick. It has to cover a cold client start: Roblox launching, updating, loading the
+    # place and spawning you in, which on a slow disk or connection is minutes rather than
+    # seconds. This is the one wait a user cannot shorten by tuning anything else, because none
+    # of it is ours to speed up.
     "lobby_rejoin_wait": ("Wait for the lobby after re-joining", 150.0),
 }
 DEFAULTS: dict[str, float] = {key: default for key, (_label, default) in DELAY_SPEC.items()}

@@ -503,13 +503,11 @@
               </div>
               <label class="check check--lg"><input type="checkbox" id="s-auto-reopen" data-key="auto_reopen_roblox"><span class="check-box"></span></label>
             </div>
-            <div class="setting-row">
-              <div class="setting-info">
-                <span class="setting-name">Action Delay (ms)</span>
-                <span class="setting-desc">Extra pause after every click — slows the macro for slower PCs</span>
-              </div>
-              <input type="number" class="setting-input" id="s-action-delay" data-key="action_delay_ms" min="0" max="2000" value="0" style="width:80px;">
-            </div>
+            <!-- There is no Action Delay row. It offered an "extra pause after every click"
+                 and nothing read `action_delay_ms` anywhere: the control saved a number that
+                 changed no timing, so a user slowing the macro down got no slower macro. The
+                 waits that are real are in Settings > Delays, each named for the step it
+                 governs — a blanket pause after every click is not one of them. -->
           </div>
         </div>
 

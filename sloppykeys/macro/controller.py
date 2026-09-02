@@ -278,8 +278,13 @@ class MacroController:
             self._log(f"Failed to launch Roblox: {exc}")
             return False
 
-        # Wait for the window to appear (up to 60s)
-        deadline = time.time() + 60.0
+        # Wait for the window to appear. `lobby_rejoin_wait` is read here, which is the reader
+        # it never had: it sat in `DELAY_SPEC` doing nothing while this used a hardcoded 60s —
+        # and 60s is exactly the case its docstring calls out as too short, since a cold start
+        # is Roblox launching, updating, loading the place and spawning in. A deadline on a
+        # poll, so a generous value costs nothing when the join is quick.
+        budget = max(1.0, float(self._delays.get("lobby_rejoin_wait", 150.0)))
+        deadline = time.time() + budget
         while time.time() < deadline:
             if self._stop_requested:
                 return False
@@ -290,7 +295,7 @@ class MacroController:
                 return True
             time.sleep(2.0)
 
-        self._log("Roblox didn't appear within 60s.")
+        self._log(f"Roblox didn't appear within {budget:.0f}s.")
         return False
 
     def _run(self) -> tuple[bool, str]:
@@ -2008,7 +2013,15 @@ class MacroController:
         return True
 
     def _capture_screenshot(self) -> bytes | None:
-        """Capture the current Roblox screen as PNG bytes for webhook attachment."""
+        """Capture the current Roblox screen as PNG bytes for webhook attachment.
+
+        `result_screenshot_delay` is read **here**, which is the one place it can be: the
+        setting existed in `DELAY_SPEC` with no reader anywhere, so the Delays tab offered it
+        and moving the slider did nothing. Its own docstring describes the live problem — the
+        banner matches the moment it appears while the rewards under it animate in after, so a
+        capture with no wait catches a half-drawn panel.
+        """
+        time.sleep(max(0.0, float(self._delays.get("result_screenshot_delay", 1.0))))
         try:
             import mss
             import cv2
