@@ -106,9 +106,16 @@ Tokens are the user's money; context is finite.
 
 ## Originality
 
-All implementation is our own; external products are studied for general UX patterns only. Never
-reference external tools, products or inspiration sources in commits, code comments or docs — a
-commit message describes only the technical change in our code.
+All implementation is our own; external products are studied for ideas and UX patterns, never
+copied. **Commits and code comments name no other tool, product or inspiration source** — a commit
+message describes only the technical change in our code.
+
+**Prior art is credited in exactly one place: README's `## Credits`.** That is where this rule
+sends it, not an exception to it, so don't delete it as a violation.
+`Cweamy/Anime-Expeditions-Creams-Macro` is named there: several features started as ideas from it,
+its licence is MIT so its code *would* be free to reuse, and we don't — the implementation diverged
+(AHK input, a topmost overlay rather than a reparented child window, RapidOCR). If a substantial
+portion of someone else's code ever does land here, their licence notice ships beside it.
 
 ## Shell
 

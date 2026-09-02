@@ -34,6 +34,7 @@ Queue up Story, Challenge, Expedition, Raid and Events runs, place your units, a
 - [Project layout](#project-layout)
 - [Bugs and requests](#bugs-and-requests)
 - [Licence](#licence)
+- [Credits](#credits)
 - [Disclaimer](#disclaimer)
 
 ## Features
@@ -217,6 +218,18 @@ about this build, not a restriction on yours.
 
 Bundled attribution: the `ponytail` steering guide is MIT, from
 [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail).
+
+## Credits
+
+[Cweamy/Anime-Expeditions-Creams-Macro](https://github.com/Cweamy/Anime-Expeditions-Creams-Macro)
+came first, and several features here started as ideas from it — the task queue, the walk-path
+recorder, the block-based match plan, Discord match reports. Credit where it's due.
+
+The code is ours: this is an independent implementation, and the load-bearing parts ended up
+different. Input goes out through AutoHotkey v2 rather than `SendInput`; Roblox rides the
+topmost band with its frame stripped instead of being reparented as a child window (we tried
+reparenting, it didn't hold); OCR is RapidOCR, which pip installs, rather than Tesseract. Their
+macro is MIT too, so either way there's nothing here you can't use.
 
 ## Disclaimer
 
