@@ -2,7 +2,8 @@
 
 Some gamemodes list their acts at fixed positions in the stage screen, so we
 click a known client-space coordinate rather than image-matching each act. These
-are Roblox *client* coordinates (as read by the Macro Tester's coord picker);
+are Roblox *client* coordinates (as read by the point picker in Settings > Debug >
+Click Points);
 the navigator adds the Roblox client origin to get a screen point for AHK.
 
 Only gamemodes present here use coordinate-based act selection. Others will need

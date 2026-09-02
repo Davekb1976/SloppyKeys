@@ -104,12 +104,14 @@ your machine; nothing is uploaded anywhere except the webhook you configured.
 
 | Key | Does |
 |---|---|
-| `F1` | Start, or stop a run in progress |
-| `F2` | Stop |
-| `F3` | Reload |
-| `Ctrl` + `T` | Open the Macro Tester |
+| `F1` | Start |
+| `F2` | Pause / resume |
+| `F3` | Stop |
+| `F4` | Reload |
+| `F6` | Open the Image Manager |
+| `F7` | Compact mode |
 
-All four are rebindable in Settings, along with the in-game keys the macro presses for
+All six are rebindable in Settings, along with the in-game keys the macro presses for
 priority, upgrade, sell and auto-upgrade.
 
 Start and stop are separate keys on purpose: with one toggle, pressing it to start a run

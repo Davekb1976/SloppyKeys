@@ -61,8 +61,8 @@ once and is deleted; a test goes here when the logic would be expensive to get w
 (step ordering, a parser, a path validator, methods resolving). Non-trivial new logic leaves
 one behind — see `ponytail.md`.
 
-Don't run a Macro Tester row, launch the app, or check code this change didn't touch. Say what
-you verified and what you did not. "Probably fine" is not validation.
+Don't launch the app, press a button that drives the game, or check code this change didn't
+touch. Say what you verified and what you did not. "Probably fine" is not validation.
 
 ## Done means the ripples are handled
 
@@ -141,5 +141,5 @@ terminal alone: **any further command in it kills the app.** Check it's alive by
 No `Start-Process`, `pythonw.exe` or output redirection. Stop it with the titlebar X or
 `taskkill /IM python.exe /F`.
 
-The app is the user's to drive. Don't press F1 or run a Macro Tester row for them — that lands
-synthetic input on their live game.
+The app is the user's to drive. Don't press F1, run Set Camera, or scan the challenge panel
+for them — those land synthetic input on their live game.

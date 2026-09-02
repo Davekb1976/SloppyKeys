@@ -243,12 +243,13 @@
         <div class="card-ico ico-good" aria-hidden="true">
           <svg viewBox="0 0 24 24"><path d="M5 12.5 10 17l9-10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </div>
-        <h3>Macro Tester</h3>
+        <h3>Image Manager</h3>
         <p>
-          Run any single step in isolation with PASS / FAIL results, a coordinate and region
-          picker overlay, and a template tester. Tuning stops being guesswork.
+          Every template the macro looks for, in one grid: capture straight from the game,
+          crop it, set that one image's match threshold, and search for it on screen to see
+          what it scores. Missing templates are listed before you go looking.
         </p>
-        <span class="kbd-row"><kbd>Ctrl</kbd><span>+</span><kbd>T</kbd></span>
+        <span class="kbd-row"><kbd>F6</kbd></span>
       </article>
 
       <article class="card card-wide reveal" data-delay="120" data-spotlight>
@@ -449,11 +450,13 @@ py -3.14 -m venv .venv
 
         <div class="side-card reveal" data-delay="120" data-spotlight>
           <h4>Default hotkeys</h4>
-          <div class="bind"><span>Start / Stop</span><kbd>F1</kbd></div>
-          <div class="bind"><span>Stop</span><kbd>F2</kbd></div>
-          <div class="bind"><span>Reload</span><kbd>F3</kbd></div>
-          <div class="bind"><span>Macro Tester</span><span class="kbd-row"><kbd>Ctrl</kbd><span>+</span><kbd>T</kbd></span></div>
-          <p class="side-note">All four are rebindable in Settings → Keybinds.</p>
+          <div class="bind"><span>Start</span><kbd>F1</kbd></div>
+          <div class="bind"><span>Pause / resume</span><kbd>F2</kbd></div>
+          <div class="bind"><span>Stop</span><kbd>F3</kbd></div>
+          <div class="bind"><span>Reload</span><kbd>F4</kbd></div>
+          <div class="bind"><span>Image Manager</span><kbd>F6</kbd></div>
+          <div class="bind"><span>Compact mode</span><kbd>F7</kbd></div>
+          <p class="side-note">All six are rebindable in Settings → Keybinds.</p>
         </div>
       </aside>
     </div>
@@ -483,7 +486,7 @@ py -3.14 -m venv .venv
       </details>
       <details class="reveal" data-delay="120">
         <summary>Does it run a full session on its own?<span class="chev" aria-hidden="true"></span></summary>
-        <p>Yes. F1 walks the lobby, starts the stage, places your units, watches for the result and goes again. Queue up to three targets with a run limit each, and daily challenges preempt the queue while any are left. Every step is still runnable on its own in the Macro Tester when something needs tuning.</p>
+        <p>Yes. F1 walks the lobby, starts the stage, places your units, watches for the result and goes again. Queue up to three targets with a run limit each, and daily challenges preempt the queue while any are left. When something needs tuning, the Image Manager searches for any single template on the live screen and tells you what it scored.</p>
       </details>
       <details class="reveal" data-delay="140">
         <summary>Does it update itself?<span class="chev" aria-hidden="true"></span></summary>

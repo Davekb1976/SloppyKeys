@@ -1,5 +1,14 @@
 # SloppyKeys UI Map
 
+> **Frozen. This describes the PySide6 front end, which is gone.** Every file it names
+> (`ui/window.py`, `ui/theme.py`, `ui/pages/*`, `ui/macro_tester.py`) was deleted with Qt,
+> and so were the surfaces: there is no SelectorScreen, no RightPanel, no Macro Tester, no
+> `Ctrl + T`. Kept only as a record of what the widgets used to be called.
+>
+> The live UI is `sloppykeys/ui_web/` — `index.html` ids, `app.js`, `bridge.py` as the
+> `js_api`. Its vocabulary is the DOM ids themselves, and how to build a surface is the
+> `ui-feature` skill.
+
 Shared vocabulary for the interface. Use these names when asking for a change and there's
 no ambiguity about which widget you mean.
 

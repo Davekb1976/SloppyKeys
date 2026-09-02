@@ -29,13 +29,15 @@ captured from the app's own capture path; the rest were not.
 1. Make sure Roblox's monitor is at **100%** scaling (see below). Nothing else matters until
    this is true.
 2. Get the screen you want a template from up in the viewport.
-3. **Macro Tester → VISION → Dump client for cropping.** It copies the client straight to the
-   **clipboard** and also writes `images/debug/client.png`, both through the same mss path
-   `find_until` matches against, so the pixel size is right by construction. It warns if the
-   monitor isn't at 100%.
-4. **Ctrl+V into your editor**, crop, save at **24 or 32-bit**. (The file is there too if you
-   prefer opening it.)
-5. **Macro Tester → VISION → Check template scale** to confirm it reads 1.00x.
+3. **Image Manager (F6)** → find the card for the template, press **+**. It grabs the client
+   through the same mss path `find_until` matches against, so the pixel size is right by
+   construction, then opens the crop view.
+4. **Drag the crop** and save. It writes to the exact filename the card names, creating the
+   folder if it needs to — there is no chance of landing in the wrong place.
+
+Nothing in this route can produce the wrong scale, which is why it replaced dumping the
+client to the clipboard and cropping in an editor: that route worked, but every step was a
+chance to save from the wrong source.
 
 The screenshot *tool* is not really the issue — any capture of the framebuffer (Snipping
 Tool, PrintScreen) gives the same pixels **when the monitor is at 100%**. Roblox's own
@@ -95,11 +97,16 @@ recapture it.
 
 ## Checking your templates
 
+**Image Manager (F6) → the card's `Test` button**, standing on the screen that template
+belongs to. It searches the live client and logs either the score and where it matched, or
+the best score it reached and the threshold that rejected it. That number is the diagnosis:
+`best 0.66 < 0.70` means the crop is nearly right, `best 0.08` means this isn't the screen.
 
-**Macro Tester → VISION → Check template scale**, standing on the screen the templates belong
-to. It matches every template from 0.80x to 1.26x and reports any whose best score is not at
-1.00x, plus any 8-bit PNG. A template that isn't on the current screen is reported as
-inconclusive rather than broken, so run it once per screen.
+**There is no scale checker.** The old one swept every template from 0.80x to 1.26x and
+reported any whose best score peaked somewhere other than 1.00x — the check that caught the
+mistake at the top of this file. It went with the Macro Tester and has no replacement, so
+step 1 and step 3 above are now the whole defence: capture at 100% scaling, through the
+app's own capture path.
 
 Per-folder notes: `lobby/`, `gamemodes/`, `stages/`, `match/`, `events/`, `challenge/` each
 have their own README for what belongs there.

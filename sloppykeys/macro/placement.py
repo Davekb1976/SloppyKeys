@@ -219,7 +219,12 @@ class UnitPlacer:
 
     def press_game_key(self, action: str, count: int = 1) -> tuple[bool, str]:
         """Send one of the in-game keys (priority / upgrade / sell / autoupgrade).
-        Public so a Macro Tester row can exercise a single key on its own."""
+
+        **No caller.** It was public so a Macro Tester row could exercise one key on its
+        own, and that surface is gone; the run presses keys through `_press`. Kept because
+        pressing a single bound key is the smallest reproduction of "the game ignored our
+        input", and `tests/test_placement_plan.py` asserts it still resolves.
+        """
         key = self._game_keys().get(action, "")
         if not key:
             return (False, f"no key bound for '{action}'")
@@ -812,8 +817,12 @@ class UnitPlacer:
         return ", ".join(parts)
 
     def wait_for_win(self, timeout: float | None = None) -> tuple[bool, str]:
-        """(ok, message) form for a Macro Tester row. A defeat is a pass too: the
-        row is checking that the macro can *see* the end of a match."""
+        """(ok, message) form of `wait_for_outcome`, where a defeat is a pass too: this
+        answers "can the macro *see* the end of a match", not "did we win".
+
+        **No caller.** Written for a Macro Tester row, which is gone; the run loop polls
+        `poll_outcome` instead. `tests/test_placement_plan.py` asserts it still resolves.
+        """
         outcome, message = self.wait_for_outcome(timeout)
         if not outcome:
             return (False, message)

@@ -47,34 +47,24 @@ times seven acts would be 35 crops, all of them stale the next patch.
 
 ## `debug/`
 
-A PNG of every measured box, written by a tester row. Nothing searches this folder — it
-exists so you can see what the macro sees through each box. Delete it whenever.
+A PNG of every measured box, written when a region is previewed. Nothing searches this
+folder — it exists so you can see what the macro sees through each box. Delete it whenever.
 
-## Checking it, in this order
+## Checking it
 
-The Macro Tester has a **CHALLENGE** group, numbered in the order to use them, and each
-tip names the screen you must be standing on. Rows 2-5 all need **the challenge list
-open**: lobby → Play → Challenges, with three challenges visible. That precondition is
-the instruction, not a detail — a row pointed at the wrong screen reports plausible
-nonsense rather than failing.
+**Open the challenge panel in game first** — lobby → Play → Challenges, with three
+challenges visible. Everything below reads the screen as it is; none of it navigates
+anywhere, and none of it fires input. A read pointed at the wrong screen reports plausible
+nonsense rather than failing, so the precondition is the instruction.
 
-All of them are report-only. None fires any input.
+1. **Settings → OCR → Text Regions.** Each challenge box has a row: `Set` re-measures it by
+   drawing on a live capture, `Test` prints the raw text that box reads right now. That
+   separates "OCR is broken" from "the box points at the wrong pixels", and it is how the
+   first hand-measured set was caught reading the `Hard Mode` tag instead of the map name.
+   Re-measure after any patch that moves the UI.
+2. **Dashboard → Challenge → Scan.** The real test: per row it logs the parsed limit, the
+   matched map with its similarity, and the raw text both came from. A pass needs all three
+   rows read *and* identified — an unidentified map means the macro can't pick a config for
+   it.
 
-0. **VISION → Map challenge panel text** OCRs the whole client with detection on and
-   logs every line with its client-space box. This is the row that re-measures the
-   coordinates: it is how the first hand-measured set was found to be reading the
-   `Hard Mode` tag instead of the map name. Run it after any patch that moves the UI.
-1. **VISION → OCR ready?** starts the engine and prints the raw text it reads out of
-   each box. This separates "the dependency is broken" from "the box points at the
-   wrong pixels".
-2. **VISION → Dump challenge boxes** writes the ten boxes to `debug/` so you can look
-   at them. A coordinate that is off shows up here rather than as a mystery later.
-3. **VISION → Check challenge templates** is now just an OCR readiness check, since the
-   scan searches for no templates at all. Working OCR is the pass.
-4. **VISION → Scan challenges** is the real test: per row it logs the parsed limit, the
-   matched map with its similarity, and the raw text both came from. A pass needs all
-   three rows read *and* identified, because an unidentified map means the macro can't
-   pick a unit config for it.
-
-Open the challenge panel by hand before running 1, 2 and 4 — they read the screen as it
-is, and none of them navigates anywhere.
+The scan searches for no templates at all, so working OCR is the whole dependency.

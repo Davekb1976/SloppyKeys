@@ -171,8 +171,10 @@ to 0.57 and matched wrong screens; tolerance is per-template — `DEFAULT_CONFID
 - **OCR reads are approximate** — `start_game.png` comes back "Start Ge". Never require an
   exact string: match a closed set (`challenge.match_map_name`) or parse digits with the usual
   confusions folded in, and use the returned confidence to spot a weak read.
-- `image_search.to_absolute_path` passes an absolute path through **on purpose** (the Macro
-  Tester's file dialog). Don't "harden" it.
+- `image_search.to_absolute_path` passes an absolute path through **on purpose**: the
+  `detect` block resolves its template against four folders and hands over the absolute
+  hit, and `bridge.test_image_search` passes what `_template_path` already validated.
+  Don't "harden" it — the validation is at those boundaries, not here.
 - AHK v2: `FileDelete` on a missing file throws and hangs the script behind a dialog. Use
   `FileOpen(path, "w")`.
 

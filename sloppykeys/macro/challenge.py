@@ -7,8 +7,9 @@ otherwise the queue falls through to its target slots.
 Two halves, deliberately separate:
 
 - `ChallengeScanner` **reads** the panel — OCR for the limit and the map, saturation for
-  the star, no templates, no clicking, no sleeping. It can run as a Macro Tester row so
-  the coordinates can be proven before anything drives the game.
+  the star, no templates, no clicking, no sleeping. The Dashboard's Scan button
+  (`bridge.scan_challenge`) runs it on its own, so the coordinates can be proven before
+  anything drives the game.
 - `ChallengeTracker` **remembers** across reads: which rows this rotation has already
   been lost on, and when that memory stops applying.
 

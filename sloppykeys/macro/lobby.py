@@ -9,8 +9,9 @@ Image search runs in Python (capture the Roblox client area, template match);
 the actual mouse moves/clicks/scrolls go through AHK. Match centres come back in
 screen coordinates, which is exactly what AHK needs with CoordMode Screen.
 
-Each step is small and independently runnable so it can be verified one at a time
-in the Macro Tester. Steps return (ok, message).
+Each step is small and returns (ok, message), which the controller logs one line at a
+time — so a failed chain names the step that failed and the score it reached, rather
+than reporting that navigation didn't work.
 """
 
 from __future__ import annotations
