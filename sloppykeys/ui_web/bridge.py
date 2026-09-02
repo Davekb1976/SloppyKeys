@@ -1527,8 +1527,12 @@ class Api:
             "stages": ("Stage Selection", "template"),
             "challenge": ("Challenge", "template"),
             "events": ("Events", "template"),
+            "portals": ("Portals", "template"),
             "reference": ("Maps", "map"),
         }
+        # This table is not a display detail: the missing-template pass below filters
+        # `expected_paths()` by `assets/<key>/`, so an expected path whose folder has no
+        # entry here is dropped silently and its card never appears to capture into.
 
         # Read current thresholds from settings
         settings = UnifiedSettings(self._app_root)

@@ -42,3 +42,13 @@ template rather than clicking a fixed coordinate after a sleep:
   Play than the lobby's `images/lobby/play.png`.
 - `win_change.png` — the post-match panel's change-gamemode control. Never matched in game, so
   `change_gamemode` clicks `CHANGE_GAMEMODE_CLICK` instead and waits `panel_fade_wait` first.
+
+## Mid-match modals
+
+Both are cropped from a **header**, never from a card face: each hands out three choices and
+the three faces are different every time.
+
+- `exp_upgrade_card.png` — Expedition's "Select an upgrade!" modal. It renders over the
+  buttons underneath, so anything found behind it is drawn but unclickable.
+- `portal_choice.png` — the Portals chooser: three portals, one to pick, and it appears
+  **before** the victory screen. The rest of that chain is in `assets/portals/`.

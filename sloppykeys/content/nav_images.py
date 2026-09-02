@@ -9,6 +9,7 @@ Layout (under assets/):
     assets/gamemodes/<gamemode>.png             one per gamemode card
     assets/stages/<gamemode>/<stage>.png        one per stage/map
     assets/match/start_game.png                 in-match, proves the stage loaded
+    assets/portals/bag.png                      the inventory bag Portals is entered through
     assets/reference/<gamemode>/<map>.png       placement backdrop, not a template
 
 Filenames are slugs: lowercase, non-alphanumerics collapsed to "_".
@@ -32,6 +33,10 @@ MATCH_DIR = "match"
 # Where route templates live: the event cards in the sidebar, the act cards, and
 # anything else a user-authored Events route needs to confirm.
 EVENTS_DIR = "events"
+# Portals is entered from the inventory bag rather than the gamemode cards, so its chain
+# has no `play.png` and no card in `gamemodes/`. Its own folder for that reason: none of
+# these four belong to the lobby's intermission menu.
+PORTALS_DIR = "portals"
 # Placement backdrops, not search templates: whole client-area screenshots the position
 # picker draws coordinates on. See assets/reference/README.md.
 REFERENCE_DIR = "reference"
@@ -132,6 +137,34 @@ EXP_UPGRADE_CARD_IMAGE = "exp_upgrade_card.png"
 # it can be recaptured in Settings > Vision and the click can be *verified* instead of fired
 # at a screen nothing has confirmed. The coordinate stays as the missing-template fallback.
 WIN_CHANGE_IMAGE = "win_change.png"
+
+# # Portals
+# The chain, in the order a run meets it:
+#
+#   bag          the lobby's inventory button
+#   portals_tab  the Portals section inside the bag
+#   search       the search field, clicked to focus it before the name is typed
+#   activate     Activate Portal, on the selected portal's detail panel
+#
+# `search` earns a template rather than a coordinate because it is the one click in this
+# project whose failure sends *characters into the game world*: the portal name is typed
+# next, and `r`, `t` and `x` are the priority, upgrade and sell keys. A focused field is
+# not matchable, but the field itself is, so this is the closest thing to proof available
+# and the typing is gated on it.
+#
+# There is no `start.png` yet. The Start that appears after Activate may be the same art as
+# `lobby/start_match.png`, which is already searched rather than clicked blind precisely
+# because it moves per panel — so it is reused until a capture proves the two differ.
+PORTAL_BAG_IMAGE = "bag.png"
+PORTALS_TAB_IMAGE = "portals_tab.png"
+PORTAL_SEARCH_IMAGE = "search.png"
+PORTAL_ACTIVATE_IMAGE = "activate.png"
+
+# The end-of-match chooser: three portals, one of which must be picked before the victory
+# screen appears. Lives with the match templates because that is where it is seen, and
+# cropped from its **header** for the same reason as `exp_upgrade_card` — the three faces
+# are different portals every time, so no card is a stable crop.
+PORTAL_CHOICE_IMAGE = "portal_choice.png"
 
 
 def slug(name: str) -> str:
@@ -279,6 +312,42 @@ def expedition_match_paths() -> list[str]:
     ]
 
 
+def portal_bag_image() -> str:
+    """The lobby's inventory bag — how a Portals run enters, instead of Play."""
+    return os.path.join(IMAGES_DIR, PORTALS_DIR, PORTAL_BAG_IMAGE)
+
+
+def portals_tab_image() -> str:
+    """The Portals section inside the bag."""
+    return os.path.join(IMAGES_DIR, PORTALS_DIR, PORTALS_TAB_IMAGE)
+
+
+def portal_search_image() -> str:
+    """The portal search field. Clicked to focus it before the name is typed."""
+    return os.path.join(IMAGES_DIR, PORTALS_DIR, PORTAL_SEARCH_IMAGE)
+
+
+def portal_activate_image() -> str:
+    """Activate Portal, on the selected portal's detail panel."""
+    return os.path.join(IMAGES_DIR, PORTALS_DIR, PORTAL_ACTIVATE_IMAGE)
+
+
+def portal_choice_image() -> str:
+    """The end-of-match "pick one of three portals" header, before the victory screen."""
+    return os.path.join(IMAGES_DIR, MATCH_DIR, PORTAL_CHOICE_IMAGE)
+
+
+def portal_paths() -> list[str]:
+    """Every template a Portals run looks for, in the order it meets them."""
+    return [
+        portal_bag_image(),
+        portals_tab_image(),
+        portal_search_image(),
+        portal_activate_image(),
+        portal_choice_image(),
+    ]
+
+
 
 
 
@@ -339,6 +408,10 @@ def expected_paths() -> list[str]:
         win_change_image(),
     ]
     paths += expedition_match_paths()
+    # Listed before the gamemode loop because Portals' chain is not derived from the
+    # schema: it enters through the bag, so it has neither a card in `gamemodes/` nor
+    # stage cards, and the loop below would produce nothing for it.
+    paths += portal_paths()
     for name, gamemode in GAMEMODES.items():
         # A custom gamemode has no card in the gamemode menu and no fixed stage
         # list — it enters through the Events button and its templates are
