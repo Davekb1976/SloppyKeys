@@ -2121,12 +2121,31 @@ class Api:
             target = " / ".join(
                 p for p in (task.get("mode"), task.get("map"), task.get("stage")) if p
             )
+        # Wins and losses ride the poll the page already makes every second. `_push_status` is
+        # the only thing that ever sent `onMatchResult`, and nothing calls it on a result — so
+        # the Scoreboard froze at whatever it read when Start was pressed and only moved again
+        # on pause or stop. Carrying them here costs no extra call and lets the page notice a
+        # finished match, which is also what tells it to re-read the run history.
+        snap = self._ctrl._stats.snapshot()
         return {
             "running": self._ctrl.is_running,
             "cycle": self._ctrl.cycle,
             "target": target,
             "phase": "paused" if (self._ctrl.is_running and self._ctrl._paused) else ("running" if self._ctrl.is_running else "idle"),
+            "wins": snap.wins,
+            "losses": snap.losses,
+            "last": snap.last_run,
         }
+
+    def get_run_history(self) -> dict:
+        """Finished matches for the Dashboard's Run History card, newest first.
+
+        Read from `settings.json` rather than session memory, so the card has rows straight
+        after a launch instead of staying empty until the first match of this session.
+        """
+        if self._ctrl is None:
+            return {"ok": False, "runs": []}
+        return {"ok": True, "runs": self._ctrl._stats.history()}
 
     def _macro_run_loop(self) -> None:
         """Worker thread driving the runner."""

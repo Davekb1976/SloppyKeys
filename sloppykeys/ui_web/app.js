@@ -231,11 +231,27 @@
   // target and the cycle count froze at whatever they were when Start was pressed. A queue
   // moving to its next task, or a cycle completing, is not an event anyone pushes, so the
   // page asks. One dict a second costs nothing and stops the label lying for a whole run.
+  // Declared above the poll that reads them: a `let` touched before its declaration throws at
+  // load and takes every handler wired after it with it, and `node --check` cannot see that.
+  let lastResultTotal = -1;
+  const runHistory = document.getElementById("run-history");
+
+  // Row text includes the portal name the user typed, so it cannot go into innerHTML raw.
+  function esc(value) {
+    return String(value == null ? "" : value).replace(/[&<>"']/g, c => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    }[c]));
+  }
+
   setInterval(async () => {
     if (!window.pywebview || !pywebview.api || !pywebview.api.get_macro_status) return;
     try {
       const s = await pywebview.api.get_macro_status();
-      if (s) window.onMacroStatus(s.running, s.cycle, s.target, s.phase);
+      if (!s) return;
+      window.onMacroStatus(s.running, s.cycle, s.target, s.phase);
+      // The same dict carries the score now. Nothing pushed onMatchResult on a result, so
+      // the Scoreboard sat still for whole runs; the poll is the one thing that always runs.
+      window.onMatchResult(s.last === "Win", s.wins, s.losses);
     } catch (e) { /* the bridge is not up yet, or the window is closing */ }
   }, 1000);
 
@@ -246,8 +262,40 @@
     const total = wins + losses;
     const rate = total > 0 ? Math.round(wins * 100 / total) + "%" : "—";
     document.getElementById("stat-winrate").textContent = rate;
-    document.getElementById("stat-last").textContent = won ? "Win" : "Loss";
+    document.getElementById("stat-last").textContent = total > 0 ? (won ? "Win" : "Loss") : "—";
+    // Re-read the history only when the score actually moved. Polling the list every second
+    // would re-parse settings.json 3600 times an hour to redraw the same rows.
+    if (total !== lastResultTotal) {
+      lastResultTotal = total;
+      refreshRunHistory();
+    }
   };
+
+  // ---- Run History card ----
+  // The card existed as markup with no renderer and no bridge method behind it, so it showed
+  // its hardcoded "No runs yet" forever. Rows come from settings.json, so a fresh launch shows
+  // previous sessions rather than waiting for this one to finish a match.
+  async function refreshRunHistory() {
+    if (!window.pywebview || !pywebview.api || !pywebview.api.get_run_history) return;
+    try {
+      const r = await pywebview.api.get_run_history();
+      const runs = (r && r.runs) || [];
+      if (!runs.length) {
+        runHistory.innerHTML = '<div class="empty-state">No runs yet</div>';
+        return;
+      }
+      // innerHTML replaces the hardcoded empty state rather than appending past it, which
+      // would leave "No runs yet" sitting above the rows.
+      runHistory.innerHTML = runs.map(run => {
+        const cls = run.result === "Win" ? "won" : "lost";
+        return `<div class="history-row ${cls}">
+          <span class="history-result">${esc(run.result)}</span>
+          <span class="history-target">${esc(run.target)}</span>
+          <span class="history-meta">${esc(run.duration)} · ${esc(run.at)}</span>
+        </div>`;
+      }).join("");
+    } catch (e) { /* the bridge is not up yet */ }
+  }
 
   // ---- Challenge card ----
   const chalSlots = document.getElementById("chal-slots");
@@ -1177,6 +1225,9 @@
   // Called from Python's on_loaded after _app_root is set.
   window.onBackendReady = function () {
     loadSettings();
+    // Rows persist in settings.json, so the card can be filled before this session has
+    // played anything. Without this it stays empty until the first match of the run finishes.
+    refreshRunHistory();
     loadGameKeybinds();
     loadOperationList();
     // Before the queue, not beside it: `renderTaskList` reads `modeFields` synchronously to
