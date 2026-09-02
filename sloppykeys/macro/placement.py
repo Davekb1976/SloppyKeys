@@ -262,7 +262,14 @@ class UnitPlacer:
 
     # # Unit panel
     def open_unit_panel(self, x: int, y: int) -> tuple[bool, str]:
-        """Click a placed unit and confirm its panel is open.
+        """Click a placed unit at a **client-space** point and confirm its panel is open."""
+        point = self._screen(x, y)
+        if point is None:
+            return (False, "unit click failed: Roblox not found")
+        return self.open_unit_panel_at(point[0], point[1], label=f"{x},{y}")
+
+    def open_unit_panel_at(self, sx: int, sy: int, label: str = "") -> tuple[bool, str]:
+        """Click a placed unit at a **screen-space** point and confirm its panel is open.
 
         Same point every time, with the tight wiggle, up to `select_attempts` times,
         parking at the empty corner between tries (every `select_clicks_per_park`
@@ -271,11 +278,20 @@ class UnitPlacer:
         Retrying rather than searching nearby is what the log supports: the only
         failure ever recorded was the first placement after Start Game, and it was
         rescued by re-clicking the *same* coordinate seconds later.
+
+        Screen space is the primitive because that is what the *other* caller has:
+        `MacroController`'s unit-action blocks resolve their coordinate through
+        `_client_to_screen`, which scales by the live viewport, while `_screen` here only
+        offsets. Two conversions for one meaning, so the guard takes the converted point
+        and `open_unit_panel` is the thin client-space wrapper. `label` keeps a caller's
+        own coordinate spelling in the log — screen numbers mean nothing to someone
+        reading a block's client-space x/y.
         """
+        where = label or f"{sx},{sy}"
         attempts = max(1, self.select_attempts)
         started = time.monotonic()
         for attempt in range(1, attempts + 1):
-            ok, message = self._click_client(x, y, spread=SPREAD_TIGHT)
+            ok, message = self._click_screen(sx, sy, spread=SPREAD_TIGHT)
             if not ok:
                 return (False, f"unit click failed: {message}")
             budget = self.select_first_timeout if attempt == 1 else self.select_timeout
@@ -283,10 +299,10 @@ class UnitPlacer:
                 elapsed = time.monotonic() - started
                 return (
                     True,
-                    f"panel open at {x},{y} (click {attempt}/{attempts}, {elapsed:.1f}s)",
+                    f"panel open at {where} (click {attempt}/{attempts}, {elapsed:.1f}s)",
                 )
             self._log(
-                f"Unit panel not detected around {x},{y} — "
+                f"Unit panel not detected around {where} — "
                 f"click {attempt}/{attempts} at {time.monotonic() - started:.1f}s."
             )
             if attempt < attempts and attempt % max(1, self.select_clicks_per_park) == 0:
@@ -296,7 +312,7 @@ class UnitPlacer:
                 time.sleep(self.settle)
         return (
             False,
-            f"unit panel never appeared around {x},{y} after {attempts} clicks in "
+            f"unit panel never appeared around {where} after {attempts} clicks in "
             f"{time.monotonic() - started:.1f}s — either the click isn't selecting "
             "the unit, or unit_ui.png isn't matching an open panel",
         )

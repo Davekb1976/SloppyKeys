@@ -1094,6 +1094,32 @@ class MacroController:
             return self._client_to_screen(x, y)
         return None
 
+    def _select_unit(self, pos: tuple[int, int], what: str) -> bool:
+        """Click the unit at `pos` and confirm its panel is open. False means press nothing.
+
+        The one thing standing between a missed click and `t`/`x`/`r` going into the game
+        world, where they are upgrade, sell and priority on *whatever the world does with
+        them* rather than on the unit. A fixed settle used to sit here instead, which cannot
+        tell a swallowed click from a selection: the run pressed the key either way, placed
+        or upgraded nothing, and read as healthy until the result screen.
+
+        Delegates to `UnitPlacer.open_unit_panel_at`, which already owns the retry, the park
+        between tries and the diagnostic that says whether the click missed or the template
+        did. `_placer` shares this controller's `should_stop`, so F1 abandons the wait.
+
+        On failure the block is **skipped, not retried** — the tick loop would otherwise
+        re-run it every tick for the rest of the match, and a match with one missing upgrade
+        can still be won. The park is because the cursor is left sitting on the unit spot:
+        Roblox draws a tooltip under a resting cursor, and that tooltip has already been
+        measured covering a button a later search needed (`best 0.47`). A move, not a click,
+        so it cannot select or place anything.
+        """
+        ok, message = self._placer.open_unit_panel_at(pos[0], pos[1])
+        if not ok:
+            self._log(f"    [block] {what}: {message} — pressing nothing")
+            self._placer.park()
+        return ok
+
     def _place_unit_by_index(self, n: int) -> dict | None:
         """Return the Nth (1-based) place_unit block across all phases."""
         phases = getattr(self, "_phases", None) or {}
@@ -1140,7 +1166,8 @@ class MacroController:
         return sanitize_game_key(raw)
 
     def _tick_upgrade_unit(self, block: dict) -> bool:
-        """Click the unit, press upgrade key. Repeats up to `times`. If autograde is on, press autograde key after."""
+        """Select the unit, confirm its panel, press upgrade. Repeats up to `times`.
+        If autograde is on, press the autograde key that many times instead."""
         params = block.get("params", {})
         times = max(1, int(params.get("times", 1) or 1))
         autograde = block.get("autograde", False)
@@ -1154,7 +1181,7 @@ class MacroController:
             self._log("    [block] upgrade: no unit position — skipping")
             return True
 
-        from sloppykeys.macro.input_scripts import nudge_click_script, key_script, SPREAD_TIGHT
+        from sloppykeys.macro.input_scripts import key_script
 
         # With Auto on, `times` is the auto-upgrade *level*: the key steps through the
         # levels, so pressing it N times selects level N. It replaces the manual presses
@@ -1165,8 +1192,9 @@ class MacroController:
                 self._log("    [block] upgrade: no usable autograde keybind — skipping")
                 del self._upgrade_state[id(block)]
                 return True
-            self._ahk.run(nudge_click_script(pos[0], pos[1], spread=SPREAD_TIGHT), wait=True, timeout=5.0)
-            time.sleep(0.4)
+            if not self._select_unit(pos, "auto upgrade"):
+                del self._upgrade_state[id(block)]
+                return True
             self._ahk.run(key_script(key, count=times), wait=True, timeout=3.0 + times)
             self._log(f"    [block] auto upgrade → level {times} ({times}× {key.upper()})")
             del self._upgrade_state[id(block)]
@@ -1177,8 +1205,11 @@ class MacroController:
             self._log("    [block] upgrade: no usable upgrade keybind — skipping")
             del self._upgrade_state[id(block)]
             return True
-        self._ahk.run(nudge_click_script(pos[0], pos[1], spread=SPREAD_TIGHT), wait=True, timeout=5.0)
-        time.sleep(0.4)
+        # Re-verified on every repeat, not once for the run of presses: each pass is a fresh
+        # click, and the panel can close between two ticks.
+        if not self._select_unit(pos, "upgrade"):
+            del self._upgrade_state[id(block)]
+            return True
         self._ahk.run(key_script(key), wait=True, timeout=3.0)
         time.sleep(0.3)
 
@@ -1189,7 +1220,7 @@ class MacroController:
         return False
 
     def _tick_sell_unit(self, block: dict) -> bool:
-        """Click the unit, press sell key. One-shot."""
+        """Select the unit, confirm its panel, press sell. One-shot."""
         pos = self._unit_click_position(block)
         if pos is None:
             self._log("    [block] sell: no unit position — skipping")
@@ -1199,9 +1230,9 @@ class MacroController:
         if not key:
             self._log("    [block] sell: no usable sell keybind — skipping")
             return True
-        from sloppykeys.macro.input_scripts import nudge_click_script, key_script, SPREAD_TIGHT
-        self._ahk.run(nudge_click_script(pos[0], pos[1], spread=SPREAD_TIGHT), wait=True, timeout=5.0)
-        time.sleep(0.4)
+        from sloppykeys.macro.input_scripts import key_script
+        if not self._select_unit(pos, "sell"):
+            return True
         self._ahk.run(key_script(key), wait=True, timeout=3.0)
         return True
 
@@ -1232,12 +1263,14 @@ class MacroController:
             self._log(f"    [block] target priority already {wanted} on a fresh unit — no press")
             return True
 
-        from sloppykeys.macro.input_scripts import nudge_click_script, key_script, SPREAD_TIGHT
-        self._ahk.run(nudge_click_script(pos[0], pos[1], spread=SPREAD_TIGHT), wait=True, timeout=5.0)
-        time.sleep(0.4)
+        from sloppykeys.macro.input_scripts import key_script
+        # Keybind before the click, so an unusable bind costs no click and leaves no panel
+        # open behind a block that pressed nothing.
         key = self._safe_game_key("priority")
         if not key:
             self._log("    [block] target priority: no usable priority keybind — skipping")
+            return True
+        if not self._select_unit(pos, "target priority"):
             return True
         self._ahk.run(key_script(key, count=presses), wait=True, timeout=3.0 + presses)
         time.sleep(0.2)
