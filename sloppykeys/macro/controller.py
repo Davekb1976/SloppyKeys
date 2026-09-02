@@ -1767,9 +1767,14 @@ class MacroController:
                 "  Challenge: the panel never read as open — not clicking a row blind. "
                 "Check the limit boxes in Settings > OCR."
             )
+            # Nothing confirmed this screen, so no blind fallback click — but the searched
+            # closes still run, because whatever *is* up is between the next task and its
+            # first click.
+            self._close_challenge_ui(panel_confirmed=False)
             return
         if not reads:
             self._log("  Challenge: panel scan returned nothing.")
+            self._close_challenge_ui(panel_confirmed=True)
             return
         self._challenges.note_reads(reads)
         # Same reads the Scan button shows, pushed to the Dashboard card. Without this the
@@ -1873,16 +1878,39 @@ class MacroController:
             break  # one challenge per detour
 
         if not started:
-            # **The challenge list is a panel over the gamemode cards.** Left open, the next
-            # task's `click_play` searches a screen the Play button is not on, and the run
-            # skips that task — which now happens on every detour that finds nothing, because
-            # a detour is taken before every match rather than once per queue pass.
-            # `close_challenge_list` is what puts the cards back within reach; clicking
-            # change-gamemode instead is what used to produce "Open Story: Story card not
-            # found" after every challenge pass. Only reached where the scan proved the panel
-            # is up, so the blind close click cannot land on an unknown screen.
+            self._log("  Challenge: nothing started — closing up.")
+            self._close_challenge_ui(panel_confirmed=True)
+
+    def _close_challenge_ui(self, panel_confirmed: bool) -> None:
+        """Undo a challenge detour that started no match, all the way back to the lobby.
+
+        **Two panels are open, and both have to go.** The challenge list sits over the
+        gamemode chooser, and the chooser sits over the lobby. Closing only the list is
+        enough for a mode that picks a card off the chooser, which is why one close looked
+        correct for so long — but the inventory bag is on the *lobby*, so a Portals task next
+        in the queue searched for the bag through the panel covering it and reported
+        `Bag not found (best 0.52 < 0.80)`, then skipped. A covered template scores like a bad
+        crop, which is what made that read as a capture problem.
+
+        Every exit that starts nothing comes here, not just the one where all the enabled
+        slots are spent: a scan that could not read the panel leaves exactly the same two
+        panels up.
+
+        `panel_confirmed` decides whether the list's blind fallback coordinate may be used.
+        Neither close failing is fatal — the next task's own chain reports it — so this
+        returns nothing and only logs.
+        """
+        # The coordinate itself stays in `content/challenge.py` — the navigator's default. All
+        # this decides is whether a blind click is allowed at all.
+        if panel_confirmed:
             ok, msg = self._nav.close_challenge_list()
-            self._log(f"  Challenge: nothing started — closing the list ({msg})")
+        else:
+            ok, msg = self._nav.close_challenge_list(fallback=None)
+        self._log(f"  Challenge: close list — {msg}")
+        # Unconditional: the list may already have been closed by hand, or its close may have
+        # missed while the chooser underneath is still up and still covering the bag.
+        ok, msg = self._nav.close_gamemode_menu()
+        self._log(f"  Challenge: close gamemode menu — {msg}")
 
     def _navigate_to_challenge(self) -> bool:
         """Navigate lobby to the challenge panel: Play → Challenge card → wait for panel."""

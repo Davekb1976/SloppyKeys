@@ -10,7 +10,23 @@ Where the boxes are: `content/challenge.py`. How the text is read: `core/ocr.py`
 maps a challenge can land on, so an imperfect read still lands on the right map and
 "none of them" stays a possible answer.
 
-## Nothing in this folder is searched. Don't capture anything for it.
+## One template, and it is the way out
+
+- `close.png` — **the challenge list's own close button.** The only searched file here.
+
+Leaving the list is not `change_gamemode`: the list is a panel over the gamemode chooser,
+and the chooser is a panel over the lobby, so getting back to a state the next task can
+navigate from takes **both** closes — this one and `lobby/close_gamemode.png`. Stopping
+after one is what made a following Portals task report `Bag not found (best 0.52 < 0.80)`,
+because the bag was behind the chooser rather than badly cropped.
+
+`content/challenge.py::CLOSE_LIST_CLICK` stays as the fallback while this file is
+uncaptured, the same arrangement as `select_stage`/`start_match`. Capturing it buys one
+thing the coordinate cannot: a blind click is only safe on a screen the OCR scan confirmed,
+so the detour that *fails* to read the panel can currently only close it if this template
+exists. Until then that path leaves the panel up and the next task is skipped.
+
+## Nothing else in this folder is searched. Don't capture anything else for it.
 
 **You do not need a star image.** The greyed star is detected by **colour**, not by a
 template: `STAR_SATURATION_MIN` in `content/challenge.py`, checked against the 90th
@@ -42,8 +58,8 @@ covered the OCR engine failing to start, and it could say "used up" without ever
 from 8. The limit is read by OCR or it stays unknown, and an unknown row is still worth
 attempting.
 
-Nothing else belongs here. There are deliberately **no** map-name templates: five maps
-times seven acts would be 35 crops, all of them stale the next patch.
+Nothing else belongs here beyond `close.png`. There are deliberately **no** map-name
+templates: five maps times seven acts would be 35 crops, all of them stale the next patch.
 
 ## `debug/`
 
@@ -67,4 +83,5 @@ nonsense rather than failing, so the precondition is the instruction.
    rows read *and* identified — an unidentified map means the macro can't pick a config for
    it.
 
-The scan searches for no templates at all, so working OCR is the whole dependency.
+The scan searches for no templates at all, so working OCR is the whole dependency. `close.png`
+is used after the scan, not by it.

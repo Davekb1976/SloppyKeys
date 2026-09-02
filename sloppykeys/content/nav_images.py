@@ -37,6 +37,13 @@ EVENTS_DIR = "events"
 # has no `play.png` and no card in `gamemodes/`. Its own folder for that reason: none of
 # these four belong to the lobby's intermission menu.
 PORTALS_DIR = "portals"
+# The challenge panel's folder. Almost everything about that panel is read by OCR at
+# measured boxes (`content/challenge.py`), so the only template here is the way out.
+CHALLENGE_DIR = "challenge"
+# The list's close button. The blind `challenge.CLOSE_LIST_CLICK` stays as its fallback, the
+# way `select_stage`/`start_match` keep theirs — but a searched close can also be used on a
+# screen the OCR scan failed to confirm, where a blind click has no business landing.
+CHALLENGE_CLOSE_IMAGE = "close.png"
 # Placement backdrops, not search templates: whole client-area screenshots the position
 # picker draws coordinates on. See assets/reference/README.md.
 REFERENCE_DIR = "reference"
@@ -56,6 +63,17 @@ SELECT_STAGE_IMAGE = "select_stage.png"
 # The lobby's Events button. Clicked instead of Play for the Events gamemode,
 # because the events list is a different UI section from the gamemode cards.
 EVENTS_IMAGE = "events.png"
+# # Closing the intermission menu back to the lobby proper
+# The gamemode chooser's own close/back control. Needed because the chooser is a panel
+# *over* the lobby, and **the inventory bag is on the lobby, not the chooser** — so a
+# gamemode whose chain starts at the bag cannot begin while this is open. Leaving it up is
+# what made a Portals task report `Bag not found (best 0.52 < 0.80)` and skip: the search
+# was matching the bag template against the chooser covering it. Story and Raid never
+# noticed, because the cards they need are on the chooser itself.
+#
+# No fallback coordinate: nobody has measured one, and a blind click on the lobby is how a
+# stray click reaches the world. A miss reports and the caller carries on.
+CLOSE_GAMEMODE_IMAGE = "close_gamemode.png"
 # Only exists once a stage is loaded and the player has control, so finding it is
 # how the macro tells "in the match" from "still on the loading screen". It comes
 # back after a win, which is also how the next match is started.
@@ -269,6 +287,18 @@ def repeat_image() -> str:
     return os.path.join(IMAGES_DIR, MATCH_DIR, REPEAT_IMAGE)
 
 
+def close_gamemode_image() -> str:
+    """The gamemode chooser's close/back control — the second half of leaving a challenge
+    detour, and the one that uncovers the inventory bag."""
+    return os.path.join(IMAGES_DIR, LOBBY_DIR, CLOSE_GAMEMODE_IMAGE)
+
+
+def challenge_close_image() -> str:
+    """The challenge list's own close button. Searched now rather than clicked blind, so the
+    list can be left from a screen the scan could not confirm."""
+    return os.path.join(IMAGES_DIR, CHALLENGE_DIR, CHALLENGE_CLOSE_IMAGE)
+
+
 def back_lobby_image() -> str:
     """In-match Back to Lobby — opens `return_lobby_confirm_image`, doesn't leave."""
     return os.path.join(IMAGES_DIR, MATCH_DIR, BACK_LOBBY_IMAGE)
@@ -450,6 +480,11 @@ def expected_paths() -> list[str]:
         # card. `sighted` returns False for a missing file, which leaves the block inert.
         autoplay_image(),
         autoplay_active_image(),
+        # The two-step way out of a challenge detour that started nothing. Both are listed
+        # even though each has a survivable miss, because the failure they prevent lands on
+        # the *next* task: an unclosed panel covers whatever that task's chain starts from.
+        challenge_close_image(),
+        close_gamemode_image(),
     ]
     paths += expedition_match_paths()
     # Listed before the gamemode loop because Portals' chain is not derived from the

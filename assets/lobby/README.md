@@ -5,6 +5,8 @@
   gamemode, which enters through the events list rather than the gamemode cards.
 - `select_stage.png` — **the Select Stage button**, clicked one step before Start.
 - `start_match.png` — **the lobby Start button**, the last click before a stage loads.
+- `close_gamemode.png` — the intermission menu's own close/back control, which puts the
+  **lobby proper** back on screen. See below.
 
 Capture all of these from the **Image Manager** (F6): it grabs the exact pixels the matcher
 reads, at the pinned client size, and writes them to the right filename. Cropping from
@@ -35,3 +37,26 @@ wave.
 Until a file exists the macro falls back to the old fixed coordinate and says so in the log
 (`clicked Select Stage at x,y (fixed coordinate — add assets/lobby/select_stage.png ...)`),
 so nothing breaks in the meantime — but the fallback is the bug these files fix.
+
+## `close_gamemode.png` — the one that uncovers the inventory bag
+
+The intermission menu is a panel *over* the lobby, and **the bag Portals is entered from is
+on the lobby**. So a queue that leaves that panel open cannot start a Portals task: the bag
+search runs against the panel covering it and reports `Bag not found (best 0.52 < 0.80)`.
+
+That number is the trap. A covered template scores like a badly cropped one, so the miss
+reads as "recapture `portals/bag.png`" when the template was fine and the screen was wrong.
+If a search misses at a plausible-looking score, check what is on top of it before recapturing.
+
+Story and Raid never needed this, which is why one close looked correct for a long time —
+the cards they click are on the panel itself. Only a chain that starts on the lobby cares.
+
+Used by `LobbyNavigator.close_gamemode_menu`, and the only caller so far is the second half
+of leaving a challenge detour that started no match
+(`MacroController._close_challenge_ui`).
+
+**No fallback coordinate, deliberately.** Every other button here degrades to a measured
+point while its template is uncaptured; this one does not, because a blind click aimed at the
+lobby lands in the game world if the panel has already closed. Until the file exists the log
+says `assets/lobby/close_gamemode.png is missing — capture it in the Image Manager` and the
+panel stays open, which is the survivable failure of the two.

@@ -35,6 +35,8 @@ from sloppykeys.content.start_stage import (
 )
 from sloppykeys.content.nav_images import (
     back_lobby_image,
+    challenge_close_image,
+    close_gamemode_image,
     events_image,
     gamemode_image,
     match_play_image,
@@ -436,27 +438,59 @@ class LobbyNavigator:
             f"searched instead)",
         )
 
-    def close_challenge_list(self) -> tuple[bool, str]:
-        """Close the challenge list, putting the gamemode cards back within reach.
+    def close_challenge_list(
+        self, fallback: tuple[int, int] | None = CLOSE_LIST_CLICK
+    ) -> tuple[bool, str]:
+        """Close the challenge list, putting the gamemode chooser back within reach.
 
-        The list is a panel *over* the gamemode menu, so leaving it is its own close button
-        (`CLOSE_LIST_CLICK`) — not `change_gamemode`, which belongs to the panel a finished
-        match lands on. Using the wrong one here left the macro on the challenge list and
-        the following card search found nothing.
+        The list is a panel *over* the gamemode chooser, so leaving it is its own close
+        button — not `change_gamemode`, which belongs to the panel a finished match lands on.
+        Using the wrong one here left the macro on the challenge list and the following card
+        search found nothing.
 
-        A fixed coordinate on a screen the macro has just read three rows off, so it is
-        known to be up; the card search that follows is what proves the click landed.
+        Searched, with `CLOSE_LIST_CLICK` as the fallback while the template is uncaptured,
+        the same arrangement as `select_stage`/`start_match`. The search is what lets this be
+        called on a screen the OCR scan could **not** confirm: pass `fallback=None` there, so
+        a miss reports instead of firing a blind click at an unknown screen.
+
+        Closing this is only half of leaving — see `close_gamemode_menu`.
         """
+        path = challenge_close_image()
+        if self._engine.template_exists(path):
+            return self._find_click(path, "Close challenge list", timeout=self.search_timeout)
+        if fallback is None:
+            return (False, f"{path} is missing and a blind click is not safe here")
         rect = self._rect()
         if rect is None:
             return (False, "Roblox not found")
-        ok, message = self._click_client(rect, CLOSE_LIST_CLICK)
+        ok, message = self._click_client(rect, fallback)
         if not ok:
             return (False, message)
-        # No settle: the caller's next step is the card search, which polls until the cards
-        # are uncovered. The cards cannot match while the panel is still over them, so an
-        # early first look costs one 17ms miss, not a wrong click.
-        return (True, f"closed the challenge list at {CLOSE_LIST_CLICK[0]},{CLOSE_LIST_CLICK[1]}")
+        # No settle: the caller's next step is another search, which polls until the panel is
+        # gone. An early first look costs one 17ms miss, not a wrong click.
+        return (
+            True,
+            f"closed the challenge list at {fallback[0]},{fallback[1]} "
+            f"(fixed coordinate — add {path} so it is searched instead)",
+        )
+
+    def close_gamemode_menu(self) -> tuple[bool, str]:
+        """Close the gamemode chooser, landing in the lobby proper.
+
+        The second half of leaving a challenge detour. The chooser is itself a panel over the
+        lobby, and **the inventory bag is on the lobby** — so stopping after
+        `close_challenge_list` leaves a Portals task searching for the bag against the panel
+        covering it, which is the `Bag not found (best 0.52 < 0.80)` skip. Modes that pick a
+        card off the chooser never noticed.
+
+        No fallback coordinate on purpose: none has been measured, and the lobby is a live
+        screen where a blind click reaches the world. A miss reports and the caller carries
+        on — the next task's own chain will fail loudly enough if this mattered.
+        """
+        path = close_gamemode_image()
+        if not self._engine.template_exists(path):
+            return (False, f"{path} is missing — capture it in the Image Manager")
+        return self._find_click(path, "Close gamemode menu", timeout=self.search_timeout)
 
     def leave_match(self) -> tuple[bool, str]:
         """Click the in-match Play button on a finished match, which continues out of it.

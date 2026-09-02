@@ -36,7 +36,7 @@ import os
 from datetime import datetime, timedelta
 
 from .gamemodes import CHALLENGE, maps_for
-from .nav_images import IMAGES_DIR
+from .nav_images import CHALLENGE_DIR, IMAGES_DIR
 
 SLOT_COUNT = 3
 SLOTS = (1, 2, 3)
@@ -177,7 +177,6 @@ CHANGE_GAMEMODE_CLICK = (676, 391)
 # the map rotates with an act appended. This crop lets the *runnable* decision, the
 # only read that changes what the macro does, still work on a machine where the OCR
 # engine won't start.
-CHALLENGE_DIR = "challenge"
 DEBUG_SUBDIR = "debug"
 # # The greyed star: read by colour, with no template at all
 # A row already completed this rotation draws its star grey. That is the only on-screen
