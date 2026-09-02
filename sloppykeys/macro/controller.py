@@ -814,11 +814,15 @@ class MacroController:
             if outcome is not None:
                 result, msg = outcome
                 if result == OUTCOME_WON:
-                    self._stats.record(won=True)
+                    # Same label the webhook uses, so a row on the card and a Discord embed
+                    # name the match identically. Read here rather than in the tracker: only
+                    # the controller knows which task is in flight, and on a challenge detour
+                    # `_current_task` is the challenge, which is the right answer.
+                    self._stats.record(won=True, target=self._task_label())
                     self._log(f"  Win! ({msg})")
                     self._send_webhook_result("win")
                 elif result == OUTCOME_LOST:
-                    self._stats.record(won=False)
+                    self._stats.record(won=False, target=self._task_label())
                     self._log(f"  Loss. ({msg})")
                     self._send_webhook_result("loss")
                 else:

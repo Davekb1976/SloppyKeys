@@ -17,6 +17,13 @@ SETTINGS_FILE = "settings.json"
 STATS_KEY = "stats"
 WINS_KEY = "wins"
 LOSSES_KEY = "losses"
+# One record per finished match, newest last, for the Dashboard's Run History card. Separate
+# from `stats` because that key is two counters that get overwritten — a list needs its own.
+HISTORY_KEY = "run_history"
+# **Bounded on write.** A farm left running overnight finishes hundreds of matches, and this
+# file is read whole on every settings edit, so an unbounded list would grow the parse cost of
+# every unrelated save. Fifty is more rows than the card can show without scrolling for a while.
+HISTORY_LIMIT = 50
 
 
 def _rate(wins: int, total: int) -> str:
@@ -112,6 +119,12 @@ class StatsTracker:
         self._launched = time.monotonic()
         self._stage_start: float | None = None
         self._last_stage = 0.0
+        # Does `_last_stage` belong to the match about to be recorded, or the one before it?
+        # `end_stage` deliberately no-ops when no clock is running, so `_last_stage` survives
+        # across matches — which is right for the webhook reading it straight after a result,
+        # and wrong for a history row on a match that was never clocked: it would inherit the
+        # previous match's length and print a duration nobody measured.
+        self._stage_timed = False
         self._last_run = "-"
 
     # # Persistence
@@ -128,16 +141,53 @@ class StatsTracker:
 
         return (count(WINS_KEY), count(LOSSES_KEY))
 
-    def _write(self) -> None:
+    def _write(self, entry: dict | None = None) -> None:
         # Called from the **macro worker** on every result, while the UI thread is free to
         # be saving the task queue or a delay into the same file. Read-then-write here was
         # reverting those edits; `update_json` holds the lock across both halves.
+        #
+        # The counters and the history row go in **one** mutate for the same reason: two
+        # `update_json` calls would take the lock twice and could interleave with a UI save
+        # between them, leaving a result counted but unlisted.
         counts = {WINS_KEY: self._all_wins, LOSSES_KEY: self._all_losses}
 
         def mutate(payload: dict) -> None:
             payload[STATS_KEY] = counts
+            if entry is None:
+                return
+            # Whatever is on disk is untrusted — a hand-edited file, or an older shape — so a
+            # non-list is replaced rather than appended to, which would raise and lose the run.
+            existing = payload.get(HISTORY_KEY)
+            rows = [r for r in existing if isinstance(r, dict)] if isinstance(existing, list) else []
+            rows.append(entry)
+            payload[HISTORY_KEY] = rows[-HISTORY_LIMIT:]
 
         update_json(self._path, mutate)
+
+    def history(self) -> list[dict]:
+        """Finished matches, **newest first**, as the card wants them.
+
+        Read from disk rather than memory so the card is populated on a fresh launch, before
+        this session has finished anything. Malformed rows are dropped, not repaired: a row
+        with no result is not a run, and inventing one would put a fake match on the card.
+        """
+        raw = read_json(self._path).get(HISTORY_KEY)
+        if not isinstance(raw, list):
+            return []
+        rows = []
+        for row in raw:
+            if not isinstance(row, dict) or row.get("result") not in ("Win", "Loss"):
+                continue
+            rows.append(
+                {
+                    "result": row["result"],
+                    "target": str(row.get("target") or "—"),
+                    "duration": str(row.get("duration") or "-"),
+                    "at": str(row.get("at") or ""),
+                }
+            )
+        rows.reverse()
+        return rows
 
     # # Clocks
     def abandon_stage(self) -> None:
@@ -148,11 +198,14 @@ class StatsTracker:
         if it had finished.
         """
         self._stage_start = None
+        self._stage_timed = False
 
     def start_stage(self) -> None:
         """A match has begun. Called when the in-match Start Game click lands, which is
         the moment the waves start — the only event that means "the match is running"."""
         self._stage_start = time.monotonic()
+        # A fresh match owns no duration yet, so the previous one's cannot be reported as its.
+        self._stage_timed = False
 
     def end_stage(self) -> None:
         """A match has finished: freeze its duration and stop the clock.
@@ -168,9 +221,10 @@ class StatsTracker:
             return
         self._last_stage = max(0.0, time.monotonic() - self._stage_start)
         self._stage_start = None
+        self._stage_timed = True
 
     # # Outcomes
-    def record(self, won: bool) -> None:
+    def record(self, won: bool, target: str = "") -> None:
         # A no-op when the outcome step already ended the match, which is the normal path.
         # Kept as a backstop so a result counted from anywhere else still freezes the clock
         # rather than leaving it running into the next match.
@@ -183,7 +237,19 @@ class StatsTracker:
             self.losses += 1
             self._all_losses += 1
             self._last_run = "Loss"
-        self._write()
+        # Only a clock that ran for *this* match gives a duration — see `_stage_timed`. Spent
+        # here so the next result cannot inherit it. `target` comes from the caller because the
+        # tracker has no view of the queue.
+        duration = format_duration(self._last_stage) if self._stage_timed else "-"
+        self._stage_timed = False
+        self._write(
+            {
+                "result": self._last_run,
+                "target": target or "—",
+                "duration": duration,
+                "at": time.strftime("%H:%M"),
+            }
+        )
 
     def snapshot(self) -> RunStats:
         now = time.monotonic()
