@@ -69,8 +69,6 @@ from sloppykeys.macro.lobby import LobbyNavigator
 from sloppykeys.macro.placement import UnitPlacer, OUTCOME_WON, OUTCOME_LOST
 
 TICK_SLEEP = 0.05
-STEP_TIMEOUT = 180.0
-MATCH_POLL = 1.0
 REOPEN_COOLDOWN = 60.0  # seconds between reopen attempts
 
 # How many times the `autoplay` block will click before it gives up and lets the match play

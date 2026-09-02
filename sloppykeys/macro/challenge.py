@@ -329,9 +329,8 @@ class ChallengeTracker:
     """What the macro remembers between reads.
 
     There is deliberately no `enabled` flag here: whether challenges run is decided by one
-    thing only, the Tasks tab's toggle (`AppSettings.run_challenges` →
-    `TaskDirector.challenges`).
-    A Settings toggle as well meant a queued challenge slot silently did nothing.
+    thing only, a Challenge task being in the queue. `MacroController._challenge_wants_in`
+    asks this tracker before every match, so position does not decide when one is taken.
 
     A row that has been **played** is done for the rest of the rotation, win or lose — one
     run of each of the three per rotation. When the clock crosses :00 or :30 the maps
@@ -380,23 +379,11 @@ class ChallengeTracker:
         """
         return not self.reads and self._attempted != interval_key(now)
 
-    def note_run_used(self, slot: int) -> None:
-        """One of the day's ten runs on this row has been spent — **call this on a win only**.
-
-        A loss leaves the game's count where it was, so decrementing on one would drift the
-        macro's belief below the truth. Called from `window.py::_record_outcome` the moment
-        the result is read, which is what puts the new number in the win notification.
-
-        The game's counter is still the source of truth and every scan re-reads it; this
-        only keeps the number honest *between* scans, which is what the stats panel and any
-        decision taken before the next read are looking at.
-        """
-        read = self.reads.get(int(slot))
-        if read is None or read.runs_remaining is None:
-            return
-        read.runs_remaining = max(0, read.runs_remaining - 1)
-        if read.runs_remaining == 0:
-            read.state = STATE_EXHAUSTED
+    # There is no `note_run_used`. It decremented a row's `n/10` between scans so a win
+    # notification could carry the new number, and its only caller was
+    # `window.py::_record_outcome`, deleted with the Qt front end. Nothing needs it now: the
+    # game's counter is the source of truth, every rotation re-scans it, and a played row is
+    # retired by `mark_done` regardless of the count.
 
     def mark_done(self, slot: int) -> None:
         """This row has been played this rotation — don't offer it again until the re-roll.

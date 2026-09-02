@@ -221,7 +221,9 @@ Change one, the others usually need it too.
   ones, and `store.update_json` takes one lock across read and write because several stores
   share the file and the macro worker writes stats mid-run. A shape change that can't be
   defaulted needs a one-time migration preserving the old intent
-  (`TaskStore.take_legacy_challenge_slot`). Known limits: that lock is per-process, so two app
+  (`RouteStore.merge_shipped`'s ledger is the surviving example; `TaskStore` and its legacy
+  challenge-slot migration were deleted with the three-slot queue). Known limits: that lock is
+  per-process, so two app
   instances still race, and `routes.json` is rewritten whole with no backup.
 - **Bound anything that grows** — log panels cap lines, the template cache keys on mtime, an
   upload is capped before Discord rejects it.

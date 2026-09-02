@@ -4,7 +4,7 @@ One class that reads and writes all keys in settings.json. Auto-saves on every
 set — no save button. Each set() call is atomic (update_json under the lock).
 
 This is the new single point of entry for the bridge's get_settings/set_setting
-API. The existing per-concern stores (DelaysStore, TaskStore, StatsTracker,
+API. The existing per-concern stores (DelaysStore, StatsTracker,
 KeybindStore, etc.) continue working independently — they all write to the same
 file through the same update_json lock. This class does NOT replace them: it
 provides a flat key→value interface for the UI, while the stores own their
@@ -32,7 +32,6 @@ DEFAULTS: dict[str, Any] = {
     "hard_mode": False,
     "camera_once_per_session": False,
     "auto_update": True,
-    "run_challenges": False,
     # New settings
     "start_minimized": False,
     "auto_reopen_roblox": True,

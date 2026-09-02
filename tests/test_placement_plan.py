@@ -107,8 +107,6 @@ for name in (
     "close_unit_panel",
     "run_sequence",
     "run_action",
-    "wait_for_win",
-    "press_game_key",
     "apply_delays",
 ):
     assert callable(getattr(UnitPlacer, name, None)), f"UnitPlacer.{name} is missing"

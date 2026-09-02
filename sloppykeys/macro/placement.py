@@ -217,20 +217,6 @@ class UnitPlacer:
             time.sleep(self.settle)
         return (ok, message)
 
-    def press_game_key(self, action: str, count: int = 1) -> tuple[bool, str]:
-        """Send one of the in-game keys (priority / upgrade / sell / autoupgrade).
-
-        **No caller.** It was public so a Macro Tester row could exercise one key on its
-        own, and that surface is gone; the run presses keys through `_press`. Kept because
-        pressing a single bound key is the smallest reproduction of "the game ignored our
-        input", and `tests/test_placement_plan.py` asserts it still resolves.
-        """
-        key = self._game_keys().get(action, "")
-        if not key:
-            return (False, f"no key bound for '{action}'")
-        ok, message = self._press(key, count=count)
-        return (ok, message if not ok else f"pressed '{key}' x{max(1, count)}")
-
     def park(self) -> None:
         """Public: move the cursor off whatever it is hovering, in match.
 
@@ -816,17 +802,9 @@ class UnitPlacer:
                 parts.append(f"{label} {score:.2f}" if score is not None else f"{label} no read")
         return ", ".join(parts)
 
-    def wait_for_win(self, timeout: float | None = None) -> tuple[bool, str]:
-        """(ok, message) form of `wait_for_outcome`, where a defeat is a pass too: this
-        answers "can the macro *see* the end of a match", not "did we win".
-
-        **No caller.** Written for a Macro Tester row, which is gone; the run loop polls
-        `poll_outcome` instead. `tests/test_placement_plan.py` asserts it still resolves.
-        """
-        outcome, message = self.wait_for_outcome(timeout)
-        if not outcome:
-            return (False, message)
-        return (True, f"{outcome}: {message}")
+    # There is no `press_game_key` or `wait_for_win`. Both were public only so a Macro Tester
+    # row could drive them, and that surface went with Qt. The run presses keys through
+    # `_press` and reads the result through `poll_outcome`.
 
 
 def split_steps(steps: list[UnitStep]) -> tuple[list[UnitStep], list[UnitStep]]:

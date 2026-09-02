@@ -17,7 +17,7 @@ IMAGES_KEY = "images"
 
 PRIVATE_SERVER_KEY = "private_server_link"
 WEBHOOK_KEY = "discord_webhook"
-RUN_CHALLENGES_KEY = "run_challenges"
+
 HARD_MODE_KEY = "hard_mode"
 # Opt-in: run the ~8s camera sequence once per Roblox session instead of once per match.
 # Default **off** because placement coordinates are stored against one camera angle, so if
@@ -53,7 +53,6 @@ class AppSettings:
         return {
             PRIVATE_SERVER_KEY: EMPTY_VALUE,
             WEBHOOK_KEY: "",
-            RUN_CHALLENGES_KEY: False,
             HARD_MODE_KEY: False,
             CAMERA_ONCE_KEY: False,
             AUTO_UPDATE_KEY: True,
@@ -92,18 +91,10 @@ class AppSettings:
     def set_discord_webhook(self, url: str) -> None:
         self._set(WEBHOOK_KEY, (url or "").strip())
 
-    # `run_challenges` is the challenges switch, read into `TaskDirector.challenges`. It
-    # lives on the Run panel's Tasks tab, above the queue it preempts, not in Settings.
-    # It was briefly a challenge *slot* in the task queue instead — which cost one of three
-    # target slots to store a boolean, since `decide()` preempts regardless of position.
-    # `TaskStore.take_legacy_challenge_slot` migrates a queue saved that way and turns this
-    # on, so an existing setup keeps running challenges.
-
-    def get_run_challenges(self) -> bool:
-        return bool(self.read().get(RUN_CHALLENGES_KEY, False))
-
-    def set_run_challenges(self, enabled: bool) -> None:
-        self._set(RUN_CHALLENGES_KEY, bool(enabled))
+    # There is no `run_challenges` switch. It was the toggle a deleted `TaskDirector` read to
+    # decide whether challenges preempted the queue; challenges are now a **task** in the
+    # queue, and the presence of that task is the switch. Removing it is safe for a stored
+    # setup — an unknown key in settings.json is preserved and simply never read.
 
     def get_camera_once(self) -> bool:
         return bool(self.read().get(CAMERA_ONCE_KEY, False))

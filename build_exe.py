@@ -115,9 +115,10 @@ PRUNE_GLOBS = (
 #   tasks                                — the developer's own queue. An empty queue makes
 #       F1 use the Run page selection, which is the right first-run behaviour; a queue
 #       pointing at maps a new user hasn't configured is not.
-#   match_confidence                     — a setting that was removed. Don't resurrect it.
+#   match_confidence, run_challenges     — settings that were removed. Don't resurrect them.
+#       `run_challenges` was the toggle the deleted TaskDirector read; challenges are a task
+#       in the queue now, so the task's presence is the switch.
 SHIPPED_SETTINGS_KEYS = (
-    "run_challenges",
     "hard_mode",
     "camera_once_per_session",
     "keybinds",

@@ -149,6 +149,7 @@ assert [read.slot for read in tracker.candidates()] == [3], "a played row moves 
 tracker.mark_done(3)
 assert tracker.candidates() == [], "all lost or exhausted: fall through to the targets"
 assert not tracker.has_work()
+assert tracker.has_work() == bool(tracker.candidates()), "has_work is the readable form"
 
 assert tracker.note_time(datetime(2026, 7, 30, 12, 30)) is True, "crossed :30"
 assert not tracker.is_skipped(1), "new maps, so old losses stop applying"
@@ -157,99 +158,12 @@ assert tracker.candidates() == [], "nothing until it is read again"
 
 
 
-# # TaskDirector: challenges preempt, a loss skips, targets take turns by limit
-from sloppykeys.config.tasks import KIND_TARGET, TaskSlot  # noqa: E402
-from sloppykeys.macro.tasks import (  # noqa: E402
-    DO_CHALLENGE,
-    DO_NOTHING,
-    DO_TARGET,
-    TaskDecision,
-    TaskDirector,
-)
+# There was a `TaskDirector` section here. It tested a decision layer that preempted a
+# three-slot queue from a `run_challenges` toggle, and it had no production caller — the web
+# UI made challenges a queue task instead. Both modules are deleted;
+# `tests/test_challenge_priority.py` covers the rules that survived, against the controller
+# that actually runs them.
 
-story = TaskSlot(kind=KIND_TARGET, gamemode="Story", map_name="King's Tomb", act="Act 3", limit=2)
-raid = TaskSlot(kind=KIND_TARGET, gamemode="Raid", map_name="Spirit City", act="Act 1", limit=3)
-
-# Nothing queued: F1 must behave as it did before the feature existed.
-assert not TaskDirector().is_configured()
-assert TaskDirector().decide().kind == DO_NOTHING
-
-# Two targets, no challenges: each runs its limit, then the queue loops.
-director = TaskDirector(slots=[story, raid])
-assert director.is_configured()
-seen = []
-for _match in range(6):
-    decision = director.decide()
-    seen.append(decision.slot.gamemode)
-    director.note_match(decision, won=True)
-assert seen == ["Story", "Story", "Raid", "Raid", "Raid", "Story"], seen
-
-# A lost target run still counts: the queue keeps moving rather than stalling.
-director = TaskDirector(slots=[story, raid])
-first = director.decide()
-director.note_match(first, won=False)
-second = director.decide()
-director.note_match(second, won=False)
-assert director.decide().slot.gamemode == "Raid", "a loss spends a run like a win"
-
-# Challenges preempt while the tracker has candidates, then it falls through.
-live = ChallengeTracker()
-live.note_reads(
-    [
-        ChallengeRead(slot=1, state=STATE_RUNNABLE, map_name="Rose Kingdom"),
-        ChallengeRead(slot=2, state=STATE_RUNNABLE, map_name="Flower Forest"),
-        ChallengeRead(slot=3, state=STATE_EXHAUSTED),
-    ]
-)
-director = TaskDirector(slots=[story], tracker=live, challenges=True)
-first = director.decide()
-assert first.kind == DO_CHALLENGE and first.challenge.slot == 1, first
-# **Winning** it also consumes the row: one run of each per rotation, so the next
-# decision is the next challenge and not the same one again.
-director.note_match(first, won=True)
-assert live.is_skipped(1), "a won row is done for this rotation too"
-second = director.decide()
-assert second.kind == DO_CHALLENGE and second.challenge.slot == 2, second
-# A loss consumes it just the same — the same map would only lose again.
-director.note_match(second, won=False)
-# Both lost, third exhausted -> the target fills the gap until the maps re-roll.
-third = director.decide()
-assert third.kind == DO_TARGET and third.slot.gamemode == "Story", third
-# Re-reading inside the same rotation does not un-skip a lost row: the map is the
-# same one that was just lost, so the skip has to outlive the read.
-live.note_reads([ChallengeRead(slot=1, state=STATE_RUNNABLE, map_name="Rose Kingdom")])
-assert director.decide().kind == DO_TARGET, "a skip lasts the whole rotation"
-
-# Crossing the boundary clears the skips *and* the stale reads, so the first decision
-# after a rotation falls to a target and challenges resume once the panel is re-read.
-later = datetime.now() + timedelta(hours=1)
-assert director.decide(later).kind == DO_TARGET, "stale reads dropped with the rotation"
-assert not live.is_skipped(1), "new maps, so the old losses stop applying"
-live.note_reads([ChallengeRead(slot=1, state=STATE_RUNNABLE, map_name="Rose Kingdom")])
-assert director.decide(later).kind == DO_CHALLENGE, "a fresh scan puts challenges first again"
-
-# Challenges off means they never run, whatever the panel says. The toggle is the only
-# switch — a challenge is no longer one of the three queue slots, so there is no queued
-# slot that can disagree with it.
-read_but_unqueued = ChallengeTracker()
-read_but_unqueued.note_reads([ChallengeRead(slot=1, state=STATE_RUNNABLE, map_name="Rose Kingdom")])
-targets_only = TaskDirector(slots=[story], tracker=read_but_unqueued)
-assert not targets_only.wants_challenges
-assert targets_only.decide().kind == DO_TARGET
-
-# current_target ignores challenges, so a caller that can't run one yet still gets on
-# with the queue instead of refusing to start.
-both = TaskDirector(slots=[story, raid], tracker=live, challenges=True)
-assert both.current_target() is story
-both.note_match(TaskDecision(kind=DO_TARGET, slot=story), won=True)
-both.note_match(TaskDecision(kind=DO_TARGET, slot=story), won=True)
-assert both.current_target() is raid, "the limit moved it along"
-assert TaskDirector(challenges=True).current_target() is None
-
-# Challenges on but nothing read yet, with no target: nothing to do rather than a guess at
-# what the panel might hold.
-empty = TaskDirector(tracker=ChallengeTracker(), challenges=True)
-assert empty.decide().kind == DO_NOTHING
 
 # # `is_candidate` is a property, and no caller may call it
 # It was called as `read.is_candidate()` in the run loop, which raises
