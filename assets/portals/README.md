@@ -39,10 +39,12 @@ and falling back to `match/repeat.png` *is* the loss path. Both consequences fol
 - a loss replays the same portal through Repeat, with no bag trip and nothing retyped, because
   the portal is still owned.
 
-The Start button that appears after Activate has no file here on purpose:
-`lobby/start_match.png` is already a search rather than a coordinate, because that button
-moves with the panel it sits on. If a capture ever shows the two are different art, this is
-where the second one goes.
+The Start button that appears after Activate has no file here, and does not need one:
+**it is the same button as every other mode's**, `lobby/start_match.png` — confirmed in game.
+That template is already a search rather than a coordinate, because the button moves with the
+panel it sits on, which is exactly why one file serves Story, Raid, Expedition, Challenge and
+now Portals. Pressing it is what loads the stage, so a miss fails the run rather than being
+passed over.
 
 ## `search.png` carries more weight than it looks
 

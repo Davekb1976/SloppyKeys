@@ -62,13 +62,15 @@ assert nav.calls[1][2] == nav.panel_fade_wait, nav.calls[1]
 assert nav.calls[0][2] == 0.0, nav.calls[0]
 assert nav.calls[2] == ("pick", "Summer Portal", portal_activate_image()), nav.calls[2]
 
-# # A missing Start is reported, not fatal
-# Nobody has confirmed whether Activate begins the run itself. Failing here would abandon a
-# run that may well have started; `wait_for_match_ready` is the real judge.
+# # A missing Start fails the step
+# Activating a portal reveals the same Start every other mode uses, and pressing it is what
+# loads the stage — confirmed in game. Passing over a miss would hand the caller a 60s
+# wait_for_match_ready that cannot succeed, and the log would blame the stage rather than the
+# button nobody found.
 nav = SpyNav(start_found=False)
 ok, message = nav.enter_portal("Summer Portal")
-assert ok, message
-assert "no Start after Activate" in message, message
+assert not ok, message
+assert "start:" in message, message
 
 # # A failed leg stops the chain before anything is typed or activated
 class DeadBag(SpyNav):

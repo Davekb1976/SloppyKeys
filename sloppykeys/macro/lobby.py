@@ -907,11 +907,12 @@ class LobbyNavigator:
         The Portals tab arrives from the bag click and Activate from the picker, so both get
         `fade_wait` — found is not clickable while a panel is still fading.
 
-        **Start is not fatal.** Nobody has confirmed whether Activate begins the run on its
-        own or reveals a Start to press, so a miss here is reported and the caller's
-        `wait_for_match_ready` becomes the judge: if Activate started it, Start Game shows up
-        and the run carries on; if a press really was needed, that poll times out and says so.
-        Better than failing the task on a button that may not exist.
+        **Start is required, and it is the same button as every other mode's** — confirmed in
+        game: activating a portal reveals `lobby/start_match.png`, and pressing it is what
+        loads the stage. So a miss here fails the step rather than being reported and passed
+        over. Letting it through would hand the caller a 60s `wait_for_match_ready` that
+        cannot succeed, and the log would blame the stage for not loading instead of naming
+        the button that was never found.
         """
         trail: list[str] = []
         ok, message = self._find_click(
@@ -937,9 +938,9 @@ class LobbyNavigator:
         trail.append(message)
 
         ok, message = self.click_start_match(fade_wait=self.panel_fade_wait)
-        trail.append(
-            message if ok else f"no Start after Activate ({message}) — waiting for the stage"
-        )
+        if not ok:
+            return (False, f"start: {message}")
+        trail.append(message)
         return (True, " \u2192 ".join(trail))
 
     def click_select_portal(self) -> tuple[bool, str]:
