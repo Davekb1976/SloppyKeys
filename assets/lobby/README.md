@@ -5,7 +5,9 @@
   gamemode, which enters through the events list rather than the gamemode cards.
 - `select_stage.png` — **the Select Stage button**, clicked one step before Start.
 - `start_match.png` — **the lobby Start button**, the last click before a stage loads.
-- `close_gamemode.png` — the intermission menu's own close/back control, which puts the
+- `close.png` — the **X** that dismisses any panel in the gamemode UI, the challenge list
+  included. One file, not one per panel.
+- `close_gamemode.png` — the intermission menu's own **Back** control, which puts the
   **lobby proper** back on screen. See below.
 
 Capture all of these from the **Image Manager** (F6): it grabs the exact pixels the matcher
@@ -38,7 +40,18 @@ Until a file exists the macro falls back to the old fixed coordinate and says so
 (`clicked Select Stage at x,y (fixed coordinate — add assets/lobby/select_stage.png ...)`),
 so nothing breaks in the meantime — but the fallback is the bug these files fix.
 
-## `close_gamemode.png` — the one that uncovers the inventory bag
+## `close.png` and `close_gamemode.png` — two closes, in that order
+
+They are different controls, which is why they are two files: `close.png` is the small red X
+in a panel's corner, `close_gamemode.png` is the Back button on the chooser. Dismissing a
+panel takes the X; getting off the chooser afterwards takes Back.
+
+`close.png` lives here rather than under `challenge/` because nothing about it is
+challenge-specific — it is the same X, in the same place, on every panel the gamemode UI
+opens. One file matches all of them, and a per-panel crop would be the same pixels stored
+again under another name.
+
+## The Back one is what uncovers the inventory bag
 
 The intermission menu is a panel *over* the lobby, and **the bag Portals is entered from is
 on the lobby**. So a queue that leaves that panel open cannot start a Portals task: the bag

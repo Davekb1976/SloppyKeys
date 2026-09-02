@@ -27,13 +27,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sloppykeys.content.challenge import CLOSE_LIST_CLICK  # noqa: E402
 from sloppykeys.content.nav_images import (  # noqa: E402
-    challenge_close_image,
     close_gamemode_image,
+    close_panel_image,
 )
 from sloppykeys.macro.controller import MacroController  # noqa: E402
 from sloppykeys.macro.lobby import LobbyNavigator  # noqa: E402
 
-CLOSE = challenge_close_image()
+CLOSE = close_panel_image()
 CLOSE_MENU = close_gamemode_image()
 BLIND = f"blind:{CLOSE_LIST_CLICK[0]},{CLOSE_LIST_CLICK[1]}"
 

@@ -35,8 +35,8 @@ from sloppykeys.content.start_stage import (
 )
 from sloppykeys.content.nav_images import (
     back_lobby_image,
-    challenge_close_image,
     close_gamemode_image,
+    close_panel_image,
     events_image,
     gamemode_image,
     match_play_image,
@@ -448,14 +448,16 @@ class LobbyNavigator:
         Using the wrong one here left the macro on the challenge list and the following card
         search found nothing.
 
-        Searched, with `CLOSE_LIST_CLICK` as the fallback while the template is uncaptured,
-        the same arrangement as `select_stage`/`start_match`. The search is what lets this be
-        called on a screen the OCR scan could **not** confirm: pass `fallback=None` there, so
-        a miss reports instead of firing a blind click at an unknown screen.
+        The template is `lobby/close.png`, the X shared by every panel in the gamemode UI
+        rather than one cropped per panel, with `CLOSE_LIST_CLICK` as the fallback while it is
+        uncaptured — the same arrangement as `select_stage`/`start_match`. The search is what
+        lets this be called on a screen the OCR scan could **not** confirm: pass
+        `fallback=None` there, so a miss reports instead of firing a blind click at an unknown
+        screen.
 
         Closing this is only half of leaving — see `close_gamemode_menu`.
         """
-        path = challenge_close_image()
+        path = close_panel_image()
         if self._engine.template_exists(path):
             return self._find_click(path, "Close challenge list", timeout=self.search_timeout)
         if fallback is None:

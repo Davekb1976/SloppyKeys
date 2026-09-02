@@ -37,13 +37,10 @@ EVENTS_DIR = "events"
 # has no `play.png` and no card in `gamemodes/`. Its own folder for that reason: none of
 # these four belong to the lobby's intermission menu.
 PORTALS_DIR = "portals"
-# The challenge panel's folder. Almost everything about that panel is read by OCR at
-# measured boxes (`content/challenge.py`), so the only template here is the way out.
+# The challenge panel's folder. That panel is read by OCR at measured boxes
+# (`content/challenge.py`), so nothing in it is a search template — the folder exists for the
+# region dumps under `challenge/debug/`.
 CHALLENGE_DIR = "challenge"
-# The list's close button. The blind `challenge.CLOSE_LIST_CLICK` stays as its fallback, the
-# way `select_stage`/`start_match` keep theirs — but a searched close can also be used on a
-# screen the OCR scan failed to confirm, where a blind click has no business landing.
-CHALLENGE_CLOSE_IMAGE = "close.png"
 # Placement backdrops, not search templates: whole client-area screenshots the position
 # picker draws coordinates on. See assets/reference/README.md.
 REFERENCE_DIR = "reference"
@@ -64,7 +61,15 @@ SELECT_STAGE_IMAGE = "select_stage.png"
 # because the events list is a different UI section from the gamemode cards.
 EVENTS_IMAGE = "events.png"
 # # Closing the intermission menu back to the lobby proper
-# The gamemode chooser's own close/back control. Needed because the chooser is a panel
+# The **X** every panel in the gamemode UI is dismissed by — the challenge list included.
+# One file rather than one per panel because it is literally the same control drawn in the
+# same place, which is also why it lives here and not under `challenge/`: nothing about it
+# belongs to one gamemode. `challenge.CLOSE_LIST_CLICK` stays as its fallback, the way
+# `select_stage`/`start_match` keep theirs — but a *searched* close can additionally be used
+# on a screen the OCR scan failed to confirm, where a blind click has no business landing.
+CLOSE_PANEL_IMAGE = "close.png"
+# The gamemode chooser's own close/back control — a **Back** button, not the X above, which is
+# why it is a second file. Needed because the chooser is a panel
 # *over* the lobby, and **the inventory bag is on the lobby, not the chooser** — so a
 # gamemode whose chain starts at the bag cannot begin while this is open. Leaving it up is
 # what made a Portals task report `Bag not found (best 0.52 < 0.80)` and skip: the search
@@ -293,10 +298,11 @@ def close_gamemode_image() -> str:
     return os.path.join(IMAGES_DIR, LOBBY_DIR, CLOSE_GAMEMODE_IMAGE)
 
 
-def challenge_close_image() -> str:
-    """The challenge list's own close button. Searched now rather than clicked blind, so the
-    list can be left from a screen the scan could not confirm."""
-    return os.path.join(IMAGES_DIR, CHALLENGE_DIR, CHALLENGE_CLOSE_IMAGE)
+def close_panel_image() -> str:
+    """The X that dismisses any panel in the gamemode UI, the challenge list included.
+    Searched rather than clicked blind, so a panel can be left from a screen nothing
+    confirmed."""
+    return os.path.join(IMAGES_DIR, LOBBY_DIR, CLOSE_PANEL_IMAGE)
 
 
 def back_lobby_image() -> str:
@@ -483,7 +489,7 @@ def expected_paths() -> list[str]:
         # The two-step way out of a challenge detour that started nothing. Both are listed
         # even though each has a survivable miss, because the failure they prevent lands on
         # the *next* task: an unclosed panel covers whatever that task's chain starts from.
-        challenge_close_image(),
+        close_panel_image(),
         close_gamemode_image(),
     ]
     paths += expedition_match_paths()
