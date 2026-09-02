@@ -1433,11 +1433,16 @@ class MacroController:
         return hook if hook.enabled else None
 
     def _task_label(self) -> str:
+        """What is in flight, for the Run History card and every Discord embed."""
         task = self._current_task or {}
-        mode = task.get("mode", "—")
-        map_name = task.get("map", "—")
-        stage = task.get("stage", "—")
-        return f"{mode} / {map_name} / {stage}"
+        # **Empty parts are dropped, not spelled `—`.** `get(key, default)` only answers the
+        # default when the key is *missing*, and the queue always writes `stage` — as `""` for
+        # any mode with no stage control, and `""` outright on a challenge detour. So every
+        # Portals and Expedition row on the history card, and every Discord embed for one,
+        # ended in a dangling ` / `. Same filter the two siblings already use
+        # (`bridge.get_macro_status`, `runner.TaskSpec.label`).
+        parts = (task.get("mode"), task.get("map"), task.get("stage"))
+        return " / ".join(str(part) for part in parts if part) or "—"
 
     def _session_field(self) -> tuple[str, str]:
         snap = self._stats.snapshot()

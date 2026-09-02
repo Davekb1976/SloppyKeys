@@ -33,6 +33,7 @@ from sloppykeys.config.stats import (  # noqa: E402
     STATS_KEY,
     StatsTracker,
 )
+from sloppykeys.macro.controller import MacroController  # noqa: E402
 
 root = tempfile.mkdtemp(prefix="sk_history_")
 path = os.path.join(root, "settings.json")
@@ -115,5 +116,37 @@ assert reloaded.snapshot().all_losses >= 1, "all-time counters persist"
 for name in os.listdir(root):
     os.remove(os.path.join(root, name))
 os.rmdir(root)
+
+
+# # The `target` these rows carry drops empty parts instead of spelling them
+# `get(key, default)` only answers the default when the key is **missing**, and the queue always
+# writes `stage` — as "" for any mode with no stage control, and "" outright on a challenge
+# detour. So every Portals, Expedition and Challenge row ended in a dangling " / ", and so did
+# the Stage field of every Discord embed, which shares this label.
+def label(task) -> str:
+    ctrl = MacroController.__new__(MacroController)
+    ctrl._current_task = task
+    return ctrl._task_label()
+
+
+assert label({"mode": "Portals", "map": "Summer", "stage": ""}) == "Portals / Summer"
+assert label({"mode": "Challenge", "map": "School Grounds", "stage": ""}) == (
+    "Challenge / School Grounds"
+)
+# A full three-part target is unchanged — this must not start dropping real information.
+assert label({"mode": "Story", "map": "Flower Forest", "stage": "Act 1"}) == (
+    "Story / Flower Forest / Act 1"
+)
+# Nothing at all still reads as something, since `record` stores `target or "—"`.
+assert label({"mode": "Raid", "map": "", "stage": ""}) == "Raid"
+assert label({}) == "—"
+assert label(None) == "—"
+for text in (
+    label({"mode": "Portals", "map": "Summer", "stage": ""}),
+    label({"mode": "Raid", "map": "", "stage": ""}),
+    label({}),
+):
+    assert not text.rstrip().endswith("/"), text
+    assert " /  / " not in text, text
 
 print("run history: OK")
