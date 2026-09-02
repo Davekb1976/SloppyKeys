@@ -123,8 +123,10 @@ ok, message = nav.pick_portal("Summer Portal", CONFIRM, "Select")
 assert ok, message
 assert nav.trail == ["click:Portal search", "slot:640,300", "click:Select"], nav.trail
 
-# # Same case, but the slot was never measured: refuse and name the fix
-reset_slot()
+# # Same case, but the slot reads as unmeasured: refuse and name the fix. Slot 1 ships a
+# # measured default now, so the way to be unset is to store `UNSET` — which a user can do, and
+# # which is what a future slot with no default looks like.
+reset_slot(portals_table.UNSET)
 nav = navigator(confirm_after_typing=False)
 ok, message = nav.pick_portal("Summer Portal", CONFIRM, "Select")
 assert not ok

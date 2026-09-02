@@ -24,7 +24,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sloppykeys.content.acts import ACT_COORDS, act_coord, apply_point_overrides  # noqa: E402
 from sloppykeys.content.gamemodes import RAID_ACTS, STORY_ACTS  # noqa: E402
-from sloppykeys.content.portals import slot_coord  # noqa: E402
+from sloppykeys.content.portals import (  # noqa: E402
+    UNSET,
+    apply_point_overrides as apply_portal_overrides,
+    slot_coord,
+    slot_key,
+)
 from sloppykeys.content.start_stage import difficulty_coord, start_coords  # noqa: E402
 from sloppykeys.ui_web.bridge import VIEWPORT_H, VIEWPORT_W, Api  # noqa: E402
 
@@ -58,13 +63,19 @@ with tempfile.TemporaryDirectory() as root:
     # Story's pair is the Hard Mode toggle; Expedition's is the cycling button.
     assert [p["label"] for p in groups["start.Story"]["points"]] == ["Hard Mode toggle"]
     assert [p["label"] for p in groups["start.Expedition"]["points"]] == ["Difficulty cycle"]
-    # The portal grid's slot ships **unset**, and `slot_coord` says so rather than handing
-    # back (0, 0): activating a portal consumes it, so a guessed coordinate spends the wrong
-    # item while the log still reads like a working run.
+    # The portal grid's slot ships the **measured** default, so Portals works on a fresh
+    # install instead of only on the account that measured it. What is still refused is a
+    # *guess*: activating a portal consumes it, so `slot_coord` answers None for `UNSET`
+    # rather than handing back (0, 0), which is empty ground the click would look fine on.
     assert [p["label"] for p in groups["portal.Portals"]["points"]] == ["Result slot 1"]
     assert (groups["portal.Portals"]["points"][0]["x"],
-            groups["portal.Portals"]["points"][0]["y"]) == (0, 0)
-    assert slot_coord(1) is None, slot_coord(1)
+            groups["portal.Portals"]["points"][0]["y"]) == (394, 253)
+    assert slot_coord(1) == (394, 253), slot_coord(1)
+    # Portals keeps its own override dict, so this is deliberately not the `apply_point_overrides`
+    # imported above — that one belongs to `content.acts`.
+    apply_portal_overrides({slot_key(1): UNSET})
+    assert slot_coord(1) is None, "a slot stored as (0, 0) must still refuse"
+    apply_portal_overrides({})
     for group in groups.values():
         assert group["where"], group["key"]  # the screen that must be up, shown on the row
         assert not any(p["edited"] for p in group["points"]), "nothing is measured yet"
@@ -82,7 +93,7 @@ with tempfile.TemporaryDirectory() as root:
     assert act_coord("Story", "Act 2") == ACT_COORDS["Story"]["Act 2"], "only the one point moved"
     assert api.set_vision_point("difficulty.Expedition", 111, 222)["ok"]
     assert difficulty_coord("Expedition") == (111, 222)
-    # Picking the portal slot is what turns it from unset into a real coordinate.
+    # Picking the portal slot overrides the shipped default, for a grid that sits elsewhere.
     assert api.set_vision_point("portal.slot.1", 640, 300)["ok"]
     assert slot_coord(1) == (640, 300), slot_coord(1)
     assert api.set_vision_point("start.Story.hard_mode", 55, 66)["ok"]
@@ -105,7 +116,7 @@ with tempfile.TemporaryDirectory() as root:
     assert difficulty_coord("Expedition") == (111, 222), "reset spilled into another group"
     assert reloaded.reset_vision_points()["ok"]
     assert difficulty_coord("Expedition") is not None  # back to the default, not gone
-    assert slot_coord(1) is None, "the portal slot's default is unset, so reset means unset"
+    assert slot_coord(1) == (394, 253), "reset takes the portal slot back to the shipped default"
     assert reloaded.get_vision_points() == {}
 
 # # The capture the picker opens with refuses a minimized game

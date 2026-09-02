@@ -8,11 +8,11 @@ so the tile is at a known *place* rather than being a known *picture* — which 
 reason for typing: a template per portal would need recapturing every time the devs add a
 tier, and there is no crop that means "the portal you asked for".
 
-**The default is deliberately unset.** Nobody has measured this yet, and a plausible-looking
-placeholder coordinate is worse than none: activating a portal consumes it, so a click 40px
-out spends the wrong item and the log still reads like a working run. `slot_coord` returns
-None until the user picks the point in Settings > Debug > Click Points, and the run step is
-expected to refuse rather than click a guess.
+Slot 1 now ships a **measured** default, like `ACT_COORDS` and `START_COORDS` do. What this
+module refuses to ship is a *guessed* one: activating a portal consumes it, so a click 40px
+out spends the wrong item and the log still reads like a working run. That is why `UNSET` and
+`slot_coord`'s `None` stay — a slot nobody has measured still refuses, and the run step is
+expected to stop and say so rather than click a placeholder.
 """
 
 from __future__ import annotations
@@ -26,7 +26,12 @@ from __future__ import annotations
 # which is exactly the click that would look harmless and do nothing.
 UNSET = (0, 0)
 SLOT_COORDS: dict[int, tuple[int, int]] = {
-    1: UNSET,
+    # Measured by the user at the pinned 1152x756 viewport, on a search filtered to one
+    # result. Shipped rather than left unset because the alternative is that every other
+    # install refuses the moment the grid needs a tile click — and only the account that
+    # measured it would have a working Portals run. A user whose grid sits elsewhere still
+    # overrides it in Settings > Debug > Click Points.
+    1: (394, 253),
 }
 
 # The mode these points belong to, for the editor's grouping.
