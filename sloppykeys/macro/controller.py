@@ -92,10 +92,15 @@ class MacroController:
         app_root: str,
         roblox_rect: RectProvider | None = None,
         log: Callable[[str], None] | None = None,
+        on_challenge_reads: Callable[[list], None] | None = None,
     ) -> None:
         self._app_root = app_root
         self._log = log or (lambda _m: None)
         self._rect = roblox_rect or self._default_rect
+        # Handed the reads from a mid-run scan so the Dashboard's challenge card matches what
+        # the macro is acting on. A callback rather than a window reference: this class has no
+        # business knowing a page exists, and the bridge already owns the payload shape.
+        self._on_challenge_reads = on_challenge_reads
 
         self._settings = AppSettings(app_root)
         self._engine = ImageSearchEngine(app_root, log=self._log)
@@ -1634,8 +1639,14 @@ class MacroController:
             self._log("  Challenge: panel scan returned nothing.")
             return
         self._challenges.note_reads(reads)
+        # Same reads the Scan button shows, pushed to the Dashboard card. Without this the
+        # card read "Not scanned" for the whole run even while the macro was playing
+        # challenges off it — the only scan that ever reached the page was the manual one.
+        if self._on_challenge_reads is not None:
+            self._on_challenge_reads(reads)
 
         # Find a ready slot
+        started = False
         for read in reads:
             if self._checkpoint():
                 return
@@ -1661,37 +1672,26 @@ class MacroController:
                 self._log(f"  Challenge slot {read.slot}: no macro assigned for {map_name} — skipping")
                 continue
 
-            # Click the slot to enter
-            from sloppykeys.content.challenge import row_click, SELECT_STAGE_CLICK, START_CLICK
-            click_pos = row_click(read.slot)
-            if click_pos is None:
-                self._log(f"  Challenge slot {read.slot}: no click position — skipping")
-                continue
+            # Row → Select Stage → Start, through the navigator. This used to be three
+            # `nudge_click_script` calls at the raw `SELECT_STAGE_CLICK` / `START_CLICK`
+            # constants, which is why Select Stage and Start looked like they never happened:
+            # both were clicked **blind** at fixed points on a panel whose height varies with
+            # the map, and Start got no `fade_wait`, so even a landed click arrived while the
+            # button was still fading and was swallowed. `start_challenge` searches
+            # `select_stage.png` and `start_match.png` — the same two every other gamemode
+            # uses — and keeps those coordinates only as the missing-template fallback.
+            ok, msg = self._nav.start_challenge(read.slot)
+            self._log(f"  Challenge slot {read.slot} start: {msg}")
+            if not ok:
+                started = False
+                break
 
-            # Click the challenge row
-            screen_pos = self._client_to_screen(click_pos[0], click_pos[1])
-            if screen_pos:
-                from sloppykeys.macro.input_scripts import nudge_click_script
-                self._ahk.run(nudge_click_script(screen_pos[0], screen_pos[1]), wait=True, timeout=5.0)
-                time.sleep(1.0)
-
-            # Click Select Stage
-            ss_pos = self._client_to_screen(SELECT_STAGE_CLICK[0], SELECT_STAGE_CLICK[1])
-            if ss_pos:
-                self._ahk.run(nudge_click_script(ss_pos[0], ss_pos[1]), wait=True, timeout=5.0)
-                time.sleep(1.0)
-
-            # Click Start
-            st_pos = self._client_to_screen(START_CLICK[0], START_CLICK[1])
-            if st_pos:
-                self._ahk.run(nudge_click_script(st_pos[0], st_pos[1]), wait=True, timeout=5.0)
-                time.sleep(1.0)
-
-            # Wait for match to load
             ok, msg = self._nav.wait_for_match_ready()
             if not ok:
                 self._log(f"  Challenge: stage didn't load — {msg}")
-                return
+                self._challenges.mark_done(read.slot)
+                started = False
+                break
 
             self.run_camera()
 
@@ -1730,7 +1730,20 @@ class MacroController:
             # here rather than on a win also means a row that failed technically doesn't
             # preempt every following match forever.
             self._challenges.mark_done(read.slot)
+            started = True
             break  # one challenge per detour
+
+        if not started:
+            # **The challenge list is a panel over the gamemode cards.** Left open, the next
+            # task's `click_play` searches a screen the Play button is not on, and the run
+            # skips that task — which now happens on every detour that finds nothing, because
+            # a detour is taken before every match rather than once per queue pass.
+            # `close_challenge_list` is what puts the cards back within reach; clicking
+            # change-gamemode instead is what used to produce "Open Story: Story card not
+            # found" after every challenge pass. Only reached where the scan proved the panel
+            # is up, so the blind close click cannot land on an unknown screen.
+            ok, msg = self._nav.close_challenge_list()
+            self._log(f"  Challenge: nothing started — closing the list ({msg})")
 
     def _navigate_to_challenge(self) -> bool:
         """Navigate lobby to the challenge panel: Play → Challenge card → wait for panel."""

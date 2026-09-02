@@ -458,21 +458,35 @@ class Api:
                 self._push_challenge({"ok": False, "reason": "panel not open"})
                 return
 
-            slots = [
-                {
-                    "slot": r.slot,
-                    "state": r.state,
-                    "map": r.map_name,
-                    "limit": r.limit_text,
-                }
-                for r in reads
-            ]
             for r in reads:
                 self._log_to_ui(f"[Challenge] {r.summary()}")
-            self._push_challenge({"ok": True, "slots": slots})
+            self.push_challenge_reads(reads)
 
         threading.Thread(target=_run, daemon=True).start()
         return {"ok": True}
+
+    def push_challenge_reads(self, reads: list) -> None:
+        """Show these reads on the Dashboard's challenge card.
+
+        Public because the **run** calls it too, through
+        `MacroController(on_challenge_reads=...)`: the card used to update only for the Scan
+        button, so it read "Not scanned" while the macro was playing challenges off a scan of
+        its own. One formatter, so the two paths cannot drift.
+        """
+        self._push_challenge(
+            {
+                "ok": True,
+                "slots": [
+                    {
+                        "slot": r.slot,
+                        "state": r.state,
+                        "map": r.map_name,
+                        "limit": r.limit_text,
+                    }
+                    for r in reads
+                ],
+            }
+        )
 
     def _push_challenge(self, payload: dict) -> None:
         """Hand a scan result to the page. json.dumps, not an f-string — Python's
@@ -2513,6 +2527,7 @@ def main() -> None:
         api._ctrl = MacroController(
             api._app_root,
             log=api._log_to_ui,
+            on_challenge_reads=api.push_challenge_reads,
         )
         # Before anything can read a box or a threshold: the tables hold defaults until
         # the stored values are pushed in.
