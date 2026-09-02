@@ -1461,8 +1461,10 @@ class MacroController:
         # Portals and Expedition row on the history card, and every Discord embed for one,
         # ended in a dangling ` / `. Same filter the two siblings already use
         # (`bridge.get_macro_status`, `runner.TaskSpec.label`).
-        parts = (task.get("mode"), task.get("map"), task.get("stage"))
-        return " / ".join(str(part) for part in parts if part) or "—"
+        # Stripped before the truthiness test, so a field holding a single space cannot pass it
+        # and put the separator back.
+        parts = (str(task.get(key) or "").strip() for key in ("mode", "map", "stage"))
+        return " / ".join(part for part in parts if part) or "—"
 
     def _session_field(self) -> tuple[str, str]:
         snap = self._stats.snapshot()

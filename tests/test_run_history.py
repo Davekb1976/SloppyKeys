@@ -24,6 +24,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -32,6 +33,8 @@ from sloppykeys.config.stats import (  # noqa: E402
     HISTORY_LIMIT,
     STATS_KEY,
     StatsTracker,
+    clean_stamp,
+    clean_target,
 )
 from sloppykeys.macro.controller import MacroController  # noqa: E402
 
@@ -113,9 +116,68 @@ reloaded = StatsTracker(root)
 assert reloaded.wins == 0, "session counters start at zero"
 assert reloaded.snapshot().all_losses >= 1, "all-time counters persist"
 
+# # Rows written by an older build are normalised on read, not left as they were
+# Fixing the producer could not reach them: the label and the timestamp are stored **at write
+# time**, so 50 rows of `Portals / Summer /` and `18:42` would have sat on the card until they
+# aged out. Repairing a display string is not the same as inventing a result — see `history()`.
+tracker = StatsTracker(root)
+update_json(
+    path,
+    lambda p: p.__setitem__(
+        HISTORY_KEY,
+        [
+            {"result": "Win", "target": "Portals / Summer / ", "duration": "0:05:48", "at": "18:42"},
+            {"result": "Loss", "target": "Story /  / ", "duration": "0:01:00", "at": "09:05"},
+        ],
+    ),
+)
+rows = tracker.history()
+assert rows[1]["target"] == "Portals / Summer", rows[1]
+assert rows[0]["target"] == "Story", rows[0]
+assert rows[1]["at"] == "06:42 PM", rows[1]
+assert rows[0]["at"] == "09:05 AM", rows[0]
+
 for name in os.listdir(root):
     os.remove(os.path.join(root, name))
 os.rmdir(root)
+
+
+# # The two normalisers, straight
+# A dangling separator, a doubled one, and whitespace that passes a truthiness test.
+assert clean_target("Portals / Summer / ") == "Portals / Summer"
+assert clean_target("Story /  / ") == "Story"
+assert clean_target("Portals / Summer /   ") == "Portals / Summer"
+assert clean_target("Story / Flower Forest / Act 1") == "Story / Flower Forest / Act 1"
+assert clean_target("") == "—"
+assert clean_target(None) == "—"
+assert clean_target(" / / ") == "—"
+for text in ("Portals / Summer / ", "Story /  / ", " / / ", ""):
+    assert not clean_target(text).endswith("/"), text
+
+# Legacy 24-hour times convert; the date is **not** invented, because it is not knowable.
+assert clean_stamp("18:42") == "06:42 PM"
+assert clean_stamp("00:07") == "12:07 AM"
+assert clean_stamp("12:00") == "12:00 PM"
+assert "1900" not in clean_stamp("18:42"), "strptime's placeholder year must not leak"
+# Anything already in the current shape, or hand-edited, passes through untouched.
+assert clean_stamp("2026-09-02 07:01 PM") == "2026-09-02 07:01 PM"
+assert clean_stamp("whenever") == "whenever"
+assert clean_stamp("") == ""
+assert clean_stamp(None) == ""
+
+# # A row recorded now carries the dated 12-hour stamp
+fresh_root = tempfile.mkdtemp(prefix="sk_stamp_")
+fresh = StatsTracker(fresh_root)
+fresh.record(won=True, target="Portals / Summer / ")
+row = fresh.history()[0]
+assert row["target"] == "Portals / Summer", row
+assert row["at"].endswith(("AM", "PM")), row
+# YYYY-MM-DD, so a card spanning midnight says which day a row belongs to.
+assert row["at"][:10] == time.strftime("%Y-%m-%d"), row
+assert row["at"].count("-") == 2, row
+for name in os.listdir(fresh_root):
+    os.remove(os.path.join(fresh_root, name))
+os.rmdir(fresh_root)
 
 
 # # The `target` these rows carry drops empty parts instead of spelling them

@@ -25,6 +25,45 @@ HISTORY_KEY = "run_history"
 # every unrelated save. Fifty is more rows than the card can show without scrolling for a while.
 HISTORY_LIMIT = 50
 
+# When a run finished. `%I:%M %p` rather than `%H:%M`, and dated, because a card capped at 50
+# rows spans more than one day on a long farm and a bare `18:42` cannot say which.
+STAMP_FORMAT = "%Y-%m-%d %I:%M %p"
+# Rows written before the format changed hold a bare 24-hour `HH:MM`. The time converts exactly;
+# the date does not exist, so it is not invented — a legacy row shows the hour it has and no
+# more. Normalised on read rather than rewritten on disk: the file is the user's, and a
+# migration that touched every row to restyle it would risk more than it fixes.
+LEGACY_STAMP_FORMAT = "%H:%M"
+LEGACY_STAMP_DISPLAY = "%I:%M %p"
+
+
+def clean_target(raw: object) -> str:
+    """A run's target with empty parts dropped: `Portals / Summer /` -> `Portals / Summer`.
+
+    The label is stored **at write time**, so rows recorded before `_task_label` learned to
+    filter keep their dangling separator for as long as they stay on the card — fixing the
+    producer could not reach them. Splitting on the separator also catches the doubled ` /  / `
+    a task with an empty map left behind, and a part that is nothing but whitespace, which
+    passes a truthiness filter.
+    """
+    parts = (part.strip() for part in str(raw or "").split("/"))
+    return " / ".join(part for part in parts if part) or "—"
+
+
+def clean_stamp(raw: object) -> str:
+    """A run's timestamp in the current format, converting a legacy 24-hour one on the way.
+
+    Anything that is not a bare `HH:MM` passes through: it is either already the current shape
+    or something hand-edited, and neither is worth guessing at.
+    """
+    text = str(raw or "").strip()
+    if not text:
+        return ""
+    try:
+        parsed = time.strptime(text, LEGACY_STAMP_FORMAT)
+    except ValueError:
+        return text
+    return time.strftime(LEGACY_STAMP_DISPLAY, parsed)
+
 
 def _rate(wins: int, total: int) -> str:
     """Win % as text. No runs yet is "-", not 0% — nothing has been won or lost."""
@@ -168,8 +207,13 @@ class StatsTracker:
         """Finished matches, **newest first**, as the card wants them.
 
         Read from disk rather than memory so the card is populated on a fresh launch, before
-        this session has finished anything. Malformed rows are dropped, not repaired: a row
-        with no result is not a run, and inventing one would put a fake match on the card.
+        this session has finished anything. A row with no result is **dropped, not repaired**:
+        that is not a run, and inventing one would put a fake match on the card.
+
+        `target` and `at` are a different case and are normalised rather than dropped. Both are
+        *display* strings written by an older build — a dangling separator, a 24-hour clock — so
+        there is nothing to validate and nothing to invent, and a row is still the run it always
+        was. See `clean_target` and `clean_stamp`.
         """
         raw = read_json(self._path).get(HISTORY_KEY)
         if not isinstance(raw, list):
@@ -181,9 +225,9 @@ class StatsTracker:
             rows.append(
                 {
                     "result": row["result"],
-                    "target": str(row.get("target") or "—"),
+                    "target": clean_target(row.get("target")),
                     "duration": str(row.get("duration") or "-"),
-                    "at": str(row.get("at") or ""),
+                    "at": clean_stamp(row.get("at")),
                 }
             )
         rows.reverse()
@@ -245,9 +289,9 @@ class StatsTracker:
         self._write(
             {
                 "result": self._last_run,
-                "target": target or "—",
+                "target": clean_target(target),
                 "duration": duration,
-                "at": time.strftime("%H:%M"),
+                "at": time.strftime(STAMP_FORMAT),
             }
         )
 
