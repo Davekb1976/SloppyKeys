@@ -948,6 +948,13 @@ class LobbyNavigator:
         over. Letting it through would hand the caller a 60s `wait_for_match_ready` that
         cannot succeed, and the log would blame the stage for not loading instead of naming
         the button that was never found.
+
+        Reports the **route** on success and the **fault** on failure. Six `_find_click`
+        messages joined made one ~300-character line whose every part said nothing went wrong:
+        a coordinate and a passing score per step, plus a fade-wait note. None of it is
+        readable at that length, and none of it is the reason anybody reads this line. A miss
+        still returns the full verbose message, which is where the score belongs — a failed
+        search reports its own `best 0.52 < 0.80`.
         """
         trail: list[str] = []
         ok, message = self._find_click(
@@ -955,7 +962,7 @@ class LobbyNavigator:
         )
         if not ok:
             return (False, f"bag: {message}")
-        trail.append(message)
+        trail.append("Bag")
 
         ok, message = self._find_click(
             portals_tab_image(),
@@ -965,8 +972,10 @@ class LobbyNavigator:
         )
         if not ok:
             return (False, f"portals tab: {message}")
-        trail.append(message)
+        trail.append("Portals tab")
 
+        # Already terse, and it carries the typed name — the one detail in this chain worth
+        # reading back, since it decides which portal gets spent.
         ok, message = self.pick_portal(name, portal_activate_image(), "Activate Portal")
         if not ok:
             return (False, f"pick: {message}")
@@ -975,7 +984,7 @@ class LobbyNavigator:
         ok, message = self.click_start_match(fade_wait=self.panel_fade_wait)
         if not ok:
             return (False, f"start: {message}")
-        trail.append(message)
+        trail.append("Start")
         return (True, " \u2192 ".join(trail))
 
     def click_select_portal(self) -> tuple[bool, str]:
@@ -1059,9 +1068,6 @@ class LobbyNavigator:
         ok, message = self._click_client(rect, field)
         if not ok:
             return (False, f"search field click failed: {message}")
-        # Kept in the trail: this step used to report nothing on success, so the chain's first
-        # click was invisible in the log — indistinguishable from a stray click.
-        trail_parts = [f"clicked the search field at {field[0]},{field[1]}"]
         if not self._ahk.available():
             return (False, "AutoHotkey v2 not found")
         # The click above parked the cursor at the corner, which does not take focus off a
@@ -1073,8 +1079,12 @@ class LobbyNavigator:
         )
         if not ok:
             return (False, f"typing '{wanted}' failed: {message}")
-        trail_parts.append(f"typed '{wanted}'")
-        trail = " → ".join(trail_parts)
+        # Names the field click as well as the typing — that click used to report nothing on
+        # success, leaving the chain's first step indistinguishable from a stray click. Without
+        # its coordinate: the point is one the user set in Click Points, not news. The typed
+        # name stays, because it decides which portal is spent and a wrong one is not
+        # recoverable.
+        trail = f"search '{wanted}'"
 
         # **Always click the filtered tile.** This used to look for the confirm first and skip
         # the tile whenever it was already on screen — which it always was, so the tile was
@@ -1100,7 +1110,7 @@ class LobbyNavigator:
         ok, message = self._click_client(rect, coord)
         if not ok:
             return (False, f"{trail}, but the result slot click failed: {message}")
-        trail += f", clicked slot 1 at {coord[0]},{coord[1]}"
+        trail += " → slot 1"
 
         ok, message = self._find_click(
             confirm_path,
@@ -1110,7 +1120,10 @@ class LobbyNavigator:
         )
         if not ok:
             return (False, f"{trail}, but {message}")
-        return (True, f"{trail} → {message}")
+        # `confirm_label`, not `_find_click`'s message: the label is which panel this was
+        # (Activate Portal from the bag, Select in match), and that is the whole content of
+        # the verbose version once the coordinate and a passing score come off.
+        return (True, f"{trail} → {confirm_label}")
 
     def route_step_budget(self, step: NavStep) -> float:
         """Wall-clock a route step can legitimately need, for the runner's timeout.

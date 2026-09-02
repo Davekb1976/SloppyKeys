@@ -170,7 +170,10 @@ ok, message = nav.pick_portal("Summer Portal", CONFIRM, "Select")
 assert not ok
 assert "Click Points" in message, message
 assert "Bag result slot 1" in message, "the refusal must name which grid to measure"
-assert "typed 'Summer Portal'" in message, message
+# The refusal still says the name was already typed — the portal is not spent, but the field
+# holds it. Terse now (`search '<name>'`), because six verbose steps joined made one
+# ~300-character success line; a failure keeps the diagnostic that follows this part.
+assert "search 'Summer Portal'" in message, message
 assert not nav.slot_clicked, "an unset point must not become a click"
 
 # # The in-match grid is a **different** point. Both ship measured now, so what matters is
