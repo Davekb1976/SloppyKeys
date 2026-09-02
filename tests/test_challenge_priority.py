@@ -52,6 +52,11 @@ def controller(reads=None, attempted=False) -> MacroController:
         ctrl._challenges.note_scan_attempt(T0)
     if reads is not None:
         ctrl._challenges.note_reads(reads)
+    # Captured rather than discarded: a silent decline is the fault this half of the file
+    # covers, so the lines are part of the behaviour under test.
+    ctrl.lines = []
+    ctrl._log = ctrl.lines.append
+    ctrl._challenge_decline = ""
     return ctrl
 
 
@@ -110,5 +115,49 @@ assert ctrl._challenge_wants_in(TASK, T0) is False, "a spent rotation must let t
 # Crossing a :00/:30 boundary clears the marks and the stale reads, so the panel is worth
 # another look. This is "the maps reset mid-match", decided on the clock with no capture.
 assert ctrl._challenge_wants_in(TASK, T1) is True
+
+
+# # A decline says why, once per reason
+# (The label the history card shares is checked in tests/test_run_history.py.)
+# Silence here is what made "it didn't go to challenge" undiagnosable: a spent rotation, an
+# unreadable panel and a missing macro assignment all logged nothing at all.
+
+# Rows offered but none this task can play — the macro assignments are the fix.
+ctrl = controller(reads=[read(1, "King's Tomb")], attempted=True)
+assert ctrl._challenge_wants_in(TASK, T0) is False
+assert len(ctrl.lines) == 1, ctrl.lines
+assert "no enabled slot has a macro assigned" in ctrl.lines[0], ctrl.lines
+assert "slot 1 King's Tomb" in ctrl.lines[0], ctrl.lines
+
+# Asked again with nothing changed: no second line. Asked twice per match, so a line per ask
+# would bury a long run.
+assert ctrl._challenge_wants_in(TASK, T0) is False
+assert len(ctrl.lines) == 1, ctrl.lines
+
+# The rotation spent, with reads on hand — a different reason, so it is said.
+ctrl = controller(reads=[read(1, "School Grounds")], attempted=True)
+ctrl._challenges.mark_done(1)
+assert ctrl._challenge_wants_in(TASK, T0) is False
+assert len(ctrl.lines) == 1, ctrl.lines
+assert "nothing playable this rotation" in ctrl.lines[0], ctrl.lines
+
+# Visited and read nothing — the OCR boxes are the fix, not the assignments, so it must not
+# report the same reason as the two above.
+ctrl = controller(attempted=True)
+assert ctrl._challenge_wants_in(TASK, T0) is False
+assert len(ctrl.lines) == 1, ctrl.lines
+assert "read nothing" in ctrl.lines[0], ctrl.lines
+
+# # The re-roll is announced
+# `note_time`'s return value was discarded, so the one event the whole preempt exists to catch
+# left no trace. It is only a re-roll on the *second* rotation seen — the first sets the clock.
+ctrl = controller(reads=[read(1, "School Grounds")], attempted=True)
+ctrl._challenges.mark_done(1)
+assert ctrl._challenge_wants_in(TASK, T0) is False
+rolled = len(ctrl.lines)
+assert ctrl._challenge_wants_in(TASK, T1) is True
+assert any("re-rolled" in line for line in ctrl.lines[rolled:]), ctrl.lines
+# A yes never reports a decline.
+assert not any("not detouring" in line for line in ctrl.lines[rolled:]), ctrl.lines
 
 print("challenge priority: OK")

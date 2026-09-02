@@ -122,6 +122,10 @@ class MacroController:
         # controller, because the memory has to outlive a single match — a per-match tracker
         # would forget every mark and send the run back to the panel after each one.
         self._challenges = ChallengeTracker()
+        # The last reason a detour was declined, so the line is logged on a change rather than
+        # on every ask. Reset per run in `start` — a run that opens with the same reason the
+        # last one ended on still has to say it once.
+        self._challenge_decline = ""
         self._delays = DelaysStore(app_root).all()
         self._stats = StatsTracker(app_root)
         self._nav.apply_delays(self._delays)
@@ -191,6 +195,9 @@ class MacroController:
         self._camera_set = False
         self._kept_position = False
         self._cycle = 0
+        # So the first decline of this run is said out loud even when it repeats the reason the
+        # last run ended on — which is exactly the case a user restarting to watch for it hits.
+        self._challenge_decline = ""
         self._log("Macro started — running the task queue.")
         self._send_webhook_started()
         return None
@@ -1833,10 +1840,45 @@ class MacroController:
         `now` is injectable for the same reason every tracker method takes it: a rotation
         boundary cannot be exercised against the wall clock.
         """
-        self._challenges.note_time(now)
+        if self._challenges.note_time(now):
+            # The mid-match re-roll, and the only announcement it gets. `note_time` has already
+            # cleared the played marks and the stale reads by the time it answers, and this
+            # return value was being discarded — so the one event the whole preempt exists to
+            # catch left no trace in the log.
+            self._log("  Challenge: the maps re-rolled — the panel is worth another look.")
         if self._challenges.needs_rescan(now):
             return True
-        return bool(self._challenge_playable(task))
+        if self._challenge_playable(task):
+            return True
+        self._log_challenge_decline()
+        return False
+
+    def _log_challenge_decline(self) -> None:
+        """Say why no detour is happening — **once per reason**, not once per ask.
+
+        Declining was completely silent, which is what made "it didn't go to challenge"
+        undiagnosable: a spent rotation, a panel that read nothing, and a row whose map has no
+        macro assigned all left a log identical to one where the feature does not exist.
+
+        Asked at least twice per match, so a line every time would bury a long run. The reason
+        string is the key: only a change in it is worth saying, which makes each line an event
+        rather than a status.
+        """
+        offered = self._challenges.candidates()
+        if offered:
+            names = ", ".join(f"slot {r.slot} {r.map_name or 'map unknown'}" for r in offered)
+            reason = f"{names} offered, but no enabled slot has a macro assigned"
+        elif self._challenges.reads:
+            reason = f"nothing playable this rotation ({self._challenges.summary()})"
+        else:
+            # `needs_rescan` was False with no reads, so the panel *was* visited this rotation
+            # and gave nothing back. Distinguished from the case above because the fix differs:
+            # this one is the OCR boxes, not the macro assignments.
+            reason = "the panel was visited this rotation and read nothing"
+        if reason == self._challenge_decline:
+            return
+        self._challenge_decline = reason
+        self._log(f"  Challenge: not detouring — {reason}.")
 
     def _run_challenge_task(self, task: dict) -> None:
         """Execute a Challenge task: scan the panel, pick a ready slot, run it.
