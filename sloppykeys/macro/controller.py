@@ -586,10 +586,11 @@ class MacroController:
 
         ok, msg = self._nav.wait_for_match_ready()
         self._log(f"  Stage loaded: {msg}")
-        if not ok:
-            return False
-        self.run_camera()
-        return True
+        # No `run_camera` here. This only runs when another rep follows, and that rep opens
+        # with `_navigate_lobby`, which sees `in_match` and sets the camera itself — so doing
+        # it here ran the ~8s pitch-and-zoom twice per rep and the log said "Camera:
+        # completed" twice in a row.
+        return ok
 
     def _navigate_route(self, map_name: str, act: str) -> bool:
         """Events route navigation."""
