@@ -353,6 +353,10 @@ input:focus, select:focus {
    the inputs start at the same x, and so does everything after them.
    - `.vr-label` was `min-width: 130px` — a floor, not a width. "Row 1 map name" plus its
      DEFAULT badge overruns it, so those rows pushed their inputs right of every other row's.
+     Fixing that by pinning the label to 150px then **hid the badge**: the label clips with an
+     ellipsis, so on the longer names the pill was the part cut off. So the badge gets its own
+     column (`.vr-flag`), always reserved whether or not it is showing — an absent badge that
+     collapsed its cell would misalign every edited row against every default one.
    - The thumb was a bare `<img hidden>`, and `hidden` is `display: none`, which drops it out
      of the flex line entirely — so a row with a preview and a row without did not agree
      either. `.vr-thumb-cell` keeps the space whether or not a crop exists.
@@ -363,6 +367,10 @@ input:focus, select:focus {
   flex: 0 0 150px; min-width: 0; color: var(--text-muted); font-weight: 600;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+.vr-flag { flex: 0 0 50px; display: flex; align-items: center; min-width: 0; }
+/* No left margin in here: the cell's own gap does that job, and the shared rule's margin is
+   for the group header, where the badge really does follow text. */
+.vr-flag .vr-default { margin-left: 0; }
 .vision-region-row input { flex: 0 0 50px; width: 50px; height: 22px; font-size: 10px; padding: 0 4px; background: var(--surface-sunken); color: var(--text); border: 1px solid var(--border); }
 .vr-thumb-cell { flex: 0 0 140px; display: flex; align-items: center; min-width: 0; overflow: hidden; }
 /* A preview is a state, not an absence: a fresh install has taken none, and an empty column
