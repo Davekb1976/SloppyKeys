@@ -1739,12 +1739,6 @@ class MacroController:
 
         self._log("  Challenge: scanning panel...")
 
-        # A preempt lands between two reps, so a Repeat that just kept the character's position
-        # may still be flagged — and this detour leaves that map for a Story one. Clearing it
-        # keeps the challenge's own walk. The camera flag is deliberately left alone: the pitch
-        # survives the trip, and re-pitching is the bug this whole pair exists to avoid.
-        self._kept_position = False
-
         # Navigate to the challenge panel
         ok = self._navigate_to_challenge()
         if not ok:
@@ -1844,6 +1838,16 @@ class MacroController:
                 self._challenges.mark_done(read.slot)
                 started = False
                 break
+
+            # **Here, not at the top of the detour.** A preempt lands between two reps, so a
+            # Repeat or Select Portal that kept the character's position may still be flagged —
+            # and this stage is a Story one, so the flag has to go. But clearing it on entry
+            # cleared it for every detour that *failed* too, and reps 2+ of a Portals task are
+            # already in a match, where `_navigate_to_challenge` cannot find Play and bails. So
+            # a rotation boundary silently un-flagged a rep that never moved, and the walk
+            # replayed from where it had already finished. Only a stage that actually loaded
+            # respawned anything.
+            self._kept_position = False
 
             self._ensure_camera()
 
