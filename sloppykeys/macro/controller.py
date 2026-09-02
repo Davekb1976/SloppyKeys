@@ -131,11 +131,19 @@ class MacroController:
         self._running = False
         self._paused = False
         self._current_task: dict | None = None
-        # True for the one rep that follows a Portals run queued from the victory screen. That
-        # match starts in the world the last one ended in — the character never respawned and
-        # the camera was never reset — so the walk and the camera setup must not run again.
-        # See `_portals_after_match`.
-        self._stage_continued = False
+        # Two separate facts about what survives the end of a match. They are *not* the same
+        # flag: the one case that proves it is Repeat Stage, which keeps both, against Select
+        # Portal, which keeps the camera and respawns you.
+        #
+        # `_camera_set` — the camera has been pitched and nothing has been back to the lobby
+        # since, so pitching again would double a raw delta (`camera.PITCH_DELTA`) and move the
+        # ground out from under every placement coordinate. Reset per run in `start`; every
+        # lobby chain ends by setting the camera, so nothing else has to clear it.
+        self._camera_set = False
+        # `_kept_position` — the last match ended with **Repeat Stage**, which drops you back
+        # into the stage exactly where you stood, so the pre-start walk must not replay. Any
+        # other way into a match respawns you and the walk is required.
+        self._kept_position = False
         self._cycle = 0
         self._last_reopen_time = 0.0
 
@@ -178,6 +186,10 @@ class MacroController:
         self._stop_requested = False
         self._paused = False
         self._running = True
+        # Nothing here knows where the game has been since the last run — the user may have
+        # walked to the lobby themselves — so a fresh run always sets the camera once.
+        self._camera_set = False
+        self._kept_position = False
         self._cycle = 0
         self._log("Macro started — running the task queue.")
         self._send_webhook_started()
@@ -365,9 +377,10 @@ class MacroController:
 
                     # Pre Start
                     self._run_phase_linear(phases.get("pre_start", []))
-                    # Consumed. Anything that continues in place sets it again on the way out,
-                    # so leaving it set would suppress the walk for the rest of the queue.
-                    self._stage_continued = False
+                    # Consumed. Only the match tail knows whether the *next* one respawns, and
+                    # it sets this again there — leaving it up would suppress the walk for the
+                    # rest of the queue.
+                    self._kept_position = False
                     if self._checkpoint():
                         return (True, f"stopped after {self._cycle} cycles")
 
@@ -407,6 +420,9 @@ class MacroController:
                     elif rep < repeat - 1:
                         # Click Repeat for next match
                         ok, msg = self._nav.click_repeat()
+                        # Repeat Stage drops you back in standing where you already were, so
+                        # the next rep must not walk again. Every mode, not just Portals.
+                        self._kept_position = bool(ok)
                         if not ok:
                             self._log(f"  Repeat: {msg} — falling through.")
 
@@ -417,12 +433,14 @@ class MacroController:
         # Check if already in match
         if self._nav.in_match():
             self._log("  Already in a match — skipping lobby.")
-            if self._stage_continued:
-                # **The pitch is a raw-delta drag, not an angle** (`camera.PITCH_DELTA`), so
-                # running it on a camera that is already set pitches down twice as far and
-                # every stored placement coordinate then points at the wrong ground. Safe to
-                # repeat only when the stage actually reloaded and reset the camera with it.
-                self._log("  Camera: already set — this run continued in place.")
+            # Reaching here means Repeat Stage or Select Portal put us straight into another
+            # match without a lobby trip, and the camera carries over from the last one. **The
+            # pitch is a raw-delta drag, not an angle** (`camera.PITCH_DELTA`), so setting it
+            # again adds a second 1000 and every placement coordinate then points at the wrong
+            # ground. Still set it if this is the first match of the run, which is the case
+            # where the macro was started with the game already in a match.
+            if self._camera_set:
+                self._log("  Camera: already set — carried over from the last match.")
             else:
                 self.run_camera()
             return True
@@ -556,13 +574,14 @@ class MacroController:
         """
         if again:
             if self._portal_next_run(task):
-                # That match starts in the world this one ended in — see `_stage_continued`.
-                self._stage_continued = True
+                # Select Portal loads the portal's stage fresh, so this one *does* respawn and
+                # the walk is needed. Only the camera carries over.
+                self._kept_position = False
                 return
             ok, msg = self._nav.click_repeat()
             self._log(f"  Repeat: {msg}")
             if ok:
-                self._stage_continued = True
+                self._kept_position = True
                 return
         ok, msg = self._nav.back_to_lobby()
         self._log(f"  Back to lobby: {msg}")
@@ -647,6 +666,7 @@ class MacroController:
         zoom_ms = int(float(self._delays.get("camera_zoom", 3.0)) * 1000)
         script = camera_setup_script(center_x, center_y, zoom_ms=zoom_ms)
         ok, msg = self._ahk.run(script, wait=True, timeout=15.0)
+        self._camera_set = ok
         self._log(f"  Camera: {msg or ('ok' if ok else 'failed')}")
 
     def _run_phase_linear(self, blocks: list) -> None:
@@ -1479,15 +1499,13 @@ class MacroController:
             # The pinned pre-start walk. Auto resolves the task's target through the table;
             # Custom names a recording outright. Had no branch here at all, so both modes
             # were silently skipped.
-            if self._stage_continued:
-                # The character is still standing where the last walk left it, so replaying the
-                # recording from here walks that distance a second time and ends somewhere the
-                # placement coordinates do not describe. Evidence it never respawned: entering
-                # from the bag reported `stage loaded after 16 checks`, continuing from the
-                # result screen reported `after 2 checks` at the same 1.0s poll — the world was
-                # already up. This is the RUNS ONCE badge the Macro Manager draws on this
-                # block, honoured across reps that never left the map.
-                self._log("    [block] walk path: already walked — this run continued in place")
+            if self._kept_position:
+                # Repeat Stage put the character back in the stage on the spot it already
+                # occupied, so replaying the recording from here walks that distance a second
+                # time and ends somewhere the placement coordinates do not describe. This is
+                # the RUNS ONCE badge the Macro Manager draws on this block, honoured across
+                # reps that never respawned. Any other entry does respawn, and walks.
+                self._log("    [block] walk path: already in position — Repeat kept it")
                 return
             task = self._current_task or {}
             if block.get("mode") == "custom":
@@ -1693,11 +1711,11 @@ class MacroController:
 
         self._log("  Challenge: scanning panel...")
 
-        # A preempt lands between two Portals reps, so the "continued in place" flag the last
-        # one set may still be up — and this detour leaves that map for a Story one. Clearing
-        # it keeps the challenge's own walk, and the interrupted rep navigates in fresh
-        # afterwards because this moved the game somewhere else entirely.
-        self._stage_continued = False
+        # A preempt lands between two reps, so a Repeat that just kept the character's position
+        # may still be flagged — and this detour leaves that map for a Story one. Clearing it
+        # keeps the challenge's own walk. The camera flag is deliberately left alone: the pitch
+        # survives the trip, and re-pitching is the bug this whole pair exists to avoid.
+        self._kept_position = False
 
         # Navigate to the challenge panel
         ok = self._navigate_to_challenge()
