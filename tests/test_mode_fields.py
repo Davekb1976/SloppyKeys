@@ -62,11 +62,19 @@ fields = api.get_mode_fields("Portals")
 assert fields == {
     "map_label": "Portal Map",
     "target_label": "Act",
+    "map": True,
     "stage": False,
     "difficulty": False,
     "extract": False,
     "search_label": "Portal",
 }, fields
+
+# Challenge stores no map: which one it plays is read off the panel. The control was hidden
+# but still saved, so a Challenge task carried whatever map was last shown — and the run then
+# walked that map's route.
+assert api.get_mode_fields("Challenge")["map"] is False
+for mode in ("Story", "Raid", "Expedition", "Events", "Portals"):
+    assert api.get_mode_fields(mode)["map"] is True, mode
 
 fields = api.get_mode_fields("Expedition")
 assert fields["stage"] is False and fields["difficulty"] is True and fields["extract"] is True

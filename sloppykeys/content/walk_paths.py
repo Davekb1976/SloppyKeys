@@ -39,6 +39,16 @@ DEFAULT_WALK_PATHS: dict[str, str] = {
 }
 
 
+# A side task plays another mode's maps on the same playfields, so it spawns where that mode
+# spawns and walks the same route. Challenge rotates through Story's maps — the same reason
+# `nav_images.map_reference_paths` has it read Story's backdrops instead of keeping duplicate
+# captures of the same ground. Without this a challenge on East Town skipped the walk that
+# every Story run on East Town takes, and its placements were measured after that walk.
+BORROWED_ROUTES: dict[str, str] = {
+    "Challenge": "Story",
+}
+
+
 def target_key(gamemode: str, map_name: str, act: str) -> str:
     """The table key for one target, or "" when the target is incomplete.
 
@@ -56,11 +66,17 @@ def default_walk_path(gamemode: str, map_name: str, act: str) -> str:
     """The walk path this target uses on Auto, or "".
 
     Act first, then the map: acts of the same map share one walk unless one of them says
-    otherwise.
+    otherwise. A mode's own rows win before the mode it borrows from, so a side task can
+    still override one map without restating the rest.
     """
-    act_key = target_key(gamemode, map_name, act)
-    map_key = target_key(gamemode, map_name, "")
-    for key in (act_key, map_key):
-        if key and key in DEFAULT_WALK_PATHS:
-            return DEFAULT_WALK_PATHS[key]
+    modes = [gamemode]
+    borrowed = BORROWED_ROUTES.get(str(gamemode or "").strip())
+    if borrowed:
+        modes.append(borrowed)
+    for mode in modes:
+        act_key = target_key(mode, map_name, act)
+        map_key = target_key(mode, map_name, "")
+        for key in (act_key, map_key):
+            if key and key in DEFAULT_WALK_PATHS:
+                return DEFAULT_WALK_PATHS[key]
     return ""

@@ -324,13 +324,23 @@ class Api:
         dimension), and Raid, Events and Portals all offered Easy/Hard with no toggle for the
         macro to click.
         """
-        from sloppykeys.content.gamemodes import has_targets, labels_for, search_label
+        from sloppykeys.content.gamemodes import (
+            has_targets,
+            is_side_task,
+            labels_for,
+            search_label,
+        )
         from sloppykeys.content.start_stage import has_difficulty
 
         map_label, target_label = labels_for(gamemode)
         return {
             "map_label": map_label,
             "target_label": target_label,
+            # A side task's map is read off the game, not chosen: which map a challenge is on
+            # comes from the panel. The control was hidden for Challenge but still *saved*,
+            # so a Challenge task carried whichever map was last shown — which is how one
+            # ended up storing Summer and walking that route.
+            "map": not is_side_task(gamemode),
             # `has_targets` is True for a custom mode even with an empty table: Events reads
             # its acts from routes.json.
             "stage": has_targets(gamemode),

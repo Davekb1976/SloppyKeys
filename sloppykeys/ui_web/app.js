@@ -411,7 +411,11 @@
     taskList.innerHTML = tasks.map((t, i) => {
       const fields = modeFields[t.mode] || {};
       const isChallenge = t.mode === "Challenge";
-      const title = [t.mode, t.map, t.stage].filter(Boolean).join(" · ") || "Unconfigured";
+      // A Challenge card names no map or stage: it plays whichever of the three rows the
+      // panel offers. A task saved before that was enforced still holds a stale one.
+      const title = isChallenge
+        ? "Challenge"
+        : [t.mode, t.map, t.stage].filter(Boolean).join(" · ") || "Unconfigured";
       // Only what this mode actually uses. Every card read "<difficulty> · ×<repeat>", which
       // for Challenge named a difficulty it has no control for and a repeat the runner
       // ignores — it plays one row per detour, however the number is set.
@@ -551,10 +555,12 @@
     if (!selectedTaskId || !window.pywebview || !pywebview.api) return;
     const changes = {
       mode: tbMode.value,
-      map: tbMap.value,
       repeat: Math.max(1, parseInt(tbRepeat.value) || 1),
       macro: tbMacro.value,
     };
+    // Challenge reads its map off the panel, so it must not store one. The control is hidden
+    // for it but still held the last mode's value, and that stale map reached the run.
+    if (tbModeFields.map !== false) changes.map = tbMap.value;
     // Only the fields this mode has a control for, so a task can't carry a stage or a
     // difficulty its mode never offered — which is what made Expedition tasks store an
     // empty stage and Raid tasks store an Easy/Hard nothing clicked.

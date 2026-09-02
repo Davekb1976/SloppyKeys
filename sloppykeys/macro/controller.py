@@ -1595,7 +1595,27 @@ class MacroController:
         return bool(self._challenge_playable(task))
 
     def _run_challenge_task(self, task: dict) -> None:
-        """Execute a Challenge task: scan the panel, pick a ready slot, run it."""
+        """Execute a Challenge task: scan the panel, pick a ready slot, run it.
+
+        Runs with `_current_task` pointing at the **challenge**, restored afterwards. That
+        used to be free: the queue loop set it before calling this, because a challenge only
+        ran at its own position. Now a challenge preempts a task mid-queue, so without this
+        the whole detour executes while `_current_task` still describes the task it
+        interrupted — and everything that reads it acts on the wrong one. It is not
+        cosmetic: `walk_path` on Auto resolved the *interrupted* target's route and walked
+        Summer's path into a Story challenge, and `_expedition_state` would have run
+        Expedition's mid-match handler inside a challenge.
+        """
+        previous_task = self._current_task
+        self._current_task = task
+        try:
+            self._run_challenge_task_inner(task)
+        finally:
+            self._current_task = previous_task
+
+    def _run_challenge_task_inner(self, task: dict) -> None:
+        """The body. Split out so the `_current_task` swap above has one exit point — this
+        has a dozen `return`s and a `try` around all of them would bury them."""
         from sloppykeys.macro.challenge import ChallengeScanner
         from sloppykeys.content.challenge import challenge_maps, SLOTS
 
@@ -1680,6 +1700,12 @@ class MacroController:
             # button was still fading and was swallowed. `start_challenge` searches
             # `select_stage.png` and `start_match.png` — the same two every other gamemode
             # uses — and keeps those coordinates only as the missing-template fallback.
+            # The map this challenge is actually on, which only the panel knows. Everything
+            # downstream reads it off `_current_task`: `walk_path` on Auto resolves the route
+            # for it (through `BORROWED_ROUTES`, since a challenge walks Story's), and the
+            # webhook names it. The wrapper restores the caller's task afterwards.
+            self._current_task = {**task, "map": map_name, "stage": ""}
+
             ok, msg = self._nav.start_challenge(read.slot)
             self._log(f"  Challenge slot {read.slot} start: {msg}")
             if not ok:
