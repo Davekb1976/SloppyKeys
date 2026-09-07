@@ -22,8 +22,8 @@ from dataclasses import dataclass, field
 
 # Story acts run 1-5 plus two special acts shown as icons in game.
 STORY_ACTS = ["Act 1", "Act 2", "Act 3", "Act 4", "Act 5", "Infinite", "Mastery"]
-# In in-game order. Named because Challenge draws from the same five maps in this
-# patch, and two copies of the list would drift apart.
+# In in-game order. Named because Challenge draws from the same Story maps, and
+# two copies of the list would drift apart.
 STORY_MAPS = [
     "School Grounds",
     "Flower Forest",
@@ -31,6 +31,7 @@ STORY_MAPS = [
     "Fairy King Forest",
     "King's Tomb",
     "East Town",
+    "Crimson Shore",
 ]
 RAID_ACTS = ["Act 1", "Act 2", "Act 3"]
 # Expedition has no third dimension: its difficulty is a toggle for how hard the
@@ -99,7 +100,7 @@ GAMEMODES: dict[str, Gamemode] = {
         name="Raid",
         map_label="Map",
         target_label="Act",
-        maps=["Spirit City"],
+        maps=["Spirit City", "Snowy Castle"],
         targets=RAID_ACTS,
         per_act_reference=True,
     ),
