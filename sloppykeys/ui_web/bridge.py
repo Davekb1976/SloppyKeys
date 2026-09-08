@@ -51,6 +51,7 @@ from sloppykeys.core.win32.roblox_window import (
     activate_window,
     find_roblox_window,
     is_frameless,
+    is_maximized,
     is_minimized,
     is_window,
     position_window_to_client_rect,
@@ -2344,6 +2345,9 @@ class Api:
 
     def _dock(self, game_hwnd: int) -> bool:
         """Float the game over the slot, frame stripped, without stealing focus."""
+        if is_maximized(game_hwnd):
+            user32.ShowWindow(game_hwnd, SW_RESTORE)
+
         target = self._slot_on_screen()
         if target is None:
             return False
@@ -2482,6 +2486,10 @@ class Api:
                     time.sleep(FOLLOW_INTERVAL)
                     continue
 
+                if self._docked and self._game_hwnd and is_maximized(self._game_hwnd):
+                    user32.ShowWindow(self._game_hwnd, SW_RESTORE)
+                    self._last_rect = None
+
                 rect = window_rect(host)
                 if rect is not None and (rect != self._last_rect or not self._docked):
                     if self._dock(self._game_hwnd):
@@ -2547,9 +2555,12 @@ def main() -> None:
         # without its frame. Fix it before we dock so our strip_frame gets a
         # clean baseline to save/restore.
         rbx = find_roblox_window()
-        if rbx and is_frameless(rbx):
-            recover_frame(rbx, VIEWPORT_W, VIEWPORT_H)
-            set_topmost(rbx, False)
+        if rbx:
+            if is_maximized(rbx):
+                user32.ShowWindow(rbx, SW_RESTORE)
+            if is_frameless(rbx):
+                recover_frame(rbx, VIEWPORT_W, VIEWPORT_H)
+                set_topmost(rbx, False)
 
         # Init the macro controller.
         api._app_root = resolve_app_root()

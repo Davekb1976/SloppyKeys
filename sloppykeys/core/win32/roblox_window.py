@@ -28,6 +28,7 @@ ROBLOX_WINDOW_CLASS = "windowsclient"
 GWL_STYLE = -16
 WS_CAPTION = 0x00C00000
 WS_THICKFRAME = 0x00040000
+WS_MAXIMIZEBOX = 0x00010000
 
 
 def get_process_exe_name(pid: int) -> str:
@@ -167,10 +168,12 @@ def strip_frame(hwnd: int) -> int | None:
     read from the game process. Needed when the game floats *above* our window:
     there is nothing left to hide its caption behind.
     """
+    if user32.IsZoomed(hwnd):
+        user32.ShowWindow(hwnd, SW_RESTORE)
     style = user32.GetWindowLongW(hwnd, GWL_STYLE)
     if not style:
         return None
-    stripped = style & ~WS_CAPTION & ~WS_THICKFRAME
+    stripped = style & ~WS_CAPTION & ~WS_THICKFRAME & ~WS_MAXIMIZEBOX
     if stripped == style:
         return style
     user32.SetWindowLongW(hwnd, GWL_STYLE, stripped)
@@ -214,6 +217,10 @@ def is_frameless(hwnd: int) -> bool:
     return not bool(style & WS_CAPTION)
 
 
+def is_maximized(hwnd: int) -> bool:
+    return bool(user32.IsZoomed(hwnd))
+
+
 # The standard Roblox style includes WS_CAPTION | WS_THICKFRAME | WS_POPUP etc.
 # We store the original, but after a force-kill we don't have it any more. This
 # reconstructs a normal Roblox style by adding caption + thickframe back.
@@ -222,10 +229,12 @@ def recover_frame(hwnd: int, client_w: int, client_h: int) -> bool:
 
     Used on startup to undo a previous force-kill that left Roblox borderless.
     """
+    if user32.IsZoomed(hwnd):
+        user32.ShowWindow(hwnd, SW_RESTORE)
     style = user32.GetWindowLongW(hwnd, GWL_STYLE)
     if not style:
         return False
-    new_style = style | WS_CAPTION | WS_THICKFRAME
+    new_style = style | WS_CAPTION | WS_THICKFRAME | WS_MAXIMIZEBOX
     if new_style == style:
         return True  # already has its frame
     user32.SetWindowLongW(hwnd, GWL_STYLE, new_style)
