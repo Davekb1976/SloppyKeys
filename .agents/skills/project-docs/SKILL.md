@@ -16,7 +16,7 @@ is a state of the work, not a phrase in the request.
 
 | Mechanism | Loads | Location |
 |---|---|---|
-| Always-on rules | every turn | `GEMINI.md` at the repo root (inside `.agents/`) |
+| Always-on rules | every turn | `.agents/rules/*.md` (or `GEMINI.md` / `AGENTS.md`) |
 | **Skill** | when the request matches the description | `.agents/skills/<name>/SKILL.md`, `name` + `description` |
 
 A skill is the portable form (the open Agent Skills standard). Its `description` is read to
@@ -73,7 +73,7 @@ can be one fetch away.
 ## Where things live
 
 ```
-.agents/GEMINI.md                    always-on rules, loaded every turn
+.agents/rules/*.md                   always-on rules, loaded every turn
 .agents/skills/<name>/SKILL.md       on-demand skill, loaded when description matches
 .agents/skills/<name>/references/    reference material the skill points at
 ```
