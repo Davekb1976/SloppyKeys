@@ -2066,6 +2066,13 @@ class MacroController:
             # here rather than on a win also means a row that failed technically doesn't
             # preempt every following match forever.
             self._challenges.mark_done(read.slot)
+
+            # Leave the result screen. Without this the next task finds itself on a screen
+            # it doesn't recognise: Portals can't see the bag, Story can't see Play, and the
+            # macro spins through the queue clicking nothing until Roblox idle-kicks.
+            ok, msg = self._back_to_lobby()
+            self._log(f"  Challenge: back to lobby — {msg}")
+
             started = True
             break  # one challenge per detour
 
