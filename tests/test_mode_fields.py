@@ -55,7 +55,7 @@ for mode in FARM_GAMEMODE_NAMES:
     assert search_label(mode) == expected, (mode, search_label(mode))
 
 # # Portals' map is the playfield, not the portal
-assert maps_for("Portals") == ["Summer"], maps_for("Portals")
+assert maps_for("Portals") == ["Summer", "Sky Ruins"], maps_for("Portals")
 
 # # What the page actually receives
 fields = api.get_mode_fields("Portals")

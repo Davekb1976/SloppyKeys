@@ -143,7 +143,7 @@ GAMEMODES: dict[str, Gamemode] = {
         name="Portals",
         map_label="Portal Map",
         target_label="Act",
-        maps=["Summer"],
+        maps=["Summer", "Sky Ruins"],
         targets=[],
         own_entry=True,
         # Non-empty means "chosen by typing a name": the Task Builder shows a text field
