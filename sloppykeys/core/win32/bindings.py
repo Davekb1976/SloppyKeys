@@ -67,7 +67,6 @@ _set_sig(
 _set_sig(user32.IsWindowVisible, wintypes.BOOL, wintypes.HWND)
 _set_sig(user32.IsWindow, wintypes.BOOL, wintypes.HWND)
 _set_sig(user32.IsIconic, wintypes.BOOL, wintypes.HWND)
-_set_sig(user32.IsZoomed, wintypes.BOOL, wintypes.HWND)
 _set_sig(user32.GetClassNameW, ctypes.c_int, wintypes.HWND, wintypes.LPWSTR, ctypes.c_int)
 _set_sig(user32.GetWindowRect, wintypes.BOOL, wintypes.HWND, ctypes.POINTER(wintypes.RECT))
 _set_sig(user32.GetClientRect, wintypes.BOOL, wintypes.HWND, ctypes.POINTER(wintypes.RECT))
