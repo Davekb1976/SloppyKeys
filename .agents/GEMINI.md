@@ -398,6 +398,8 @@ Tokens are the user's money; context is finite.
 - Read a file once, then work from it. Don't re-read to confirm, and don't re-read a doc you were
   just given.
 - Fire independent tool calls in one block. A serial chain of six reads costs six round trips.
+- Broad "where does X live" exploration goes to the `research` sub-agent, not a dozen greps
+  in the main thread. A known file or symbol is a direct read.
 - Don't re-verify code this change didn't touch.
 
 ## Originality
@@ -453,6 +455,10 @@ for them — those land synthetic input on their live game.
 
 Private repo `Davekb1976/SloppyKeys`, remote `origin`, branch `main`. There is no handoff
 document: `git log` is the history.
+
+This section is deliberately short — it is the part that has to be true *without anyone asking
+for it*. The message format, the body rules and the release procedure are in the
+**`git-workflow` skill**; read it before writing a message or cutting a release.
 
 ## Always
 
