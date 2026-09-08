@@ -102,9 +102,18 @@ def changes_since(tag: str) -> str:
 
 def group_subjects(subjects: list[str]) -> str:
     """The changelog body for a list of commit subjects. Pure, so it can be tested."""
+    reverted = set()
+    for line in subjects:
+        m = re.match(r'^Revert "([^"]+)"', line.strip())
+        if m:
+            reverted.add(m.group(1))
+
     grouped: dict[str, list[str]] = {name: [] for name, _heading in HEADINGS}
     for line in subjects:
-        match = SUBJECT.match(line.strip())
+        stripped = line.strip()
+        if stripped in reverted:
+            continue
+        match = SUBJECT.match(stripped)
         if match is None:
             continue
         kind = match.group("type")
