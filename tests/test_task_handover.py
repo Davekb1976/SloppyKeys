@@ -60,7 +60,7 @@ class FakeNav:
     def select_stage(self, mode, map_name):
         return self._ok(f"stage:{map_name}")
 
-    def select_act(self, mode, act):
+    def select_act(self, mode, act, prefer_golden=False):
         return self._ok(f"act:{act}")
 
     def set_difficulty(self, mode, diff):

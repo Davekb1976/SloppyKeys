@@ -33,6 +33,22 @@ ACT_COORDS: dict[str, dict[str, tuple[int, int]]] = {
     },
 }
 
+# When Golden Hour is active on a Story stage, the Gift Box is inserted at Slot 0,
+# shifting Acts 1-5 and Infinite down by one slot. Mastery is scrolled off the bottom
+# and reached by scrolling the act column down.
+GOLDEN_HOUR_ACT_COORDS: dict[str, dict[str, tuple[int, int]]] = {
+    "Story": {
+        "Golden Hour": (249, 233),  # Slot 0: Gift box
+        "Act 1": (250, 287),        # Slot 1
+        "Act 2": (246, 341),        # Slot 2
+        "Act 3": (248, 397),        # Slot 3
+        "Act 4": (246, 451),        # Slot 4
+        "Act 5": (245, 513),        # Slot 5
+        "Infinite": (249, 567),     # Slot 6
+        "Mastery": (249, 567),      # Lands at bottom slot after scrolling down
+    },
+}
+
 # # User overrides
 # Same reasoning as the challenge OCR boxes: the points above were measured on one machine
 # at one viewport size, and being 20px out doesn't fail — it clicks the act above the one
@@ -61,6 +77,11 @@ def apply_point_overrides(overrides: dict[str, tuple[int, int]]) -> None:
 def act_coord(gamemode: str, act: str) -> tuple[int, int] | None:
     default = ACT_COORDS.get(gamemode, {}).get(act)
     return _OVERRIDES.get(act_key(gamemode, act), default)
+
+
+def golden_hour_act_coord(gamemode: str, act: str) -> tuple[int, int] | None:
+    """The act coordinate when Golden Hour is active on the stage."""
+    return GOLDEN_HOUR_ACT_COORDS.get(gamemode, {}).get(act)
 
 
 def act_specs() -> list[tuple[str, str, str, tuple[int, int]]]:

@@ -347,6 +347,7 @@ class Api:
             "difficulty": has_difficulty(gamemode),
             "extract": gamemode == "Expedition",
             "search_label": search_label(gamemode),
+            "golden_hour": gamemode == "Story",
         }
 
     def get_priority_options(self) -> list:

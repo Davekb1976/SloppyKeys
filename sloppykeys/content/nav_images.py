@@ -60,6 +60,8 @@ SELECT_STAGE_IMAGE = "select_stage.png"
 # The lobby's Events button. Clicked instead of Play for the Events gamemode,
 # because the events list is a different UI section from the gamemode cards.
 EVENTS_IMAGE = "events.png"
+# The Golden Hour badge on a stage card or in the stage act screen.
+GOLDEN_HOUR_IMAGE = "golden_hour.png"
 # # Closing the intermission menu back to the lobby proper
 # The **X** every panel in the gamemode UI is dismissed by — the challenge list included.
 # One file rather than one per panel because it is literally the same control drawn in the
@@ -254,6 +256,11 @@ def select_stage_image() -> str:
 def events_image() -> str:
     """The lobby Events button — the Events gamemode's entry point."""
     return os.path.join(IMAGES_DIR, LOBBY_DIR, EVENTS_IMAGE)
+
+
+def golden_hour_image() -> str:
+    """The Golden Hour badge on a stage card or in the stage act screen."""
+    return os.path.join(IMAGES_DIR, LOBBY_DIR, GOLDEN_HOUR_IMAGE)
 
 
 def events_templates_dir() -> str:
@@ -474,6 +481,7 @@ def expected_paths() -> list[str]:
         events_image(),
         select_stage_image(),
         start_match_image(),
+        golden_hour_image(),
         start_game_image(),
         repeat_image(),
         win_change_image(),

@@ -16,10 +16,11 @@ than reporting that navigation didn't work.
 
 from __future__ import annotations
 
+import os
 import time
 from typing import Callable
 
-from sloppykeys.content.acts import act_coord
+from sloppykeys.content.acts import act_coord, golden_hour_act_coord
 from sloppykeys.content.challenge import (
     CHANGE_GAMEMODE_CLICK,
     CLOSE_LIST_CLICK,
@@ -39,6 +40,7 @@ from sloppykeys.content.nav_images import (
     close_panel_image,
     events_image,
     gamemode_image,
+    golden_hour_image,
     match_play_image,
     play_image,
     portal_activate_image,
@@ -597,17 +599,49 @@ class LobbyNavigator:
                 time.sleep(self.scroll_settle)
         return (False, f"{self._miss(path, stage, region)} after {max_scrolls} scrolls")
 
-    def select_act(self, gamemode: str, act: str) -> tuple[bool, str]:
-        """Click a fixed-position act. Coordinates are client-space; add the
-        Roblox client origin to get the screen point AHK clicks."""
-        coord = act_coord(gamemode, act)
-        if coord is None:
-            return (False, f"no act coordinates for {gamemode} / {act}")
+    def select_act(
+        self, gamemode: str, act: str, prefer_golden: bool = False
+    ) -> tuple[bool, str]:
+        """Click an act button. Coordinates are client-space; add the
+        Roblox client origin to get the screen point AHK clicks.
+
+        When Golden Hour is active on a Story stage, the Gift Box is inserted at Slot 0.
+        If prefer_golden is True, the Gift Box is clicked. If prefer_golden is False,
+        coordinates are shifted down by 1 slot (and scrolled for Mastery) so the user's
+        chosen act is clicked without misclicking the Gift Box. If prefer_golden is True
+        but Golden Hour is absent, it falls back to the requested act.
+        """
         rect = self._rect()
         if rect is None:
             return (False, "Roblox not found")
         if not self._ahk.available():
             return (False, "AutoHotkey v2 not found")
+
+        has_golden = False
+        if gamemode == "Story" and os.path.isfile(golden_hour_image()):
+            has_golden = self._find(golden_hour_image(), timeout=0.6) is not None
+
+        if has_golden:
+            if prefer_golden:
+                coord = golden_hour_act_coord("Story", "Golden Hour")
+                target_label = "Golden Hour"
+            else:
+                target_label = act
+                if act == "Mastery":
+                    # Mastery is pushed off-screen at the bottom; scroll act column down
+                    self._scroll_at((249, 350), notches=4)
+                    time.sleep(self.scroll_settle)
+                coord = golden_hour_act_coord("Story", act)
+        else:
+            if prefer_golden:
+                target_label = f"{act} (Golden Hour inactive)"
+            else:
+                target_label = act
+            coord = act_coord(gamemode, act)
+
+        if coord is None:
+            return (False, f"no act coordinates for {gamemode} / {act}")
+
         screen_x = rect[0] + coord[0]
         screen_y = rect[1] + coord[1]
         # Parks like every other lobby click: an act row left hovered draws a tooltip over
@@ -621,7 +655,7 @@ class LobbyNavigator:
             wait=True,
             timeout=8,
         )
-        return (True, f"clicked {act}") if ok else (False, f"{act} click failed: {message}")
+        return (True, f"clicked {target_label}") if ok else (False, f"{target_label} click failed: {message}")
 
     def run_to_stage(self, gamemode: str, stage: str) -> tuple[bool, str]:
         for label, step in (

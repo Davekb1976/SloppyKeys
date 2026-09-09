@@ -67,6 +67,7 @@ assert fields == {
     "difficulty": False,
     "extract": False,
     "search_label": "Portal",
+    "golden_hour": False,
 }, fields
 
 # Challenge stores no map: which one it plays is read off the panel. The control was hidden
@@ -79,12 +80,15 @@ for mode in ("Story", "Raid", "Expedition", "Events", "Portals"):
 fields = api.get_mode_fields("Expedition")
 assert fields["stage"] is False and fields["difficulty"] is True and fields["extract"] is True
 assert fields["target_label"] == "Difficulty", fields
+assert fields["golden_hour"] is False
 
 fields = api.get_mode_fields("Story")
 assert fields["stage"] is True and fields["difficulty"] is True and fields["extract"] is False
+assert fields["golden_hour"] is True
 
 fields = api.get_mode_fields("Events")
 assert fields["stage"] is True and fields["difficulty"] is False
+assert fields["golden_hour"] is False
 assert fields["map_label"] == "Event", fields
 
 # An unknown mode must answer with something the page can render, not blow up.

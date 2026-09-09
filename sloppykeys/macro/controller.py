@@ -524,7 +524,9 @@ class MacroController:
             (f"Select {map_name}", lambda: self._nav.select_stage(mode, map_name)),
         ]
         if stage and act_coord(mode, stage) is not None:
-            steps.append((f"Select {stage}", lambda s=stage: self._nav.select_act(mode, s)))
+            prefer_golden = bool((self._current_task or {}).get("golden_hour", False))
+            step_name = f"Select {stage}" + (" (prefer Golden Hour)" if prefer_golden else "")
+            steps.append((step_name, lambda s=stage, pg=prefer_golden: self._nav.select_act(mode, s, prefer_golden=pg)))
 
         # One field, two controls: a mode with the cycling button gets 1-3 clicks on the way
         # in, and every other mode reads it as Story's Easy/Hard pair, which `start_stage`
