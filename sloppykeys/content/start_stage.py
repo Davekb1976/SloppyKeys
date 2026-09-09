@@ -64,7 +64,7 @@ def start_coords(gamemode: str) -> dict[str, tuple[int, int]] | None:
 # menu opens and each click advances 1 -> 2 -> 3 -> 1. So selecting a difficulty
 # means clicking (target - 1) times, and nothing at all for difficulty 1.
 DIFFICULTY_COORDS: dict[str, tuple[int, int]] = {
-    "Expedition": (312, 473),
+    "Expedition": (442, 527),
 }
 DIFFICULTY_MIN = 1
 DIFFICULTY_MAX = 3

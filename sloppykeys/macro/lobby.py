@@ -565,7 +565,7 @@ class LobbyNavigator:
         )
 
     def select_stage(
-        self, gamemode: str, stage: str, max_scrolls: int = 8, notches: int = 8
+        self, gamemode: str, stage: str, max_scrolls: int = 8, notches: int = 4
     ) -> tuple[bool, str]:
         path = stage_image(gamemode, stage)
         # No search region. There was a per-gamemode stage-label band

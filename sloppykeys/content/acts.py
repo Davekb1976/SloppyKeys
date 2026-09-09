@@ -27,9 +27,9 @@ ACT_COORDS: dict[str, dict[str, tuple[int, int]]] = {
     },
     # Raid lists three acts, spaced further apart than Story's seven.
     "Raid": {
-        "Act 1": (252, 271),
-        "Act 2": (245, 404),
-        "Act 3": (246, 527),
+        "Act 1": (249, 231),
+        "Act 2": (252, 290),
+        "Act 3": (252, 343),
     },
 }
 
