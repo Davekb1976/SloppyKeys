@@ -32,14 +32,18 @@ USER = "286825732000000000"
 
 def build(root: str) -> tuple[MacroController, list[dict]]:
     """A controller wired to a temp app root, with every send captured instead of posted."""
+    ops_dir = os.path.join(root, "operations")
+    os.makedirs(ops_dir, exist_ok=True)
+    with open(os.path.join(ops_dir, "test.json"), "w", encoding="utf-8") as handle:
+        json.dump({"blocks": []}, handle)
     with open(os.path.join(root, "settings.json"), "w", encoding="utf-8") as handle:
         json.dump(
             {
                 "discord_webhook": GOOD,
                 "discord_user_id": USER,
                 "tasks": [
-                    {"mode": "Expedition", "map": "School Grounds", "stage": "1", "repeat": 1},
-                    {"mode": "Expedition", "map": "East Town", "stage": "1", "repeat": 1},
+                    {"mode": "Expedition", "map": "School Grounds", "stage": "1", "repeat": 1, "macro": "test"},
+                    {"mode": "Expedition", "map": "East Town", "stage": "1", "repeat": 1, "macro": "test"},
                 ],
             },
             handle,
@@ -159,7 +163,7 @@ def test_no_webhook_url_means_silence_not_an_error() -> None:
     with tempfile.TemporaryDirectory() as root:
         ctrl, sent = build(root)
         with open(os.path.join(root, "settings.json"), "w", encoding="utf-8") as handle:
-            json.dump({"tasks": [{"mode": "Story", "map": "East Town"}]}, handle)
+            json.dump({"tasks": [{"mode": "Story", "map": "East Town", "stage": "Act 1", "macro": "test"}]}, handle)
         assert ctrl.start() is None
         ctrl.pause()
         ctrl.resume()

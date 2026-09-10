@@ -225,19 +225,21 @@ class MacroController:
     def stop(self) -> None:
         self._stop_requested = True
         self._paused = False
-        self._log("Stop requested.")
+        self._log("Stop requested; finishing current step.")
 
     def pause(self) -> None:
         # Guarded so a second Pause doesn't post a second notification.
         if self._paused:
             return
         self._paused = True
+        self._log("Paused.")
         self._send_webhook_paused(True)
 
     def resume(self) -> None:
         if not self._paused:
             return
         self._paused = False
+        self._log("Resumed.")
         self._send_webhook_paused(False)
 
     def run_loop(self) -> tuple[bool, str]:

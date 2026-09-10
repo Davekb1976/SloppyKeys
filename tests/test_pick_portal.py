@@ -425,4 +425,5 @@ assert camera_flag(ahk_ok=True), "a camera that ran must be recorded as set"
 # Otherwise a failed pitch reads as done and every later match skips it.
 assert not camera_flag(ahk_ok=False), "a camera that failed must not be recorded as set"
 
+portals_table.apply_point_overrides({})
 print("pick portal: OK")

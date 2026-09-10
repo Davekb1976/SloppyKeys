@@ -2282,10 +2282,8 @@ class Api:
                     if self._ctrl and self._ctrl.is_running:
                         if self._ctrl._paused:
                             self._ctrl.resume()
-                            self._log_to_ui("Resumed.")
                         else:
                             self._ctrl.pause()
-                            self._log_to_ui("Paused.")
                         self._push_status()
                 self._key_down["pause"] = pause_down
 
@@ -2294,7 +2292,6 @@ class Api:
                 if stop_down and not self._key_down["stop"]:
                     if self._ctrl and self._ctrl.is_running:
                         self._ctrl.stop()
-                        self._log_to_ui("Stop requested; finishing current step.")
                         self._push_status()
                 self._key_down["stop"] = stop_down
 
