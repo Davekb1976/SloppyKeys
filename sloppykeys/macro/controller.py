@@ -186,10 +186,17 @@ class MacroController:
     def stop_requested(self) -> bool:
         return self._stop_requested
 
+    def reload_delays(self) -> None:
+        """Reload tunable timings from settings.json and apply to navigator and placer."""
+        self._delays = DelaysStore(self._app_root).all()
+        self._nav.apply_delays(self._delays)
+        self._placer.apply_delays(self._delays)
+
     def start(self) -> str | None:
         """Validate and begin. Returns error string or None."""
         if self._running:
             return "already running"
+        self.reload_delays()
         tasks = UnifiedSettings(self._app_root).get_tasks()
         if not tasks:
             return "task queue is empty"

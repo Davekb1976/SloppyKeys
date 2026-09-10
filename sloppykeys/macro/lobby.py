@@ -578,15 +578,10 @@ class LobbyNavigator:
         region = None
         # Clear any hover left by the gamemode click before the first look.
         self._park()
-        # The first look owns the whole wait for the stage screen to slide/fade in.
-        # Scrolling a screen that hasn't finished animating moves the list past the
-        # stage before it was ever searchable, which is why the chain failed here
-        # while the standalone test (screen already up) passed. Later looks are
-        # single-shot: the list is up by then, we're only scrolling it into view.
+        if self.panel_fade_wait > 0:
+            time.sleep(self.panel_fade_wait)
         for attempt in range(max_scrolls + 1):
-            match = self._find(
-                path, timeout=self.search_timeout if attempt == 0 else 0.0, region=region
-            )
+            match = self._find(path, timeout=0.0, region=region)
             if match is not None:
                 ok, message = self._click(match)
                 if ok:
@@ -611,10 +606,10 @@ class LobbyNavigator:
             return (False, f"Golden Hour template ({path}) not found")
 
         self._park()
+        if self.panel_fade_wait > 0:
+            time.sleep(self.panel_fade_wait)
         for attempt in range(max_scrolls + 1):
-            match = self._find(
-                path, timeout=self.search_timeout if attempt == 0 else 0.0
-            )
+            match = self._find(path, timeout=0.0)
             if match is not None:
                 ok, message = self._click(match)
                 if ok:

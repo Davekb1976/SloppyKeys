@@ -740,6 +740,8 @@ class Api:
         if not self._app_root:
             return {"ok": False}
         ok = UnifiedSettings(self._app_root).set_delay(key, value)
+        if ok and self._ctrl is not None:
+            self._ctrl.reload_delays()
         return {"ok": ok}
 
     # ---- Game Keybinds (in-game keys the macro presses) ----

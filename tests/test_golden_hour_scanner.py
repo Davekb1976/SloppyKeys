@@ -17,6 +17,7 @@ nav._rect = lambda: (100, 100, 1152, 756)
 nav.park_client = (10, 10)
 nav.search_timeout = 1.0
 nav.scroll_settle = 0.0
+nav.panel_fade_wait = 0.0
 nav._park = MagicMock()
 nav._ahk = MagicMock()
 nav._ahk.available.return_value = True
