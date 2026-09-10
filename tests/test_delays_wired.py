@@ -38,13 +38,13 @@ from sloppykeys.macro.placement import UnitPlacer  # noqa: E402
 PROBE = {
     "image_search_cooldown": 0.11,
     "panel_fade_wait": 0.22,
-    "search_timeout": 33.0,
     "camera_zoom": 4.4,
     "placement_settle": 0.55,
     "result_screenshot_delay": 0.66,
     "lobby_rejoin_wait": 77.0,
 }
 assert set(PROBE) == set(DELAY_SPEC), "a delay was added or removed without tracing it here"
+assert DELAY_SPEC["panel_fade_wait"][0] == "UI fade-in wait"
 
 root = tempfile.mkdtemp(prefix="sk_delays_")
 path = os.path.join(root, "settings.json")
@@ -56,22 +56,24 @@ for key, value in PROBE.items():
 loaded = DelaysStore(root).all()
 assert loaded == PROBE, loaded
 with open(path, encoding="utf-8") as handle:
-    assert json.load(handle)["delays"]["search_timeout"] == 33.0
+    assert json.load(handle)["delays"]["panel_fade_wait"] == 0.22
 
-# # LobbyNavigator: three keys, and `image_search_cooldown` feeds two attributes
+# # LobbyNavigator: two keys, and `image_search_cooldown` feeds two attributes
 nav = LobbyNavigator.__new__(LobbyNavigator)
-nav.click_settle = nav.scroll_settle = nav.search_timeout = nav.panel_fade_wait = -1.0
+nav.click_settle = nav.scroll_settle = nav.panel_fade_wait = -1.0
+nav.search_timeout = 6.0
 nav.apply_delays(loaded)
 assert nav.click_settle == 0.11, nav.click_settle
 assert nav.scroll_settle == 0.11, "the unverifiable-click wait covers scrolls too"
-assert nav.search_timeout == 33.0, nav.search_timeout
+assert nav.search_timeout == 6.0, "search_timeout retains internal default"
 assert nav.panel_fade_wait == 0.22, nav.panel_fade_wait
 
-# # UnitPlacer: its own two
+# # UnitPlacer: placement_settle
 placer = UnitPlacer.__new__(UnitPlacer)
-placer.search_timeout = placer.settle = -1.0
+placer.settle = -1.0
+placer.search_timeout = 6.0
 placer.apply_delays(loaded)
-assert placer.search_timeout == 33.0, placer.search_timeout
+assert placer.search_timeout == 6.0, "search_timeout retains internal default"
 assert placer.settle == 0.55, placer.settle
 
 

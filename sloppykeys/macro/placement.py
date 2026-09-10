@@ -163,8 +163,8 @@ class UnitPlacer:
 
     def apply_delays(self, delays: dict[str, float]) -> None:
         """Share the Settings > Delays tunables with the lobby navigator."""
-        self.search_timeout = float(delays.get("search_timeout", self.search_timeout))
-        self.settle = float(delays.get("placement_settle", self.settle))
+        self.search_timeout = float(delays.get("search_timeout", getattr(self, "search_timeout", 6.0)))
+        self.settle = float(delays.get("placement_settle", getattr(self, "settle", 0.25)))
 
     # # Primitives
     def _screen(self, x: int, y: int) -> tuple[int, int] | None:

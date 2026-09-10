@@ -25,18 +25,12 @@ DELAY_SPEC: dict[str, tuple[str, float]] = {
     # Steps followed by an image search don't use it at all: the search polls until
     # it finds the screen, which is a better wait than any fixed number.
     "image_search_cooldown": ("Wait after an unverifiable click", 0.8),
-    # How long the post-match panel gets to finish fading in before `change_gamemode`
-    # clicks it. Paid on **both** paths now, searched and fallback: matching
-    # `win_change.png` proves the panel is being drawn, not that it is interactive —
-    # normalized correlation ignores a uniform brightness scale, so a half-faded panel
-    # still scores ~0.93. Clicking then gets the click swallowed, and the failure appears
-    # one step later as "Challenge card not found (best 0.42)". Raise this if that recurs;
-    # it is the only wait that can help, because no score threshold can see the fade.
-    "panel_fade_wait": ("Wait for a panel to fade in", 1.0),
-    # How long a search keeps looking for an image it expects. Covers menus that
-    # slide/fade in: too low and the macro gives up (or scrolls) before the screen
-    # has finished animating.
-    "search_timeout": ("Image search wait", 6.0),
+    # How long an arriving UI panel gets to finish fading in before interaction.
+    # Paid on carousel stage selection, post-match results, and dialog transitions:
+    # matching a template proves the panel is drawn, not that it is interactive —
+    # normalized correlation ignores opacity, so a half-faded panel still scores ~0.93
+    # while Roblox swallows the click.
+    "panel_fade_wait": ("UI fade-in wait", 1.0),
     # How long the camera step holds O to zoom right out — the single biggest cost in a
     # run's startup now that the hold-I zoom-in is gone. It has to be long enough to reach
     # the far extreme: Roblox zooms at a fixed rate, so "long enough" is a property of that

@@ -1,4 +1,4 @@
-﻿"""Unit test verifying stage selection fade wait, single-look search, and live delay reload."""
+"""Unit test verifying stage selection fade wait, single-look search, and live delay reload."""
 
 from __future__ import annotations
 
@@ -70,14 +70,14 @@ finally:
 ctrl = MacroController.__new__(MacroController)
 ctrl._app_root = ROOT
 ctrl._nav = LobbyNavigator.__new__(LobbyNavigator)
-ctrl._nav.click_settle = ctrl._nav.scroll_settle = ctrl._nav.panel_fade_wait = ctrl._nav.search_timeout = -1.0
+ctrl._nav.click_settle = ctrl._nav.scroll_settle = ctrl._nav.panel_fade_wait = -1.0
 from sloppykeys.macro.placement import UnitPlacer
 ctrl._placer = UnitPlacer.__new__(UnitPlacer)
-ctrl._placer.search_timeout = ctrl._placer.settle = -1.0
+ctrl._placer.settle = -1.0
 
 ctrl.reload_delays()
 assert ctrl._nav.panel_fade_wait > 0, "panel_fade_wait should be reloaded from settings"
-assert ctrl._nav.search_timeout > 0, "search_timeout should be reloaded from settings"
+assert ctrl._nav.click_settle > 0, "click_settle should be reloaded from settings"
 assert ctrl._placer.settle > 0, "placement settle should be reloaded from settings"
 
 print("stage selection fade and reload delays test: OK")

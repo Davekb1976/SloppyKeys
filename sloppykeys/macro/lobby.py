@@ -142,8 +142,8 @@ class LobbyNavigator:
         cooldown = float(delays.get("image_search_cooldown", self.click_settle))
         self.click_settle = cooldown
         self.scroll_settle = cooldown
-        self.search_timeout = float(delays.get("search_timeout", self.search_timeout))
-        self.panel_fade_wait = float(delays.get("panel_fade_wait", self.panel_fade_wait))
+        self.search_timeout = float(delays.get("search_timeout", getattr(self, "search_timeout", 6.0)))
+        self.panel_fade_wait = float(delays.get("panel_fade_wait", getattr(self, "panel_fade_wait", 1.0)))
 
     # # Primitives
     def _find(
