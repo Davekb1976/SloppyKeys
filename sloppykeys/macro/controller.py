@@ -90,6 +90,7 @@ class MacroController:
 
     _golden_hour_played_interval: tuple[int, int, int, int, int] | None = None
     _golden_hour_attempted_interval: tuple[int, int, int, int, int] | None = None
+    _left_early: bool = False
 
     def __init__(
         self,
@@ -150,8 +151,10 @@ class MacroController:
         self._camera_set = False
         # `_kept_position` — the last match ended with **Repeat Stage**, which drops you back
         # into the stage exactly where you stood, so the pre-start walk must not replay. Any
-        # other way into a match respawns you and the walk is required.
         self._kept_position = False
+        self._left_early = False
+        from sloppykeys.core.ocr import OcrReader
+        self._ocr = OcrReader()
         self._cycle = 0
         self._last_reopen_time = 0.0
         self._golden_hour_played_interval = None
@@ -207,6 +210,7 @@ class MacroController:
         # walked to the lobby themselves — so a fresh run always sets the camera once.
         self._camera_set = False
         self._kept_position = False
+        self._left_early = False
         self._cycle = 0
         self._golden_hour_played_interval = None
         self._golden_hour_attempted_interval = None
@@ -478,7 +482,12 @@ class MacroController:
                                 "starting the next match."
                             )
 
-                    if mode == "Portals":
+                    if self._left_early:
+                        self._left_early = False
+                        # Left early to the lobby mid-match. No Repeat/Result screen exists;
+                        # the next rep or task will navigate from the lobby fresh.
+                        self._kept_position = False
+                    elif mode == "Portals":
                         self._portals_after_match(task, again=more_reps)
                     elif mode == "Expedition":
                         # Expedition's result screen has no Repeat. Leave through Back to
@@ -830,6 +839,13 @@ class MacroController:
         self._exp_next_check = 0.0
         self._exp_busy = False
 
+        leave_at_wave = 0
+        try:
+            leave_at_wave = max(0, int((self._current_task or {}).get("leave_at_wave", 0)))
+        except (ValueError, TypeError):
+            leave_at_wave = 0
+        next_wave_check = 0.0
+
         while not self._stop_requested:
             if self._checkpoint():
                 # Nobody saw this match end, so its clock must not keep running into the next
@@ -847,6 +863,21 @@ class MacroController:
                 )
                 self._stats.abandon_stage()
                 return
+
+            if leave_at_wave > 0:
+                now = time.time()
+                if now >= next_wave_check:
+                    next_wave_check = now + 2.0
+                    current_w = self._read_current_wave()
+                    if current_w is not None and current_w >= leave_at_wave:
+                        self._log(
+                            f"  Target wave {leave_at_wave} reached (wave {current_w}) — returning to lobby."
+                        )
+                        self._stats.abandon_stage()
+                        ok, msg = self._back_to_lobby()
+                        self._log(f"  Back to lobby: {msg}")
+                        self._left_early = True
+                        return
 
             # Before the blocks and before parking: Expedition's own screens are what a
             # placement click would otherwise land on.
@@ -1410,6 +1441,39 @@ class MacroController:
         self._log(f"    [block] autoplay click {state['clicks']}/{AUTOPLAY_CLICKS}: {message}")
         return False
 
+    def _read_current_wave(self) -> int | None:
+        """Read the live match wave number via OCR on the calibrated wave region."""
+        try:
+            rect = self._rect()
+            if rect is None:
+                return None
+
+            ok, _ = self._ocr.available()
+            if not ok:
+                return None
+
+            import mss
+            import numpy as np
+            from sloppykeys.content.match_regions import wave_region
+            from sloppykeys.macro.placement import parse_wave
+
+            bx, by, bw, bh = wave_region()
+            vx, vy, vw, vh = rect
+            wave_x = vx + int(bx * vw / 1152)
+            wave_y = vy + int(by * vh / 756)
+            wave_w = max(1, int(bw * vw / 1152))
+            wave_h = max(1, int(bh * vh / 756))
+
+            with mss.mss() as sct:
+                mon = {"left": wave_x, "top": wave_y, "width": wave_w, "height": wave_h}
+                img = np.array(sct.grab(mon))[:, :, :3].copy()
+
+            read = self._ocr.read_line(img)
+            return parse_wave(read.text, max_wave=0)
+        except (OSError, ValueError, AttributeError) as exc:
+            self._log(f"    wave read failed: {exc}")
+            return None
+
     def _tick_wait_wave(self, block: dict) -> bool:
         """Wait until the wave counter reaches the target. Polls OCR every 2s."""
         params = block.get("params", {})
@@ -1424,53 +1488,15 @@ class MacroController:
 
         self._wave_check_time = now + 2.0
 
-        # Read the wave number. `OcrReader.read_line` is the only reader there is —
-        # this called a `read_text` that does not exist, and the bare `except` swallowed
-        # the AttributeError, so the block never finished and the phase stalled forever.
-        try:
-            from sloppykeys.core.ocr import OcrReader
-            import mss
-            import numpy as np
+        ok, msg = self._ocr.available()
+        if not ok:
+            self._log(f"    [block] wait wave: OCR unavailable ({msg}) — skipping")
+            return True
 
-            rect = self._rect()
-            if rect is None:
-                return False
-
-            ocr = OcrReader()
-            ok, msg = ocr.available()
-            if not ok:
-                # Surfaced, not swallowed: without OCR this block can never complete, so
-                # skip it rather than hang the match.
-                self._log(f"    [block] wait wave: OCR unavailable ({msg}) — skipping")
-                return True
-
-            # Through the accessor, so the user's Settings > OCR measurement is what gets
-            # read (falls back to calibrated default at 1152x756).
-            from sloppykeys.content.match_regions import wave_region
-
-            bx, by, bw, bh = wave_region()
-            vx, vy, vw, vh = rect
-            wave_x = vx + int(bx * vw / 1152)
-            wave_y = vy + int(by * vh / 756)
-            wave_w = max(1, int(bw * vw / 1152))
-            wave_h = max(1, int(bh * vh / 756))
-
-            with mss.mss() as sct:
-                mon = {"left": wave_x, "top": wave_y, "width": wave_w, "height": wave_h}
-                img = np.array(sct.grab(mon))[:, :, :3].copy()
-
-            read = ocr.read_line(img)
-            # OCR reads are approximate, so never require an exact string — take the
-            # first run of digits and compare numerically.
-            import re
-            numbers = re.findall(r"\d+", read.text or "")
-            if numbers:
-                current = int(numbers[0])
-                if current >= target:
-                    self._log(f"    [block] wave {current} reached target {target}")
-                    return True
-        except (OSError, ValueError, AttributeError) as exc:
-            self._log(f"    [block] wait wave: read failed: {exc}")
+        current = self._read_current_wave()
+        if current is not None and current >= target:
+            self._log(f"    [block] wave {current} reached target {target}")
+            return True
 
         return False
 

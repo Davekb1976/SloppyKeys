@@ -432,6 +432,8 @@
   const tbRepeat = document.getElementById("tb-repeat");
   const tbExtract = document.getElementById("tb-extract");
   const tbExtractRow = document.getElementById("tb-extract-row");
+  const tbLeaveWave = document.getElementById("tb-leave-wave");
+  const tbLeaveWaveRow = document.getElementById("tb-leave-wave-row");
   const tbMacro = document.getElementById("tb-macro");
   const tbSearch = document.getElementById("tb-search");
   const tbSearchRow = document.getElementById("tb-search-row");
@@ -479,6 +481,9 @@
         if (fields.difficulty && t.difficulty) bits.push(t.difficulty);
         bits.push("×" + (t.repeat || 1));
         if (fields.search_label && t.search) bits.push(t.search);
+        if (t.mode === "Story" && t.stage === "Infinite" && t.leave_at_wave) {
+          bits.push("leave @ w" + t.leave_at_wave);
+        }
         if (t.macro) bits.push(t.macro);
       }
       // Challenge is taken by availability, not by position, so the number on the left is
@@ -522,10 +527,18 @@
       loadDifficulty(task.mode, task.difficulty);
       tbRepeat.value = task.repeat || 1;
       tbExtract.value = task.extract_after || 1;
+      tbLeaveWave.value = task.leave_at_wave || 0;
       tbSearch.value = task.search || "";
       applyModeFields(task.mode);
       tbMacro.value = task.macro || "";
+      updateLeaveWaveVisibility(task.mode, task.stage);
     }
+  }
+
+  function updateLeaveWaveVisibility(mode, stage) {
+    const isInfinite = (mode !== undefined ? mode : tbMode.value) === "Story" &&
+                       (stage !== undefined ? stage : tbStage.value) === "Infinite";
+    tbLeaveWaveRow.style.display = isInfinite ? "" : "none";
   }
 
   // Show only the rows this gamemode can actually use. Every answer comes from `content/`
@@ -578,11 +591,17 @@
   async function loadStages(mode, map, selected) {
     if (!window.pywebview || !pywebview.api || !mode || !map) {
       tbStage.innerHTML = '<option value="">—</option>';
+      updateLeaveWaveVisibility(mode, "");
       return;
     }
     const stages = await pywebview.api.get_targets(mode, map);
-    if (!stages.length) { tbStage.innerHTML = '<option value="">—</option>'; return; }
+    if (!stages.length) {
+      tbStage.innerHTML = '<option value="">—</option>';
+      updateLeaveWaveVisibility(mode, "");
+      return;
+    }
     tbStage.innerHTML = '<option value="">—</option>' + stages.map((s) => `<option value="${s}"${s === selected ? " selected" : ""}>${s}</option>`).join("");
+    updateLeaveWaveVisibility(mode, tbStage.value);
   }
 
   // Difficulty means two different game controls: a 1-3 cycling button on Expedition, a
@@ -618,6 +637,9 @@
       changes.extract_after = Math.max(1, parseInt(tbExtract.value) || 1);
     }
     if (tbModeFields.search_label) changes.search = tbSearch.value.trim();
+    if (tbMode.value === "Story" && tbStage.value === "Infinite") {
+      changes.leave_at_wave = Math.max(0, parseInt(tbLeaveWave.value) || 0);
+    }
     // Challenge-specific: per-map macros + slot enables
     if (tbMode.value === "Challenge") {
       const t = tasks.find(x => x.id === selectedTaskId);
@@ -641,8 +663,10 @@
     document.getElementById("tb-standard-fields").style.display = isChallenge ? "none" : "contents";
     document.getElementById("tb-challenge-fields").style.display = isChallenge ? "block" : "none";
     if (isChallenge) {
+      updateLeaveWaveVisibility(tbMode.value, "");
       renderChallengeMapGrid();
     } else {
+      updateLeaveWaveVisibility(tbMode.value, tbStage.value);
       loadMaps(tbMode.value, "");
       tbStage.innerHTML = '<option value="">—</option>';
       // Before the save, not after: `saveCurrentTask` reads `tbModeFields` to decide which
@@ -661,10 +685,14 @@
     loadStages(tbMode.value, tbMap.value, "");
     saveCurrentTask();
   });
-  tbStage.addEventListener("change", saveCurrentTask);
+  tbStage.addEventListener("change", () => {
+    updateLeaveWaveVisibility(tbMode.value, tbStage.value);
+    saveCurrentTask();
+  });
   tbDifficulty.addEventListener("change", saveCurrentTask);
   tbRepeat.addEventListener("change", saveCurrentTask);
   tbExtract.addEventListener("change", saveCurrentTask);
+  tbLeaveWave.addEventListener("change", saveCurrentTask);
   tbMacro.addEventListener("change", saveCurrentTask);
   // `change` fires on blur for a text input, which is the same contract every other row
   // here has — no keystroke-by-keystroke writes to settings.json.

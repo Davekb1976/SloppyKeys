@@ -890,33 +890,47 @@ class _MatchSchedule:
 def parse_wave(text: str, max_wave: int = 0) -> int | None:
     """The current wave from an OCR'd counter. None when it can't be read confidently.
 
-    Two shapes, because the counter is drawn differently from stage to stage:
+    Two valid shapes:
+    - `"1/15"`, `"5 / 15 wave"`, `"12/25"` — a `<current> / <total>` fraction. Separators
+      `('/', '\\', '|', ':')` and common OCR digit confusions are folded. If `max_wave` is
+      specified, a total that disagrees is rejected.
+    - `"Wave 12"`, `"120 wave"` — a number explicitly accompanied by the `wave` keyword.
 
-    - `"12/25"` — `parse_limit` handles it, digit confusions and separator misreads
-      included. With `max_wave` set, a total that disagrees is a *misread*, not a
-      different map, so the read is refused rather than acted on.
-    - `"12"`, `"Wave 12"` — a bare number, and only safe because `max_wave` bounds it: a
-      counter on a 25-wave map cannot say 125, so that reading is rejected instead of
-      opening a gate 100 waves early.
-
-    Refuses rather than guesses, for the same reason `parse_limit` does — this decides
-    when an ability fires, and a wrong number is worse than no number.
+    Rejects bare isolated numbers (e.g. text containing only "3" or "12" with no slash
+    and no "wave") to prevent outlier numbers in widened OCR boxes from triggering false gates.
     """
-    current, total = parse_limit(text)
-    if current is not None:
-        if max_wave > 0 and total != max_wave:
-            return None
-        return current if current > 0 else None
+    if not text:
+        return None
 
-    compact = re.sub(r"[^0-9a-zA-Z|]+", "", text or "").translate(DIGIT_FIXES)
-    numbers = re.findall(r"\d{1,3}", compact)
-    if len(numbers) != 1:
-        return None
-    value = int(numbers[0])
-    ceiling = max_wave if max_wave > 0 else WAVE_MAX
-    if not 1 <= value <= ceiling:
-        return None
-    return value
+    # 1. Look for a fraction: <current> / <total>
+    for sep in ("/", "\\", "|", ":"):
+        if sep in text:
+            m = re.search(r"([0-9a-zA-Z]{1,4})\s*" + re.escape(sep) + r"\s*([0-9a-zA-Z]{1,4})", text)
+            if m:
+                left_str = m.group(1).translate(DIGIT_FIXES)
+                right_str = m.group(2).translate(DIGIT_FIXES)
+                if left_str.isdigit() and right_str.isdigit():
+                    current = int(left_str)
+                    total = int(right_str)
+                    if current > 0 and total > 0 and current <= total:
+                        if max_wave > 0 and total != max_wave:
+                            return None
+                        return current
+
+    # 2. Look for wave keyword: 'Wave 120' or '120 wave'
+    lowered = text.lower()
+    m = re.search(r"([0-9a-zA-Z]{1,4})\s*(?:wave|wav)\b", lowered) or re.search(
+        r"\b(?:wave|wav)\s*[:\-]?\s*([0-9a-zA-Z]{1,4})", lowered
+    )
+    if m:
+        val_str = m.group(1).translate(DIGIT_FIXES)
+        if val_str.isdigit():
+            val = int(val_str)
+            ceiling = max_wave if max_wave > 0 else WAVE_MAX
+            if 1 <= val <= ceiling:
+                return val
+
+    return None
 
 
 def _as_int(value: object, default: int = 0) -> int:

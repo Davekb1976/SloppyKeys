@@ -221,13 +221,18 @@ assert parse_wave("9|10", 10) == 9
 assert parse_wave("12/26", 25) is None
 assert parse_wave("12/25", 0) == 12, "no max set still reads a well-formed counter"
 
-# A bare number is only safe because max_wave bounds it.
-assert parse_wave("12", 25) == 12
+# Stricter parsing: bare numbers without a slash fraction or 'wave' keyword are rejected
+# to prevent outlier numbers in widened OCR boxes from triggering false gates.
+assert parse_wave("12", 25) is None
+assert parse_wave("3", 25) is None
 assert parse_wave("Wave 12", 25) == 12
-assert parse_wave("125", 25) is None, "a 25-wave stage cannot be on wave 125"
-assert parse_wave("125", 0) is None, "above WAVE_MAX with no stage total to trust"
-assert parse_wave("26", 25) is None
-assert parse_wave("0", 25) is None, "wave 0 does not exist"
+assert parse_wave("12 wave", 25) == 12
+assert parse_wave("120 wave", 0) == 120
+assert parse_wave("Wave 120", 0) == 120
+assert parse_wave("125 wave", 25) is None, "a 25-wave stage cannot be on wave 125"
+assert parse_wave("1000 wave", 0) is None, "above WAVE_MAX with no stage total to trust"
+assert parse_wave("26 wave", 25) is None
+assert parse_wave("0 wave", 25) is None, "wave 0 does not exist"
 assert parse_wave("", 25) is None
 assert parse_wave("~~~", 25) is None
 assert parse_wave("12 of 3 things 25", 25) is None, "two numbers is ambiguous"
@@ -240,7 +245,7 @@ gate = StepAction(
 gate_back = StepAction.from_payload(gate.as_payload())
 assert (gate_back.wave, gate_back.max_wave) == (12, 25), gate_back
 assert gate_back.region() == (500, 10, 90, 24), gate_back.region()
-assert StepAction.from_payload({"Type": "wave", "Wave": 10**6}).wave == 99
+assert StepAction.from_payload({"Type": "wave", "Wave": 10**6}).wave == 999
 assert StepAction.from_payload({"Type": "wave", "Wave": -5}).wave == 0
 
 # The gate has **no** timing field of its own: it takes one look, and repeating it is the

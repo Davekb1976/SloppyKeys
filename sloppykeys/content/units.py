@@ -171,10 +171,8 @@ ACTION_FIELDS = {
 BUTTON_OPTIONS = ["left", "right", "middle"]
 BUTTON_DEFAULT = "left"
 
-# Ceiling for a wave number. No stage in this game runs to three figures, and the bound is
-# what lets a bare OCR read be trusted: "125" from a counter on a 25-wave map is a misread
-# of "12", not wave 125.
-WAVE_MAX = 99
+# Ceiling for a wave number, accommodating high waves in Infinite mode.
+WAVE_MAX = 999
 
 
 @dataclass
