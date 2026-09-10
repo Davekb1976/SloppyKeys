@@ -1357,7 +1357,7 @@
     const key = `${phase}-n${parentIdx}${branch === "then" ? "t" : "e"}${idx}`;
     const fields = b.type === "detect"
       ? `<span class="blk-field-label">nested detect is not supported</span>`
-      : buildBlockFields(b, key, phase, idx);
+      : buildBlockFields(b, key, phase, idx, parentIdx, branch);
     return `<div class="block-row" data-phase="${phase}" data-parent="${parentIdx}" data-branch="${branch}" data-idx="${idx}" data-type="${b.type}" draggable="true">
       <span class="block-type">${b.type.replace(/_/g, " ")}</span>
       <span class="block-fields">${fields}</span>
@@ -1370,8 +1370,11 @@
   // The controls for one block, for every type except detect (which owns its whole row).
   // `key` only has to be unique on the page — the handlers read the owning row's data
   // attributes rather than parsing it, so a nested block gets working fields for free.
-  function buildBlockFields(b, key, phase, i) {
+  function buildBlockFields(b, key, phase, i, parentIdx = null, branch = null) {
     const t = b.type;
+    const setArgs = (parentIdx !== null && branch)
+      ? `'${phase}',${i},${parentIdx},'${branch}'`
+      : `'${phase}',${i}`;
     if (t === "walk_path") {
       let f = `<svg class="pinned-walk-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4m-10-10h4m12 0h4"/></svg>
         <button class="btn btn--sm tip-left${b.mode === "auto" ? " btn--primary" : ""}" data-tip="${walkDefaultsTip()}" onclick="setWalkPathMode('${phase}',${i},'auto')">Auto</button>
@@ -1398,7 +1401,7 @@
         + blkField("Key", `<button class="btn btn--sm hotkey-capture tip-left" id="hk-${key}" data-tip="Unit slot hotkey">${hk ? hk.toUpperCase() : "Key"}</button>`)
         + blkField("X", `<input value="${b.params?.x || 0}" data-field="params.x" type="number">`)
         + blkField("Y", `<input value="${b.params?.y || 0}" data-field="params.y" type="number">`)
-        + blkField("Position", `<button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button>`)
+        + blkField("Position", `<button class="btn btn--sm" onclick="openPositionPicker(${setArgs})">Set</button>`)
         + blkField("Name", `<input value="${b.params?.name || ""}" data-field="params.name" style="width:80px;">`);
     }
     if (t === "upgrade_unit") {
@@ -1425,7 +1428,7 @@
     if (t === "click") {
       return blkField("X", `<input value="${b.params?.x || 0}" data-field="params.x" type="number">`)
         + blkField("Y", `<input value="${b.params?.y || 0}" data-field="params.y" type="number">`)
-        + blkField("Position", `<button class="btn btn--sm" onclick="openPositionPicker('${phase}',${i})">Set</button>`);
+        + blkField("Position", `<button class="btn btn--sm" onclick="openPositionPicker(${setArgs})">Set</button>`);
     }
     if (t === "send_key") {
       return blkField("Key", `<input value="${b.key || ""}" data-field="key" style="width:50px;">`)
@@ -2567,14 +2570,17 @@
     renderVisionPoints();
   }
 
-  window.openPositionPicker = async function (phase, idx) {
+  window.openPositionPicker = async function (phase, idx, parentIdx = null, branch = null) {
     posMode = "blocks";
     posGroup = null;
     posArmed = null;
     document.getElementById("pos-chips").style.display = "none";
     document.querySelector("#pos-modal .modal-title").textContent = "Set Position";
-    posTarget = { phase, idx };
-    const block = opPhases[phase][idx];
+    posTarget = { phase, idx, parentIdx, branch };
+    const block = (parentIdx !== null && branch)
+      ? opPhases[phase]?.[parentIdx]?.[branch]?.[idx]
+      : opPhases[phase]?.[idx];
+    if (!block) return;
     posReadout.textContent = (block.params?.x && block.params?.y) ? `X ${block.params.x}, Y ${block.params.y}` : "Not set";
     // Hide the game so the modal isn't behind it
     setGameVisible(false);
@@ -2733,27 +2739,52 @@
       click: "rgba(232, 162, 58, 0.7)",          // amber
     };
     let markerNum = 0;
+
+    function renderMarker(b, isCurrent) {
+      if (!COORD_TYPES.includes(b.type)) return;
+      markerNum++;
+      const x = (b.params?.x || 0) * scale;
+      const y = (b.params?.y || 0) * scale;
+      if (!x && !y) return;
+      posCtx.beginPath();
+      posCtx.arc(x, y, 8 / posZoom, 0, Math.PI * 2);
+      posCtx.fillStyle = isCurrent ? "rgba(139, 92, 246, 0.9)" : (TYPE_COLORS[b.type] || "rgba(232, 162, 58, 0.7)");
+      posCtx.fill();
+      posCtx.strokeStyle = "#fff";
+      posCtx.lineWidth = 2 / posZoom;
+      posCtx.stroke();
+      // Number label
+      posCtx.fillStyle = "#fff";
+      posCtx.font = `bold ${Math.round(10 / posZoom)}px sans-serif`;
+      posCtx.textAlign = "center";
+      posCtx.textBaseline = "middle";
+      posCtx.fillText(String(markerNum), x, y);
+    }
+
     PHASES.forEach((phase) => {
       (opPhases[phase] || []).forEach((b, idx) => {
-        if (!COORD_TYPES.includes(b.type)) return;
-        markerNum++;
-        const x = (b.params?.x || 0) * scale;
-        const y = (b.params?.y || 0) * scale;
-        if (!x && !y) return;
-        const isCurrent = posTarget && posTarget.phase === phase && posTarget.idx === idx;
-        posCtx.beginPath();
-        posCtx.arc(x, y, 8 / posZoom, 0, Math.PI * 2);
-        posCtx.fillStyle = isCurrent ? "rgba(139, 92, 246, 0.9)" : (TYPE_COLORS[b.type] || "rgba(232, 162, 58, 0.7)");
-        posCtx.fill();
-        posCtx.strokeStyle = "#fff";
-        posCtx.lineWidth = 2 / posZoom;
-        posCtx.stroke();
-        // Number label
-        posCtx.fillStyle = "#fff";
-        posCtx.font = `bold ${Math.round(10 / posZoom)}px sans-serif`;
-        posCtx.textAlign = "center";
-        posCtx.textBaseline = "middle";
-        posCtx.fillText(String(markerNum), x, y);
+        if (b.type === "detect") {
+          ["then", "else"].forEach((branch) => {
+            (b[branch] || []).forEach((nb, nidx) => {
+              const isCurrent = Boolean(
+                posTarget
+                && posTarget.phase === phase
+                && posTarget.parentIdx === idx
+                && posTarget.branch === branch
+                && posTarget.idx === nidx
+              );
+              renderMarker(nb, isCurrent);
+            });
+          });
+          return;
+        }
+        const isCurrent = Boolean(
+          posTarget
+          && posTarget.phase === phase
+          && (posTarget.parentIdx === null || posTarget.parentIdx === undefined)
+          && posTarget.idx === idx
+        );
+        renderMarker(b, isCurrent);
       });
     });
     posCtx.restore();
@@ -2808,7 +2839,10 @@
       return;
     }
     // Write back to the block
-    const block = opPhases[posTarget.phase][posTarget.idx];
+    const block = (posTarget.parentIdx !== null && posTarget.parentIdx !== undefined && posTarget.branch)
+      ? opPhases[posTarget.phase]?.[posTarget.parentIdx]?.[posTarget.branch]?.[posTarget.idx]
+      : opPhases[posTarget.phase]?.[posTarget.idx];
+    if (!block) return;
     block.params = block.params || {};
     block.params.x = x;
     block.params.y = y;
