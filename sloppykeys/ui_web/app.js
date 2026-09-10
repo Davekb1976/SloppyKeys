@@ -490,7 +490,9 @@
       // misleading on its own — the badge is what stops it reading as "runs third".
       const badge = isChallenge
         ? `<span class="task-card-badge" data-tip="Runs before the other tasks whenever a challenge&#10;is available, wherever it sits in this queue.&#10;The maps re-roll every :00 and :30.">Priority</span>`
-        : "";
+        : (!t.macro
+            ? `<span class="task-card-badge task-card-badge--warn" data-tip="No macro operation assigned.&#10;Character will not walk and units will not be placed.">No Macro</span>`
+            : "");
       const sel = t.id === selectedTaskId ? " selected" : "";
       return `<div class="task-card${sel}" data-id="${t.id}">
         <span class="task-card-index">${i + 1}</span>
@@ -504,6 +506,15 @@
     taskList.querySelectorAll(".task-card").forEach((card) => {
       card.addEventListener("click", () => selectTask(card.dataset.id));
     });
+  }
+
+  function updateMacroWarning() {
+    const isChallenge = tbMode.value === "Challenge";
+    const noMacro = !isChallenge && !tbMacro.value;
+    const warnEl = document.getElementById("tb-macro-warn");
+    const tagEl = document.getElementById("tb-no-macro-tag");
+    if (warnEl) warnEl.style.display = noMacro ? "" : "none";
+    if (tagEl) tagEl.style.display = noMacro ? "" : "none";
   }
 
   function selectTask(id) {
@@ -521,6 +532,7 @@
     document.getElementById("tb-challenge-fields").style.display = isChallenge ? "block" : "none";
     if (isChallenge) {
       renderChallengeMapGrid();
+      updateMacroWarning();
     } else {
       loadMaps(task.mode, task.map);
       loadStages(task.mode, task.map, task.stage);
@@ -532,6 +544,7 @@
       applyModeFields(task.mode);
       tbMacro.value = task.macro || "";
       updateLeaveWaveVisibility(task.mode, task.stage);
+      updateMacroWarning();
     }
   }
 
@@ -569,6 +582,7 @@
   function showBuilderEmpty() {
     taskBuilder.style.display = "none";
     taskBuilderEmpty.style.display = "";
+    updateMacroWarning();
   }
 
   async function loadTasks() {
@@ -659,6 +673,7 @@
     const isChallenge = tbMode.value === "Challenge";
     document.getElementById("tb-standard-fields").style.display = isChallenge ? "none" : "contents";
     document.getElementById("tb-challenge-fields").style.display = isChallenge ? "block" : "none";
+    updateMacroWarning();
     if (isChallenge) {
       updateLeaveWaveVisibility(tbMode.value, "");
       renderChallengeMapGrid();
@@ -690,7 +705,10 @@
   tbRepeat.addEventListener("change", saveCurrentTask);
   tbExtract.addEventListener("change", saveCurrentTask);
   tbLeaveWave.addEventListener("change", saveCurrentTask);
-  tbMacro.addEventListener("change", saveCurrentTask);
+  tbMacro.addEventListener("change", () => {
+    updateMacroWarning();
+    saveCurrentTask();
+  });
   // `change` fires on blur for a text input, which is the same contract every other row
   // here has — no keystroke-by-keystroke writes to settings.json.
   tbSearch.addEventListener("change", saveCurrentTask);
@@ -1880,7 +1898,10 @@
     const names = await pywebview.api.list_operations();
     opLoad.innerHTML = '<option value="">Load...</option>' + names.map((n) => `<option value="${n}">${n}</option>`).join("");
     // Also populate the task builder's macro dropdown
+    const prevMacro = tbMacro.value;
     tbMacro.innerHTML = '<option value="">No Macro</option>' + names.map((n) => `<option value="${n}">${n}</option>`).join("");
+    if (prevMacro) tbMacro.value = prevMacro;
+    updateMacroWarning();
     const ghMacro = document.getElementById("s-golden-hour-macro");
     if (ghMacro) {
       const cur = ghMacro.dataset.pendingVal !== undefined ? ghMacro.dataset.pendingVal : ghMacro.value;

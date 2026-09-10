@@ -407,8 +407,14 @@
                   </div>
                   <div class="setting-row" style="grid-column:1/3;">
                     <div class="setting-info">
-                      <span class="setting-label">Macro Operation</span>
+                      <div style="display:flex; align-items:center; gap:6px;">
+                        <span class="setting-label">Macro Operation</span>
+                        <span class="tb-no-macro-tag" id="tb-no-macro-tag" style="display:none;">No Macro</span>
+                      </div>
                       <span class="setting-desc">The block-based routine to run (Macro Manager tab)</span>
+                      <div class="tb-macro-warn" id="tb-macro-warn" style="display:none;">
+                        No macro assigned — character won't walk and units won't be placed.
+                      </div>
                     </div>
                     <select class="setting-select" id="tb-macro"><option value="">No Macro</option></select>
                   </div>

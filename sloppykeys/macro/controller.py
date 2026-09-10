@@ -426,6 +426,7 @@ class MacroController:
                         phases = op.get("phases", {})
                     else:
                         phases = {}
+                        self._log("  [task] Notice: no macro assigned — skipping match actions and walk path.")
                     self._phases = phases
 
                     # Pre Start

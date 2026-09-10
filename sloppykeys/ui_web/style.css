@@ -603,6 +603,22 @@ input:focus, select:focus {
   padding: 2px 8px; color: var(--accent); background: var(--accent-soft);
   border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
 }
+.task-card-badge--warn {
+  color: var(--amber);
+  background: color-mix(in srgb, var(--amber) 12%, transparent);
+  border-color: color-mix(in srgb, var(--amber) 40%, transparent);
+}
+.tb-no-macro-tag {
+  font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+  padding: 1px 6px; color: var(--amber);
+  background: color-mix(in srgb, var(--amber) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--amber) 40%, transparent);
+}
+.tb-macro-warn {
+  font-size: 11px;
+  color: var(--amber);
+  margin-top: 3px;
+}
 .task-builder { display: flex; flex-direction: column; gap: var(--space-3); }
 .task-builder-actions { display: flex; justify-content: flex-end; margin-top: var(--space-3); }
 
