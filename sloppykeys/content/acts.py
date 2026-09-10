@@ -81,7 +81,10 @@ def act_coord(gamemode: str, act: str) -> tuple[int, int] | None:
 
 def golden_hour_act_coord(gamemode: str, act: str) -> tuple[int, int] | None:
     """The act coordinate when Golden Hour is active on the stage."""
-    return GOLDEN_HOUR_ACT_COORDS.get(gamemode, {}).get(act)
+    default = GOLDEN_HOUR_ACT_COORDS.get(gamemode, {}).get(act)
+    if act == "Golden Hour":
+        return _OVERRIDES.get(act_key(gamemode, act), default)
+    return default
 
 
 def act_specs() -> list[tuple[str, str, str, tuple[int, int]]]:
@@ -90,8 +93,13 @@ def act_specs() -> list[tuple[str, str, str, tuple[int, int]]]:
     The gamemode is its own field because the editor groups by it: all of Story's acts are
     set from one screenshot of Story's act list, and the number of rows differs per mode.
     """
-    return [
+    specs = [
         (act_key(gamemode, act), gamemode, act, coord)
         for gamemode, acts in ACT_COORDS.items()
         for act, coord in acts.items()
     ]
+    # Golden Hour is clicked when active on Story stages
+    specs.append(
+        (act_key("Story", "Golden Hour"), "Story", "Golden Hour", (249, 233))
+    )
+    return specs

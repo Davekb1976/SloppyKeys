@@ -11,6 +11,7 @@ sys.path.insert(0, ROOT)
 from sloppykeys.content.acts import (  # noqa: E402
     ACT_COORDS,
     act_coord,
+    apply_point_overrides,
     golden_hour_act_coord,
     GOLDEN_HOUR_ACT_COORDS,
 )
@@ -43,6 +44,12 @@ assert golden_hour_act_coord("Story", "Act 4") == (246, 451)
 assert golden_hour_act_coord("Story", "Act 5") == (245, 513)
 assert golden_hour_act_coord("Story", "Infinite") == (249, 567)
 assert golden_hour_act_coord("Story", "Mastery") == (249, 567)
+
+# Override test
+apply_point_overrides({"act.Story.Golden Hour": (260, 240)})
+assert golden_hour_act_coord("Story", "Golden Hour") == (260, 240)
+apply_point_overrides({})
+assert golden_hour_act_coord("Story", "Golden Hour") == (249, 233)
 
 # 3. LobbyNavigator.select_act mock tests
 nav = LobbyNavigator.__new__(LobbyNavigator)

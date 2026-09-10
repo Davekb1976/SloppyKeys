@@ -22,7 +22,12 @@ import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from sloppykeys.content.acts import ACT_COORDS, act_coord, apply_point_overrides  # noqa: E402
+from sloppykeys.content.acts import (  # noqa: E402
+    ACT_COORDS,
+    act_coord,
+    apply_point_overrides,
+    golden_hour_act_coord,
+)
 from sloppykeys.content.gamemodes import RAID_ACTS, STORY_ACTS  # noqa: E402
 from sloppykeys.content.portals import (  # noqa: E402
     UNSET,
@@ -58,9 +63,9 @@ with tempfile.TemporaryDirectory() as root:
     }, groups
     # Every act in the table gets a chip, and the count differs per mode — that is what the
     # dot overlay is drawn from.
-    assert len(groups["acts.Story"]["points"]) == len(ACT_COORDS["Story"])
+    assert len(groups["acts.Story"]["points"]) == len(ACT_COORDS["Story"]) + 1
     assert len(groups["acts.Raid"]["points"]) == len(ACT_COORDS["Raid"])
-    assert [p["label"] for p in groups["acts.Story"]["points"]] == STORY_ACTS
+    assert [p["label"] for p in groups["acts.Story"]["points"]] == STORY_ACTS + ["Golden Hour"]
     assert [p["label"] for p in groups["acts.Raid"]["points"]] == RAID_ACTS
     # Story's pair is the Hard Mode toggle; Expedition's is the cycling button.
     assert [p["label"] for p in groups["start.Story"]["points"]] == ["Hard Mode toggle"]
@@ -128,6 +133,8 @@ with tempfile.TemporaryDirectory() as root:
     assert slot_coord(1) == (640, 300), slot_coord(1)
     assert api.set_vision_point("start.Story.hard_mode", 55, 66)["ok"]
     assert start_coords("Story")["hard_mode"] == (55, 66)
+    assert api.set_vision_point("act.Story.Golden Hour", 260, 240)["ok"]
+    assert golden_hour_act_coord("Story", "Golden Hour") == (260, 240)
     assert api.list_vision_points()["groups"][0]["points"][0]["edited"] is True
 
     # # A fresh process reads them back through the same path startup uses
@@ -135,7 +142,7 @@ with tempfile.TemporaryDirectory() as root:
     apply_point_overrides({})  # forget them, as if the app had just started
     assert act_coord("Story", "Act 1") == ACT_COORDS["Story"]["Act 1"]
     applied = reloaded.apply_stored_overrides()
-    assert applied["points"] == 4, applied
+    assert applied["points"] == 5, applied
     assert act_coord("Story", "Act 1") == (300, 400), "startup did not apply stored points"
     # Startup has to reach *every* point table, not just the two it shipped with.
     assert slot_coord(1) == (640, 300), "startup did not apply the portal slot"
