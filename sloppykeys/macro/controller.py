@@ -564,14 +564,14 @@ class MacroController:
         # in, and every other mode reads it as Story's Easy/Hard pair, which `start_stage`
         # applies. Per task rather than global for both — two Expedition tasks in one queue
         # can want different difficulties, and the queue is where the rest of the run is
-        # chosen. Settings' Hard Mode is the default for a task that never said.
+        # chosen.
         asked = (self._current_task or {}).get("difficulty")
         hard = False
         if difficulty_coord(mode) is not None:
             diff = difficulty_from_task(asked)
             steps.append((f"Difficulty {diff}", lambda: self._nav.set_difficulty(mode, diff)))
         else:
-            hard = hard_mode_from_task(asked, self._settings.get_hard_mode())
+            hard = hard_mode_from_task(asked)
 
         steps.append((f"Start stage{' (hard)' if hard else ''}", lambda: self._nav.start_stage(mode, hard)))
         steps.append(("Stage loaded", lambda: self._nav.wait_for_match_ready()))
@@ -2279,9 +2279,8 @@ class MacroController:
             return False
         time.sleep(self._nav.click_settle)
 
-        # Start stage
-        hard = self._settings.get_hard_mode()
-        ok, msg = self._nav.start_stage("Story", hard)
+        # Start stage (Golden Hour has no Hard Mode toggle)
+        ok, msg = self._nav.start_stage("Story", hard_mode=False)
         if not ok:
             self._log(f"  Golden Hour: start stage failed: {msg}")
             return False
