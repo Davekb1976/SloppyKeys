@@ -26,6 +26,7 @@ from sloppykeys.config.settings import AppSettings
 from sloppykeys.config.stats import StatsTracker
 from sloppykeys.config.unified import UnifiedSettings
 from sloppykeys.content.acts import act_coord
+from sloppykeys.content.challenge import interval_key
 from sloppykeys.content.gamemodes import is_custom, selection_complete
 from sloppykeys.content.start_stage import (
     difficulty_coord,
@@ -87,7 +88,8 @@ RectProvider = Callable[[], tuple[int, int, int, int] | None]
 class MacroController:
     """Drives the macro from the task queue without any Qt dependency."""
 
-    _just_ran_golden_hour: bool = False
+    _golden_hour_played_interval: tuple[int, int, int, int, int] | None = None
+    _golden_hour_attempted_interval: tuple[int, int, int, int, int] | None = None
 
     def __init__(
         self,
@@ -152,7 +154,8 @@ class MacroController:
         self._kept_position = False
         self._cycle = 0
         self._last_reopen_time = 0.0
-        self._just_ran_golden_hour = False
+        self._golden_hour_played_interval = None
+        self._golden_hour_attempted_interval = None
 
     @staticmethod
     def _default_rect() -> tuple[int, int, int, int] | None:
@@ -198,7 +201,8 @@ class MacroController:
         self._camera_set = False
         self._kept_position = False
         self._cycle = 0
-        self._just_ran_golden_hour = False
+        self._golden_hour_played_interval = None
+        self._golden_hour_attempted_interval = None
         # So the first decline of this run is said out loud even when it repeats the reason the
         # last run ended on — which is exactly the case a user restarting to watch for it hits.
         self._challenge_decline = ""
@@ -322,8 +326,8 @@ class MacroController:
                 self._log(f"Queue finished — restarting (pass {loop_pass}).")
 
             # If Golden Hour is prioritized, scan Story stages before beginning the queue pass
-            if not self._just_ran_golden_hour and self._run_golden_hour_detour():
-                self._just_ran_golden_hour = True
+            if self._golden_hour_wants_in():
+                self._run_golden_hour_detour()
                 if self._checkpoint():
                     return (True, f"stopped after {self._cycle} cycles")
 
@@ -345,27 +349,31 @@ class MacroController:
                 if mode == "Challenge":
                     if self._challenge_wants_in(task):
                         self._run_challenge_task(task)
-                        self._just_ran_golden_hour = False
-                    if not self._just_ran_golden_hour and self._run_golden_hour_detour():
-                        self._just_ran_golden_hour = True
+                    if self._golden_hour_wants_in():
+                        self._run_golden_hour_detour()
                     if self._checkpoint():
                         return (True, f"stopped after {self._cycle} cycles")
                     continue
 
                 for rep in range(repeat):
-                    self._just_ran_golden_hour = False
                     if self._checkpoint():
                         return (True, f"stopped after {self._cycle} cycles")
 
                     # **Before every match, not at the queue position.** A rotation lasts 30
                     # minutes; a task with a high repeat count can hold the queue for hours,
-                    # so a challenge that waited its turn would miss rotation after rotation.
-                    # This is the check that answers "the maps re-rolled mid-match" — it runs
-                    # once the match that was in flight has finished, never interrupting one.
+                    # so a challenge or Golden Hour that waited its turn would miss rotation
+                    # after rotation. This checks once the match that was in flight has
+                    # finished, never interrupting one.
                     challenge = self._challenge_task(tasks)
                     if challenge is not None and self._challenge_wants_in(challenge):
                         self._log("  Challenge available — taking it before this match.")
                         self._run_challenge_task(challenge)
+                        if self._checkpoint():
+                            return (True, f"stopped after {self._cycle} cycles")
+
+                    if self._golden_hour_wants_in():
+                        self._log("  Golden Hour available — taking it before this match.")
+                        self._run_golden_hour_detour()
                         if self._checkpoint():
                             return (True, f"stopped after {self._cycle} cycles")
 
@@ -456,6 +464,12 @@ class MacroController:
                                 "  Challenge is due — ending this rep here rather than "
                                 "starting the next match."
                             )
+                        elif self._golden_hour_wants_in():
+                            more_reps = False
+                            self._log(
+                                "  Golden Hour is due — ending this rep here rather than "
+                                "starting the next match."
+                            )
 
                     if mode == "Portals":
                         self._portals_after_match(task, again=more_reps)
@@ -476,9 +490,9 @@ class MacroController:
                         if not ok:
                             self._log(f"  Repeat: {msg} — falling through.")
 
-                # Task completed all repeats. If Golden Hour is prioritized, scan Story stages.
-                if not self._just_ran_golden_hour and self._run_golden_hour_detour():
-                    self._just_ran_golden_hour = True
+                # Task completed all repeats. If Golden Hour is prioritized, check detour.
+                if self._golden_hour_wants_in():
+                    self._run_golden_hour_detour()
                     if self._checkpoint():
                         return (True, f"stopped after {self._cycle} cycles")
 
@@ -2167,6 +2181,30 @@ class MacroController:
         # had drawn or not, and it proved nothing either way.
         return True
 
+    def _golden_hour_wants_in(self, now: datetime | None = None) -> bool:
+        """Should Golden Hour run before the next match or queue pass?
+
+        Golden Hour re-rolls every 30 minutes on :00 and :30 boundaries.
+        It is non-repeatable: once played or attempted without finding a badge
+        in the current rotation, it rests until the clock crosses the next boundary.
+        """
+        settings = getattr(self, "_settings", None)
+        if settings is None or not settings.get_prioritize_golden_hour():
+            return False
+
+        from sloppykeys.content.nav_images import golden_hour_image
+
+        if not os.path.isfile(golden_hour_image()):
+            return False
+
+        current_interval = interval_key(now)
+        if self._golden_hour_played_interval == current_interval:
+            return False
+        if self._golden_hour_attempted_interval == current_interval:
+            return False
+
+        return True
+
     def _run_golden_hour_detour(self) -> bool:
         """If Golden Hour is prioritized, scan Story stages for the Golden Hour badge.
 
@@ -2179,14 +2217,7 @@ class MacroController:
 
         Returns True if a Golden Hour run was executed, False otherwise.
         """
-        settings = getattr(self, "_settings", None)
-        if settings is None or not settings.get_prioritize_golden_hour():
-            return False
-
-        from sloppykeys.content.nav_images import golden_hour_image
-
-        if not os.path.isfile(golden_hour_image()):
-            self._log("  Golden Hour: template not captured yet — skipping detour.")
+        if not self._golden_hour_wants_in():
             return False
 
         previous_task = self._current_task
@@ -2228,7 +2259,8 @@ class MacroController:
         # Scan stages in carousel
         ok, msg = self._nav.find_and_select_golden_hour_stage()
         if not ok:
-            self._log(f"  Golden Hour: {msg}.")
+            self._golden_hour_attempted_interval = interval_key()
+            self._log(f"  Golden Hour: {msg} — resting until next 30-min rotation.")
             # Close stage list and gamemode menu to return cleanly to lobby
             self._nav.close_stage_list()
             time.sleep(self._nav.click_settle)
@@ -2242,6 +2274,8 @@ class MacroController:
         if not ok:
             self._log(f"  Golden Hour: select Gift Box failed: {msg}")
             self._nav.close_stage_list()
+            time.sleep(self._nav.click_settle)
+            self._nav.close_gamemode_menu()
             return False
         time.sleep(self._nav.click_settle)
 
@@ -2299,6 +2333,7 @@ class MacroController:
             return True
 
         self._cycle += 1
+        self._golden_hour_played_interval = interval_key()
 
         self._log("  Golden Hour: match finished — returning to lobby.")
         ok, msg = self._back_to_lobby()
