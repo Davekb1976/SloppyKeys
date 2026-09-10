@@ -83,10 +83,11 @@
           <polygon points="6,4 20,12 6,20"/>
         </svg>
       </button>
-      <button class="nav-btn" data-screen="queue" data-tip="Task Queue">
+      <button class="nav-btn" data-screen="queue" data-tip="Task Queue" id="nav-btn-queue">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
         </svg>
+        <span class="nav-badge-dot" id="queue-warn-dot" style="display:none;"></span>
       </button>
       <button class="nav-btn" data-screen="planner" data-tip="Macro Manager">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -175,7 +176,7 @@
               <span class="status-dot" id="status-dot"></span>
               <span class="status-action" id="stat-action">Idle</span>
             </div>
-            <div class="status-row"><span class="status-label">Gamemode</span><span class="status-value" id="stat-gamemode">—</span></div>
+            <div class="status-row"><span class="status-label" id="stat-target-label">Gamemode</span><span class="status-value" id="stat-gamemode">—</span></div>
             <div class="status-row"><span class="status-label">Cycle</span><span class="status-value" id="stat-cycle">0</span></div>
             <div class="status-row"><span class="status-label">Last Match</span><span class="status-value" id="stat-last">—</span></div>
           </div>

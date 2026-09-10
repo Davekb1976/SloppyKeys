@@ -125,6 +125,17 @@ input:focus, select:focus {
   width: 12px; height: 2px; background: var(--accent);
 }
 .nav-btn svg { width: 16px; height: 16px; transition: transform 0.15s; }
+.nav-badge-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--amber);
+  box-shadow: 0 0 5px var(--amber);
+  pointer-events: none;
+}
 
 .titlebar-right { display: flex; align-items: center; gap: var(--space-2); margin-left: auto; }
 .titlebar-clocks { display: flex; align-items: center; gap: var(--space-3); }
@@ -401,6 +412,7 @@ input:focus, select:focus {
 }
 .status-label { font-size: 12px; color: var(--text-faint); }
 .status-value { font-size: 12px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+.status-value--warn { color: var(--amber); }
 
 /* ---- Buttons (chunky plate system) ---- */
 .btn {

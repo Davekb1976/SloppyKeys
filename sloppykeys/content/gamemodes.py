@@ -19,6 +19,7 @@ config surfaces treat it like any other mode.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 
 # Story acts run 1-5 plus two special acts shown as icons in game.
 STORY_ACTS = ["Act 1", "Act 2", "Act 3", "Act 4", "Act 5", "Infinite", "Mastery"]
@@ -267,4 +268,75 @@ def sanitize_task(task: dict) -> dict:
     if not (mode == "Story" and task.get("stage") == "Infinite"):
         task["leave_at_wave"] = 0
     return task
+
+
+def validate_task(task: dict, app_root: Path | str | None = None) -> str | None:
+    """Validate that a task has all inputs needed to run.
+
+    Returns None if valid, or a human-readable failure description.
+    """
+    if not isinstance(task, dict):
+        return "invalid task format"
+
+    mode = str(task.get("mode") or "").strip()
+    if not mode:
+        return "gamemode is required"
+    if mode not in GAMEMODES:
+        return f"unknown gamemode '{mode}'"
+
+    # Challenge is a side task evaluated by availability rather than farm target
+    if mode == "Challenge":
+        slots = task.get("challenge_slots", [True, True, True])
+        if not any(slots):
+            return "all challenge slots are disabled"
+        return None
+
+    # Farm gamemodes require a map
+    map_name = str(task.get("map") or "").strip()
+    if not map_name:
+        map_lbl, _ = labels_for(mode)
+        return f"{map_lbl.lower()} is required"
+
+    # Gamemodes with acts/targets require an act/stage
+    if has_targets(mode):
+        stage = str(task.get("stage") or "").strip()
+        if not stage:
+            _, target_lbl = labels_for(mode)
+            return f"{target_lbl.lower()} is required"
+
+    # Portals / typed search requires a search query
+    if search_label(mode):
+        search_val = str(task.get("search") or "").strip()
+        if not search_val:
+            return f"{search_label(mode).lower()} name is required"
+
+    # Macro operation is required to place units and navigate playfield
+    macro_name = str(task.get("macro") or "").strip()
+    if not macro_name:
+        return "macro operation is required"
+
+    if app_root:
+        op_path = Path(app_root) / "operations" / f"{macro_name}.json"
+        if not op_path.is_file():
+            return f"macro operation '{macro_name}' not found"
+
+    return None
+
+
+def validate_task_queue(tasks: list[dict], app_root: Path | str | None = None) -> str | None:
+    """Validate an entire task queue before starting.
+
+    Returns None if all tasks are ready, or an error string naming the task.
+    """
+    if not tasks:
+        return "task queue is empty"
+
+    for i, t in enumerate(tasks, 1):
+        err = validate_task(t, app_root=app_root)
+        if err:
+            mode = t.get("mode") if isinstance(t, dict) else "unknown"
+            return f"Task {i} ({mode or 'unconfigured'}): {err}"
+
+    return None
+
 

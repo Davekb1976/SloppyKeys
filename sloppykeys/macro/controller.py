@@ -27,7 +27,7 @@ from sloppykeys.config.stats import StatsTracker
 from sloppykeys.config.unified import UnifiedSettings
 from sloppykeys.content.acts import act_coord
 from sloppykeys.content.challenge import interval_key
-from sloppykeys.content.gamemodes import is_custom, selection_complete
+from sloppykeys.content.gamemodes import is_custom, selection_complete, validate_task_queue
 from sloppykeys.content.start_stage import (
     difficulty_coord,
     difficulty_from_task,
@@ -201,8 +201,10 @@ class MacroController:
             return "already running"
         self.reload_delays()
         tasks = UnifiedSettings(self._app_root).get_tasks()
-        if not tasks:
-            return "task queue is empty"
+        error = validate_task_queue(tasks, self._app_root)
+        if error:
+            self._log(f"Can't start: {error}")
+            return error
         self._stop_requested = False
         self._paused = False
         self._running = True

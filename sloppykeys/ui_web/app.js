@@ -214,7 +214,14 @@
     dot.className = "status-dot" + (running ? (macroPaused ? " paused" : " running") : " stopped");
     // Status text
     statAction.textContent = running ? (macroPaused ? "Paused" : "Running") : "Idle";
-    statGamemode.textContent = target || "—";
+    const statTargetLabel = document.getElementById("stat-target-label");
+    if (running) {
+      if (statTargetLabel) statTargetLabel.textContent = "Target";
+      statGamemode.textContent = target || "—";
+      statGamemode.className = "status-value";
+    } else {
+      updateQueueReadiness();
+    }
     statCycle.textContent = String(cycle);
     // Sync compact strip
     const csAction = document.getElementById("compact-action");
@@ -488,11 +495,25 @@
       }
       // Challenge is taken by availability, not by position, so the number on the left is
       // misleading on its own — the badge is what stops it reading as "runs third".
-      const badge = isChallenge
-        ? `<span class="task-card-badge" data-tip="Runs before the other tasks whenever a challenge&#10;is available, wherever it sits in this queue.&#10;The maps re-roll every :00 and :30.">Priority</span>`
-        : (!t.macro
-            ? `<span class="task-card-badge task-card-badge--warn" data-tip="No macro operation assigned.&#10;Character will not walk and units will not be placed.">No Macro</span>`
-            : "");
+      let badge = "";
+      if (isChallenge) {
+        const slots = t.challenge_slots || [true, true, true];
+        if (!slots.some(Boolean)) {
+          badge = `<span class="task-card-badge task-card-badge--warn" data-tip="All challenge slots are disabled.&#10;Enable at least one slot in Task Builder.">Disabled</span>`;
+        } else {
+          badge = `<span class="task-card-badge" data-tip="Runs before the other tasks whenever a challenge&#10;is available, wherever it sits in this queue.&#10;The maps re-roll every :00 and :30.">Priority</span>`;
+        }
+      } else {
+        const missingMap = !t.map;
+        const missingStage = fields.stage && !t.stage;
+        const missingSearch = fields.search_label && !t.search;
+        if (missingMap || missingStage || missingSearch) {
+          const reason = missingMap ? "Map required" : (missingStage ? "Stage required" : "Portal required");
+          badge = `<span class="task-card-badge task-card-badge--warn" data-tip="${reason} — configure in Task Builder.">Incomplete</span>`;
+        } else if (!t.macro) {
+          badge = `<span class="task-card-badge task-card-badge--warn" data-tip="No macro operation assigned.&#10;Character will not walk and units will not be placed.">No Macro</span>`;
+        }
+      }
       const sel = t.id === selectedTaskId ? " selected" : "";
       return `<div class="task-card${sel}" data-id="${t.id}">
         <span class="task-card-index">${i + 1}</span>
@@ -506,6 +527,7 @@
     taskList.querySelectorAll(".task-card").forEach((card) => {
       card.addEventListener("click", () => selectTask(card.dataset.id));
     });
+    updateQueueReadiness();
   }
 
   function updateMacroWarning() {
@@ -515,6 +537,97 @@
     const tagEl = document.getElementById("tb-no-macro-tag");
     if (warnEl) warnEl.style.display = noMacro ? "" : "none";
     if (tagEl) tagEl.style.display = noMacro ? "" : "none";
+  }
+
+  function updateQueueReadiness() {
+    let queueIssue = null;
+    if (!tasks.length) {
+      queueIssue = "Queue empty";
+    } else {
+      for (let i = 0; i < tasks.length; i++) {
+        const t = tasks[i];
+        const fields = modeFields[t.mode] || {};
+        const isChal = t.mode === "Challenge";
+        if (isChal) {
+          const slots = t.challenge_slots || [true, true, true];
+          if (!slots.some(Boolean)) {
+            queueIssue = `Task ${i + 1}: All slots off`;
+            break;
+          }
+        } else {
+          if (!t.map) {
+            queueIssue = `Task ${i + 1}: No map`;
+            break;
+          }
+          if (fields.stage && !t.stage) {
+            queueIssue = `Task ${i + 1}: No ${fields.target_label || "act"}`;
+            break;
+          }
+          if (fields.search_label && !t.search) {
+            queueIssue = `Task ${i + 1}: No portal name`;
+            break;
+          }
+          if (!t.macro) {
+            queueIssue = `Task ${i + 1}: No macro`;
+            break;
+          }
+        }
+      }
+    }
+
+    // Titlebar nav button warning dot and tooltip
+    const warnDot = document.getElementById("queue-warn-dot");
+    const navBtnQueue = document.getElementById("nav-btn-queue");
+    if (warnDot) {
+      const hasIssue = queueIssue !== null && tasks.length > 0;
+      warnDot.style.display = hasIssue ? "" : "none";
+      if (navBtnQueue) {
+        navBtnQueue.setAttribute(
+          "data-tip",
+          hasIssue
+            ? `Task Queue\n⚠️ ${queueIssue}`
+            : "Task Queue"
+        );
+      }
+    }
+
+    // Dashboard status card when macro is idle
+    const statAction = document.getElementById("stat-action");
+    const statTargetLabel = document.getElementById("stat-target-label");
+    const statGamemode = document.getElementById("stat-gamemode");
+    const isRunning = statAction && statAction.textContent !== "Idle";
+
+    if (!isRunning && statGamemode) {
+      if (statTargetLabel) statTargetLabel.textContent = "Next Task";
+      if (!tasks.length) {
+        statGamemode.textContent = "Queue is empty";
+        statGamemode.className = "status-value";
+      } else {
+        const first = tasks[0];
+        const f = modeFields[first.mode] || {};
+        let firstIssue = null;
+        if (first.mode === "Challenge") {
+          const slots = first.challenge_slots || [true, true, true];
+          if (!slots.some(Boolean)) firstIssue = "All slots off";
+        } else {
+          if (!first.map) firstIssue = "No map";
+          else if (f.stage && !first.stage) firstIssue = `No ${f.target_label || "act"}`;
+          else if (f.search_label && !first.search) firstIssue = "No portal name";
+          else if (!first.macro) firstIssue = "No macro";
+        }
+
+        if (firstIssue) {
+          statGamemode.textContent = `${first.mode || "Task 1"} (${firstIssue})`;
+          statGamemode.className = "status-value status-value--warn";
+        } else {
+          const title = first.mode === "Challenge"
+            ? "Challenge"
+            : [first.mode, first.map, first.stage].filter(Boolean).join(" · ");
+          statGamemode.textContent = title || "Ready";
+          statGamemode.className = "status-value";
+        }
+      }
+    }
   }
 
   function selectTask(id) {

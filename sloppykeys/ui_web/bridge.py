@@ -2068,6 +2068,16 @@ class Api:
 
     # ---- Macro control ----
 
+    def validate_queue(self) -> dict:
+        """Validate the task queue and return {"ok": bool, "error": str | None}."""
+        if not self._app_root:
+            return {"ok": False, "error": "app root not ready"}
+        from sloppykeys.config.unified import UnifiedSettings
+        from sloppykeys.content.gamemodes import validate_task_queue
+        tasks = UnifiedSettings(self._app_root).get_tasks()
+        err = validate_task_queue(tasks, self._app_root)
+        return {"ok": err is None, "error": err}
+
     def start_macro(self, *args) -> dict:
         """Start the macro — runs the task queue. No selector args needed."""
         if self._ctrl is None:
