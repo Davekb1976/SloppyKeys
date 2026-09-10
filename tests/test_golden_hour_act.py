@@ -74,19 +74,23 @@ try:
     call_args = nav._ahk.run.call_args[0][0]
     assert "349" in call_args and "333" in call_args
 
-    # Case B: Story with Golden Hour present, prefer_golden=False -> clicks Act 1 shifted to Slot 1 (250, 287)
+    # Case B: Story with Golden Hour present, prefer_golden=False -> scrolls down, then clicks Act 1 at calibrated coordinate (249, 233)
+    nav._scroll_at = MagicMock(return_value=(True, ""))
     ok, msg = nav.select_act("Story", "Act 1", prefer_golden=False)
     assert ok is True
     assert msg == "clicked Act 1"
+    assert nav._scroll_at.called, "Must scroll down when Golden Hour is present to expose normal acts"
     call_args = nav._ahk.run.call_args[0][0]
-    assert "350" in call_args and "387" in call_args
+    assert "349" in call_args and "333" in call_args
 
-    # Case C: Story with Golden Hour present, selecting Mastery -> scrolls first, then clicks
-    nav._scroll_at = MagicMock(return_value=(True, ""))
+    # Case C: Story with Golden Hour present, selecting Mastery -> scrolls down, then clicks Mastery at (249, 567)
+    nav._scroll_at.reset_mock()
     ok, msg = nav.select_act("Story", "Mastery", prefer_golden=False)
     assert ok is True
     assert msg == "clicked Mastery"
-    assert nav._scroll_at.called, "Must scroll down for Mastery when Golden Hour is present"
+    assert nav._scroll_at.called, "Must scroll down for Mastery"
+    call_args = nav._ahk.run.call_args[0][0]
+    assert "349" in call_args and "667" in call_args
 
     # Case D: Story without Golden Hour (not found on screen), prefer_golden=True -> falls back to Act 1
     nav._find = lambda path, **kwargs: None  # Golden Hour not found

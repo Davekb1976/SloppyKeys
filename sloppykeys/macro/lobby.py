@@ -627,11 +627,12 @@ class LobbyNavigator:
                 target_label = "Golden Hour"
             else:
                 target_label = act
-                if act == "Mastery":
-                    # Mastery is pushed off-screen at the bottom; scroll act column down
-                    self._scroll_at((249, 350), notches=4)
-                    time.sleep(self.scroll_settle)
-                coord = golden_hour_act_coord("Story", act)
+                # Golden Hour is at the top. Scroll the act list down so the Gift Box
+                # scrolls off the top, exposing Acts 1-5, Infinite, and Mastery at their
+                # calibrated coordinates.
+                self._scroll_at((249, 350), notches=6)
+                time.sleep(self.scroll_settle)
+                coord = act_coord(gamemode, act)
         else:
             if prefer_golden:
                 target_label = f"{act} (Golden Hour inactive)"
