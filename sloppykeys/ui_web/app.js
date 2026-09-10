@@ -166,7 +166,7 @@
   btnStart.addEventListener("click", () => {
     if (!window.pywebview || !pywebview.api) return;
     pywebview.api.start_macro().then((r) => {
-      if (!r.ok) window.addLog("Start blocked: " + r.error);
+      if (!r.ok) window.addLog("Can't start: " + r.error);
     });
   });
 

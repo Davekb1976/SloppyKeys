@@ -203,7 +203,6 @@ class MacroController:
         tasks = UnifiedSettings(self._app_root).get_tasks()
         error = validate_task_queue(tasks, self._app_root)
         if error:
-            self._log(f"Can't start: {error}")
             return error
         self._stop_requested = False
         self._paused = False
