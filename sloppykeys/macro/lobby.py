@@ -662,9 +662,12 @@ class LobbyNavigator:
                 target_label = "Golden Hour"
             else:
                 target_label = act
-                # Golden Hour is at the top. Scroll the act list down so the Gift Box
-                # scrolls off the top, exposing Acts 1-5, Infinite, and Mastery at their
-                # calibrated coordinates.
+                # Golden Hour is at the top. Click the top slot to give the scroll
+                # frame input focus, then scroll down so the Gift Box scrolls off the top,
+                # exposing Acts 1-5, Infinite, and Mastery at their calibrated coordinates.
+                top_coord = golden_hour_act_coord("Story", "Golden Hour") or (249, 233)
+                self._click_client(rect, top_coord)
+                time.sleep(self.click_settle)
                 self._scroll_at((249, 350), notches=6)
                 time.sleep(self.scroll_settle)
                 coord = act_coord(gamemode, act)

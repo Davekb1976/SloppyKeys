@@ -56,6 +56,7 @@ nav = LobbyNavigator.__new__(LobbyNavigator)
 nav._rect = lambda: (100, 100, 1152, 756)
 nav.park_client = (10, 10)
 nav.scroll_settle = 0.0
+nav.click_settle = 0.0
 nav._ahk = MagicMock()
 nav._ahk.available.return_value = True
 nav._ahk.run.return_value = (True, "")
@@ -74,12 +75,14 @@ try:
     call_args = nav._ahk.run.call_args[0][0]
     assert "349" in call_args and "333" in call_args
 
-    # Case B: Story with Golden Hour present, prefer_golden=False -> scrolls down, then clicks Act 1 at calibrated coordinate (249, 233)
+    # Case B: Story with Golden Hour present, prefer_golden=False -> clicks top slot to focus, scrolls down, then clicks Act 1
+    nav._ahk.run.reset_mock()
     nav._scroll_at = MagicMock(return_value=(True, ""))
     ok, msg = nav.select_act("Story", "Act 1", prefer_golden=False)
     assert ok is True
     assert msg == "clicked Act 1"
     assert nav._scroll_at.called, "Must scroll down when Golden Hour is present to expose normal acts"
+    assert nav._ahk.run.call_count == 2, "Must click top slot to focus, then click target act"
     call_args = nav._ahk.run.call_args[0][0]
     assert "349" in call_args and "333" in call_args
 
