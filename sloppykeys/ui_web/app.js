@@ -1898,9 +1898,10 @@
     const names = await pywebview.api.list_operations();
     opLoad.innerHTML = '<option value="">Load...</option>' + names.map((n) => `<option value="${n}">${n}</option>`).join("");
     // Also populate the task builder's macro dropdown
-    const prevMacro = tbMacro.value;
+    const curTask = tasks.find((t) => t.id === selectedTaskId);
+    const targetMacro = (curTask && curTask.macro) || tbMacro.value;
     tbMacro.innerHTML = '<option value="">No Macro</option>' + names.map((n) => `<option value="${n}">${n}</option>`).join("");
-    if (prevMacro) tbMacro.value = prevMacro;
+    if (targetMacro) tbMacro.value = targetMacro;
     updateMacroWarning();
     const ghMacro = document.getElementById("s-golden-hour-macro");
     if (ghMacro) {
