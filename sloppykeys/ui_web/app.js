@@ -429,8 +429,6 @@
   const tbMap = document.getElementById("tb-map");
   const tbStage = document.getElementById("tb-stage");
   const tbDifficulty = document.getElementById("tb-difficulty");
-  const tbGoldenHour = document.getElementById("tb-golden-hour");
-  const tbGoldenHourRow = document.getElementById("tb-golden-hour-row");
   const tbRepeat = document.getElementById("tb-repeat");
   const tbExtract = document.getElementById("tb-extract");
   const tbExtractRow = document.getElementById("tb-extract-row");
@@ -479,7 +477,6 @@
         bits.push(assigned.length ? assigned.length + " map macro" + (assigned.length === 1 ? "" : "s") : "no macros assigned");
       } else {
         if (fields.difficulty && t.difficulty) bits.push(t.difficulty);
-        if (fields.golden_hour && t.golden_hour) bits.push("Golden Hour");
         bits.push("×" + (t.repeat || 1));
         if (fields.search_label && t.search) bits.push(t.search);
         if (t.macro) bits.push(t.macro);
@@ -523,7 +520,6 @@
       loadMaps(task.mode, task.map);
       loadStages(task.mode, task.map, task.stage);
       loadDifficulty(task.mode, task.difficulty);
-      tbGoldenHour.checked = Boolean(task.golden_hour);
       tbRepeat.value = task.repeat || 1;
       tbExtract.value = task.extract_after || 1;
       tbSearch.value = task.search || "";
@@ -552,7 +548,6 @@
     document.getElementById("tb-stage-label").textContent = f.target_label || "Stage";
     document.getElementById("tb-stage-row").style.display = f.stage ? "" : "none";
     document.getElementById("tb-difficulty-row").style.display = f.difficulty ? "" : "none";
-    tbGoldenHourRow.style.display = f.golden_hour ? "" : "none";
     tbExtractRow.style.display = f.extract ? "" : "none";
     tbSearchRow.style.display = f.search_label ? "" : "none";
     if (f.search_label) document.getElementById("tb-search-label").textContent = f.search_label;
@@ -619,7 +614,6 @@
     // empty stage and Raid tasks store an Easy/Hard nothing clicked.
     if (tbModeFields.stage) changes.stage = tbStage.value;
     if (tbModeFields.difficulty) changes.difficulty = tbDifficulty.value;
-    if (tbModeFields.golden_hour) changes.golden_hour = tbGoldenHour.checked;
     if (tbModeFields.extract) {
       changes.extract_after = Math.max(1, parseInt(tbExtract.value) || 1);
     }
@@ -669,7 +663,6 @@
   });
   tbStage.addEventListener("change", saveCurrentTask);
   tbDifficulty.addEventListener("change", saveCurrentTask);
-  tbGoldenHour.addEventListener("change", saveCurrentTask);
   tbRepeat.addEventListener("change", saveCurrentTask);
   tbExtract.addEventListener("change", saveCurrentTask);
   tbMacro.addEventListener("change", saveCurrentTask);
@@ -1860,6 +1853,12 @@
     opLoad.innerHTML = '<option value="">Load...</option>' + names.map((n) => `<option value="${n}">${n}</option>`).join("");
     // Also populate the task builder's macro dropdown
     tbMacro.innerHTML = '<option value="">No Macro</option>' + names.map((n) => `<option value="${n}">${n}</option>`).join("");
+    const ghMacro = document.getElementById("s-golden-hour-macro");
+    if (ghMacro) {
+      const cur = ghMacro.dataset.pendingVal !== undefined ? ghMacro.dataset.pendingVal : ghMacro.value;
+      ghMacro.innerHTML = '<option value="">Default (Current Task Macro)</option>' + names.map((n) => `<option value="${n}">${n}</option>`).join("");
+      if (cur) ghMacro.value = cur;
+    }
   }
 
   document.getElementById("btn-op-save").addEventListener("click", async () => {
@@ -1985,7 +1984,10 @@
         const val = s[el.dataset.key];
         if (val === undefined) return;
         if (el.type === "checkbox") el.checked = !!val;
-        else el.value = val;
+        else {
+          el.value = val;
+          if (el.tagName === "SELECT") el.dataset.pendingVal = val;
+        }
       });
     } catch (e) {}
 

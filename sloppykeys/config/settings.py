@@ -19,6 +19,9 @@ PRIVATE_SERVER_KEY = "private_server_link"
 WEBHOOK_KEY = "discord_webhook"
 
 HARD_MODE_KEY = "hard_mode"
+PRIORITIZE_GOLDEN_HOUR_KEY = "prioritize_golden_hour"
+GOLDEN_HOUR_REPEATS_KEY = "golden_hour_repeats"
+GOLDEN_HOUR_MACRO_KEY = "golden_hour_macro"
 # Opt-in: run the ~8s camera sequence once per Roblox session instead of once per match.
 # Default **off** because placement coordinates are stored against one camera angle, so if
 # Roblox resets the camera on a stage load, skipping misplaces every unit silently. Cheap to
@@ -54,6 +57,9 @@ class AppSettings:
             PRIVATE_SERVER_KEY: EMPTY_VALUE,
             WEBHOOK_KEY: "",
             HARD_MODE_KEY: False,
+            PRIORITIZE_GOLDEN_HOUR_KEY: False,
+            GOLDEN_HOUR_REPEATS_KEY: 1,
+            GOLDEN_HOUR_MACRO_KEY: "",
             CAMERA_ONCE_KEY: False,
             AUTO_UPDATE_KEY: True,
         }
@@ -113,6 +119,24 @@ class AppSettings:
 
     def set_hard_mode(self, enabled: bool) -> None:
         self._set(HARD_MODE_KEY, bool(enabled))
+
+    def get_prioritize_golden_hour(self) -> bool:
+        return bool(self.read().get(PRIORITIZE_GOLDEN_HOUR_KEY, False))
+
+    def set_prioritize_golden_hour(self, enabled: bool) -> None:
+        self._set(PRIORITIZE_GOLDEN_HOUR_KEY, bool(enabled))
+
+    def get_golden_hour_repeats(self) -> int:
+        return max(1, int(self.read().get(GOLDEN_HOUR_REPEATS_KEY, 1) or 1))
+
+    def set_golden_hour_repeats(self, repeats: int) -> None:
+        self._set(GOLDEN_HOUR_REPEATS_KEY, max(1, int(repeats or 1)))
+
+    def get_golden_hour_macro(self) -> str:
+        return str(self.read().get(GOLDEN_HOUR_MACRO_KEY, "")).strip()
+
+    def set_golden_hour_macro(self, macro_name: str) -> None:
+        self._set(GOLDEN_HOUR_MACRO_KEY, (macro_name or "").strip())
 
 
 # Roblox's share page hands the client a deep link rather than a resolved server

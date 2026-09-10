@@ -87,6 +87,8 @@ RectProvider = Callable[[], tuple[int, int, int, int] | None]
 class MacroController:
     """Drives the macro from the task queue without any Qt dependency."""
 
+    _just_ran_golden_hour: bool = False
+
     def __init__(
         self,
         app_root: str,
@@ -150,6 +152,7 @@ class MacroController:
         self._kept_position = False
         self._cycle = 0
         self._last_reopen_time = 0.0
+        self._just_ran_golden_hour = False
 
     @staticmethod
     def _default_rect() -> tuple[int, int, int, int] | None:
@@ -195,6 +198,7 @@ class MacroController:
         self._camera_set = False
         self._kept_position = False
         self._cycle = 0
+        self._just_ran_golden_hour = False
         # So the first decline of this run is said out loud even when it repeats the reason the
         # last run ended on — which is exactly the case a user restarting to watch for it hits.
         self._challenge_decline = ""
@@ -317,6 +321,12 @@ class MacroController:
             if loop_pass > 1:
                 self._log(f"Queue finished — restarting (pass {loop_pass}).")
 
+            # If Golden Hour is prioritized, scan Story stages before beginning the queue pass
+            if not self._just_ran_golden_hour and self._run_golden_hour_detour():
+                self._just_ran_golden_hour = True
+                if self._checkpoint():
+                    return (True, f"stopped after {self._cycle} cycles")
+
             for i, task in enumerate(tasks, 1):
                 if self._checkpoint():
                     return (True, f"stopped after {self._cycle} cycles")
@@ -335,11 +345,15 @@ class MacroController:
                 if mode == "Challenge":
                     if self._challenge_wants_in(task):
                         self._run_challenge_task(task)
+                        self._just_ran_golden_hour = False
+                    if not self._just_ran_golden_hour and self._run_golden_hour_detour():
+                        self._just_ran_golden_hour = True
                     if self._checkpoint():
                         return (True, f"stopped after {self._cycle} cycles")
                     continue
 
                 for rep in range(repeat):
+                    self._just_ran_golden_hour = False
                     if self._checkpoint():
                         return (True, f"stopped after {self._cycle} cycles")
 
@@ -462,6 +476,12 @@ class MacroController:
                         if not ok:
                             self._log(f"  Repeat: {msg} — falling through.")
 
+                # Task completed all repeats. If Golden Hour is prioritized, scan Story stages.
+                if not self._just_ran_golden_hour and self._run_golden_hour_detour():
+                    self._just_ran_golden_hour = True
+                    if self._checkpoint():
+                        return (True, f"stopped after {self._cycle} cycles")
+
         return (True, f"stopped after {self._cycle} cycles")
 
     def _navigate_lobby(self, mode: str, map_name: str, stage: str) -> bool:
@@ -524,9 +544,7 @@ class MacroController:
             (f"Select {map_name}", lambda: self._nav.select_stage(mode, map_name)),
         ]
         if stage and act_coord(mode, stage) is not None:
-            prefer_golden = bool((self._current_task or {}).get("golden_hour", False))
-            step_name = f"Select {stage}" + (" (prefer Golden Hour)" if prefer_golden else "")
-            steps.append((step_name, lambda s=stage, pg=prefer_golden: self._nav.select_act(mode, s, prefer_golden=pg)))
+            steps.append((f"Select {stage}", lambda s=stage: self._nav.select_act(mode, s, prefer_golden=False)))
 
         # One field, two controls: a mode with the cycling button gets 1-3 clicks on the way
         # in, and every other mode reads it as Story's Easy/Hard pair, which `start_stage`
@@ -2147,6 +2165,168 @@ class MacroController:
         # panel reads as open, and a deadline search replaces a fixed sleep rather than
         # following one — two seconds here was latency paid on every pass whether the panel
         # had drawn or not, and it proved nothing either way.
+        return True
+
+    def _run_golden_hour_detour(self) -> bool:
+        """If Golden Hour is prioritized, scan Story stages for the Golden Hour badge.
+
+        If a stage is found with Golden Hour active:
+          1. Enters that stage's act selection screen.
+          2. Clicks the Gift Box (Slot 0) via `select_act("Story", "Golden Hour", prefer_golden=True)`.
+          3. Starts the stage and waits for the match to be ready.
+          4. Executes the configured Golden Hour macro (or fallback).
+          5. Repeats for `golden_hour_repeats` times via `click_repeat()`.
+          6. Returns to the lobby via `_back_to_lobby()`.
+
+        Returns True if a Golden Hour run was executed, False otherwise.
+        """
+        settings = getattr(self, "_settings", None)
+        if settings is None or not settings.get_prioritize_golden_hour():
+            return False
+
+        from sloppykeys.content.nav_images import golden_hour_image
+
+        if not os.path.isfile(golden_hour_image()):
+            self._log("  Golden Hour: template not captured yet — skipping detour.")
+            return False
+
+        previous_task = self._current_task
+        previous_phases = getattr(self, "_phases", None)
+        try:
+            return self._run_golden_hour_detour_inner()
+        finally:
+            self._current_task = previous_task
+            self._phases = previous_phases
+
+    def _run_golden_hour_detour_inner(self) -> bool:
+        self._log("  Golden Hour: prioritizing — opening Story to scan for active stage...")
+
+        # If on a result screen from a previous match, leave it first
+        if self._nav.result_screen_up():
+            ok, msg = self._nav.leave_match()
+            self._log(f"  Leave match: {msg}")
+            if not ok:
+                return False
+            time.sleep(self._nav.click_settle)
+            ok, msg = self._nav.change_gamemode()
+            self._log(f"  Change gamemode: {msg}")
+            if not ok:
+                return False
+            time.sleep(self._nav.click_settle)
+        else:
+            ok, msg = self._nav.click_play()
+            if not ok:
+                self._log(f"  Golden Hour: click Play failed: {msg}")
+                return False
+            time.sleep(self._nav.click_settle)
+
+        ok, msg = self._nav.open_gamemode("Story")
+        if not ok:
+            self._log(f"  Golden Hour: open Story failed: {msg}")
+            return False
+        time.sleep(self._nav.click_settle)
+
+        # Scan stages in carousel
+        ok, msg = self._nav.find_and_select_golden_hour_stage()
+        if not ok:
+            self._log(f"  Golden Hour: {msg}.")
+            # Close stage list and gamemode menu to return cleanly to lobby
+            self._nav.close_stage_list()
+            time.sleep(self._nav.click_settle)
+            self._nav.close_gamemode_menu()
+            return False
+
+        self._log("  Golden Hour: entered stage — selecting Gift Box...")
+
+        # Inside stage: select Gift Box (Slot 0)
+        ok, msg = self._nav.select_act("Story", "Golden Hour", prefer_golden=True)
+        if not ok:
+            self._log(f"  Golden Hour: select Gift Box failed: {msg}")
+            self._nav.close_stage_list()
+            return False
+        time.sleep(self._nav.click_settle)
+
+        # Start stage
+        hard = self._settings.get_hard_mode()
+        ok, msg = self._nav.start_stage("Story", hard)
+        if not ok:
+            self._log(f"  Golden Hour: start stage failed: {msg}")
+            return False
+
+        ok, msg = self._nav.wait_for_match_ready()
+        if not ok:
+            self._log(f"  Golden Hour: match ready wait failed: {msg}")
+            return False
+
+        self._ensure_camera()
+
+        # Load operation
+        gh_macro = self._settings.get_golden_hour_macro()
+        macro_name = gh_macro or ((self._current_task or {}).get("macro", "")) or "auto play"
+        op = load_operation(self._app_root, macro_name)
+        phases = op.get("phases", {})
+        self._phases = phases
+
+        repeats = self._settings.get_golden_hour_repeats()
+
+        for rep in range(repeats):
+            if self._checkpoint():
+                return True
+
+            self._log(
+                f"  Golden Hour: running match ({rep + 1}/{repeats}) with macro '{macro_name}'..."
+            )
+
+            # Pre Start (walk)
+            self._run_phase_linear(phases.get("pre_start", []))
+            self._kept_position = False
+            if self._checkpoint():
+                return True
+
+            # Start Game
+            self._placer.park()
+            ok, msg = self._nav.click_start_game()
+            if ok:
+                self._stats.start_stage()
+                self._log(f"  Start Game: {msg or 'ok'}")
+            else:
+                self._log(f"  Start Game failed: {msg}")
+
+            if self._checkpoint():
+                return True
+
+            # Battle + Loops
+            battle_blocks = phases.get("battle", [])
+            loop_a = phases.get("loop_a", [])
+            loop_b = phases.get("loop_b", [])
+            self._run_match(battle_blocks, loop_a, loop_b)
+
+            if self._checkpoint():
+                return True
+
+            self._cycle += 1
+
+            more_reps = rep < repeats - 1
+            if more_reps:
+                self._log(
+                    f"  Golden Hour: match {rep + 1}/{repeats} complete — repeating stage..."
+                )
+                ok, msg = self._nav.click_repeat()
+                self._kept_position = bool(ok)
+                if not ok:
+                    self._log(f"  Repeat: {msg} — falling through to lobby.")
+                    ok_b, msg_b = self._back_to_lobby()
+                    self._log(f"  Back to lobby: {msg_b}")
+                    break
+                ok, msg = self._nav.wait_for_match_ready()
+                if not ok:
+                    self._log(f"  Golden Hour: wait ready after repeat failed: {msg}")
+                    break
+            else:
+                self._log(f"  Golden Hour: all {repeats} repeat(s) finished — returning to lobby.")
+                ok, msg = self._back_to_lobby()
+                self._log(f"  Back to lobby: {msg}")
+
         return True
 
     def _capture_screenshot(self) -> bytes | None:

@@ -599,6 +599,41 @@ class LobbyNavigator:
                 time.sleep(self.scroll_settle)
         return (False, f"{self._miss(path, stage, region)} after {max_scrolls} scrolls")
 
+    def find_and_select_golden_hour_stage(
+        self, max_scrolls: int = 8, notches: int = 4
+    ) -> tuple[bool, str]:
+        """Scan the Story carousel for a stage displaying the Golden Hour badge.
+
+        If found, clicks the badge/card to enter that stage's act selection screen.
+        """
+        path = golden_hour_image()
+        if not os.path.isfile(path):
+            return (False, f"Golden Hour template ({path}) not found")
+
+        self._park()
+        for attempt in range(max_scrolls + 1):
+            match = self._find(
+                path, timeout=self.search_timeout if attempt == 0 else 0.0
+            )
+            if match is not None:
+                ok, message = self._click(match)
+                if ok:
+                    return (True, f"selected Golden Hour stage ({match.score:.2f})")
+                return (False, f"found Golden Hour stage but click failed: {message}")
+            if attempt < max_scrolls:
+                ok, message = self._scroll(notches)
+                if not ok:
+                    return (False, f"scroll failed: {message}")
+                time.sleep(self.scroll_settle)
+        return (False, f"Golden Hour badge not found after {max_scrolls} scrolls")
+
+    def close_stage_list(self) -> tuple[bool, str]:
+        """Close the stage chooser back towards the gamemode menu."""
+        path = close_panel_image()
+        if self._engine.template_exists(path):
+            return self._find_click(path, "Close stage list", timeout=self.search_timeout)
+        return (False, f"{path} is missing")
+
     def select_act(
         self, gamemode: str, act: str, prefer_golden: bool = False
     ) -> tuple[bool, str]:

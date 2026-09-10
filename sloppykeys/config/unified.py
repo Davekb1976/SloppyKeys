@@ -40,6 +40,10 @@ DEFAULTS: dict[str, Any] = {
     # harmlessly — `UnifiedSettings.get` only answers for keys this table declares. Real
     # per-step waits live in `config/delays.py::DELAY_SPEC`, which the Delays tab builds itself.
     "debug_screenshots": False,
+    # Golden Hour
+    "prioritize_golden_hour": False,
+    "golden_hour_repeats": 1,
+    "golden_hour_macro": "",
     # Image thresholds (per-name overrides, dict)
     "image_thresholds": {},
 }
