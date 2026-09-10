@@ -40,6 +40,7 @@ from sloppykeys.content.nav_images import (
     close_panel_image,
     events_image,
     gamemode_image,
+    golden_hour_act_image,
     golden_hour_image,
     match_play_image,
     play_image,
@@ -647,31 +648,39 @@ class LobbyNavigator:
         if not self._ahk.available():
             return (False, "AutoHotkey v2 not found")
 
-        has_golden = False
-        if gamemode == "Story" and os.path.isfile(golden_hour_image()):
-            has_golden = self._find(golden_hour_image(), timeout=0.6) is not None
+        # Check for the Golden Hour act on screen
+        golden_match = None
+        if gamemode == "Story":
+            act_path = golden_hour_act_image()
+            if os.path.isfile(act_path):
+                golden_match = self._find(act_path, timeout=0.0)
+            elif os.path.isfile(golden_hour_image()):
+                golden_match = self._find(golden_hour_image(), timeout=0.0)
 
-        if has_golden:
+        if golden_match is not None:
             if prefer_golden:
-                coord = golden_hour_act_coord("Story", "Golden Hour")
-                target_label = "Golden Hour"
+                # Click the matched Golden Hour act directly (no hardcoded click point)
+                ok, message = self._click(golden_match)
+                return (
+                    (True, f"clicked Golden Hour ({golden_match.score:.2f})")
+                    if ok
+                    else (False, f"Golden Hour click failed: {message}")
+                )
             else:
                 target_label = act
-                # Golden Hour is at the top. Click the top slot to give the scroll
-                # frame input focus, then scroll down so the Gift Box scrolls off the top,
-                # exposing Acts 1-5, Infinite, and Mastery at their calibrated coordinates.
-                top_coord = golden_hour_act_coord("Story", "Golden Hour") or (249, 233)
-                self._click_client(rect, top_coord)
-                time.sleep(self.click_settle)
+                # Golden Hour is active, but a normal act is requested (or Golden Hour toggled off).
+                # Scroll down so the Gift Box scrolls off the top, exposing Acts 1-5,
+                # Infinite, and Mastery without clicking on Golden Hour.
                 self._scroll_at((249, 350), notches=6)
                 time.sleep(self.scroll_settle)
                 coord = act_coord(gamemode, act)
         else:
             if prefer_golden:
                 target_label = f"{act} (Golden Hour inactive)"
+                coord = golden_hour_act_coord("Story", "Golden Hour") or act_coord(gamemode, act)
             else:
                 target_label = act
-            coord = act_coord(gamemode, act)
+                coord = act_coord(gamemode, act)
 
         if coord is None:
             return (False, f"no act coordinates for {gamemode} / {act}")

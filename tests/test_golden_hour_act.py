@@ -17,17 +17,24 @@ from sloppykeys.content.acts import (  # noqa: E402
 )
 from sloppykeys.content.nav_images import (  # noqa: E402
     expected_paths,
+    golden_hour_act_image,
     golden_hour_image,
+    GOLDEN_HOUR_ACT_IMAGE,
     GOLDEN_HOUR_IMAGE,
 )
 from sloppykeys.macro.lobby import LobbyNavigator  # noqa: E402
+from sloppykeys.core.image_search import ImageMatch  # noqa: E402
 
 
 # 1. Template registration
 assert GOLDEN_HOUR_IMAGE == "golden_hour.png"
+assert GOLDEN_HOUR_ACT_IMAGE == "golden_hour_act.png"
 gh_path = golden_hour_image()
+gh_act_path = golden_hour_act_image()
 assert gh_path.endswith(os.path.join("assets", "lobby", "golden_hour.png"))
-assert gh_path in expected_paths(), "golden_hour_image must be registered in expected_paths for Image Manager"
+assert gh_act_path.endswith(os.path.join("assets", "lobby", "golden_hour_act.png"))
+assert gh_path in expected_paths(), "golden_hour_image must be registered in expected_paths"
+assert gh_act_path in expected_paths(), "golden_hour_act_image must be registered in expected_paths"
 
 # 2. Coordinates
 # Normal Story acts
@@ -61,37 +68,38 @@ nav._ahk = MagicMock()
 nav._ahk.available.return_value = True
 nav._ahk.run.return_value = (True, "")
 
-# Case A: Story with Golden Hour present, prefer_golden=True -> clicks Gift Box at (249, 233)
-nav._find = lambda path, **kwargs: MagicMock()  # Golden Hour found
-# Temporarily mock os.path.isfile to return True for golden_hour_image
+# Case A: Story with Golden Hour present, prefer_golden=True -> clicks matched image directly
+mock_match = ImageMatch("golden_hour_act", 0.95, 349, 333, 300, 300, 50, 50)
+nav._find = lambda path, **kwargs: mock_match  # Golden Hour found
+nav._click = MagicMock(return_value=(True, ""))
 orig_isfile = os.path.isfile
-os.path.isfile = lambda p: True if "golden_hour.png" in p else orig_isfile(p)
+os.path.isfile = lambda p: True if "golden_hour" in p else orig_isfile(p)
 
 try:
     ok, msg = nav.select_act("Story", "Act 1", prefer_golden=True)
     assert ok is True
-    assert msg == "clicked Golden Hour"
-    # Verify screen coordinate passed to AHK: 100 + 249 = 349, 100 + 233 = 333
-    call_args = nav._ahk.run.call_args[0][0]
-    assert "349" in call_args and "333" in call_args
+    assert "clicked Golden Hour" in msg
+    assert nav._click.called, "Must click matched image directly"
 
-    # Case B: Story with Golden Hour present, prefer_golden=False -> clicks top slot to focus, scrolls down, then clicks Act 1
+    # Case B: Story with Golden Hour present, prefer_golden=False -> scrolls down, then clicks Act 1 (NO pre-click on Golden Hour)
     nav._ahk.run.reset_mock()
     nav._scroll_at = MagicMock(return_value=(True, ""))
     ok, msg = nav.select_act("Story", "Act 1", prefer_golden=False)
     assert ok is True
     assert msg == "clicked Act 1"
     assert nav._scroll_at.called, "Must scroll down when Golden Hour is present to expose normal acts"
-    assert nav._ahk.run.call_count == 2, "Must click top slot to focus, then click target act"
+    assert nav._ahk.run.call_count == 1, "Must NOT click top slot, only click target act after scrolling"
     call_args = nav._ahk.run.call_args[0][0]
     assert "349" in call_args and "333" in call_args
 
     # Case C: Story with Golden Hour present, selecting Mastery -> scrolls down, then clicks Mastery at (249, 567)
     nav._scroll_at.reset_mock()
+    nav._ahk.run.reset_mock()
     ok, msg = nav.select_act("Story", "Mastery", prefer_golden=False)
     assert ok is True
     assert msg == "clicked Mastery"
     assert nav._scroll_at.called, "Must scroll down for Mastery"
+    assert nav._ahk.run.call_count == 1
     call_args = nav._ahk.run.call_args[0][0]
     assert "349" in call_args and "667" in call_args
 
