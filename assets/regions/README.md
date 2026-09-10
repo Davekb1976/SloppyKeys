@@ -12,9 +12,9 @@ the user managed to get the Challenge panel on screen.
 ## They are reference, not calibration
 
 The shipped crops were taken at *tuned* boxes, not at the defaults in `content/challenge.py`
-and `config/regions.py`. Most are within a few pixels of the default; `match_wave` and
-`slot3_map` are further off. So treat a shipped preview as "this is the wave counter", not as
-"this is exactly what the numbers beside it cut out".
+and `config/regions.py`. Most are within a few pixels of the default; `slot3_map` is
+further off. So treat a shipped preview as reference, not as "this is exactly what the numbers
+beside it cut out".
 
 Nothing reads these files but the Settings panel — no matching, no OCR, no macro step. A wrong
 one is cosmetic.

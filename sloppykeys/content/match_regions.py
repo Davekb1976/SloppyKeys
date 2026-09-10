@@ -17,11 +17,9 @@ from __future__ import annotations
 
 # Where the wave counter is drawn in the match HUD, as (x, y, w, h) in client space.
 #
-# **Not yet confirmed against a real stage.** It came from an approximation in the runner
-# rather than a measurement, which is exactly why it is editable: `wait_wave` reads whatever
-# is in this box and compares the first run of digits, so a box over the wrong HUD element
-# gates on the wrong number and looks like a hung block.
-WAVE_REGION = (420, 15, 160, 40)
+# Measured against the live in-match HUD at the pinned 1152x756 client size.
+# `wait_wave` reads whatever is in this box and compares the first run of digits.
+WAVE_REGION = (460, 16, 113, 30)
 
 
 _OVERRIDES: dict[str, tuple[int, int, int, int]] = {}

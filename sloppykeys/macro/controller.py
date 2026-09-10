@@ -1445,7 +1445,7 @@ class MacroController:
                 return True
 
             # Through the accessor, so the user's Settings > OCR measurement is what gets
-            # read. The default is an approximation and has never been confirmed in a stage.
+            # read (falls back to calibrated default at 1152x756).
             from sloppykeys.content.match_regions import wave_region
 
             bx, by, bw, bh = wave_region()
