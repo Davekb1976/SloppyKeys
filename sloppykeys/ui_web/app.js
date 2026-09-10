@@ -637,9 +637,9 @@
       changes.extract_after = Math.max(1, parseInt(tbExtract.value) || 1);
     }
     if (tbModeFields.search_label) changes.search = tbSearch.value.trim();
-    if (tbMode.value === "Story" && tbStage.value === "Infinite") {
-      changes.leave_at_wave = Math.max(0, parseInt(tbLeaveWave.value) || 0);
-    }
+    changes.leave_at_wave = (tbMode.value === "Story" && tbStage.value === "Infinite")
+      ? Math.max(0, parseInt(tbLeaveWave.value) || 0)
+      : 0;
     // Challenge-specific: per-map macros + slot enables
     if (tbMode.value === "Challenge") {
       const t = tasks.find(x => x.id === selectedTaskId);

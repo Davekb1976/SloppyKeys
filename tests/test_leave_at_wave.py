@@ -22,13 +22,20 @@ assert WAVE_MAX == 999, f"WAVE_MAX should be 999 to support infinite waves, got 
 # Fractions
 assert parse_wave("1/15") == 1
 assert parse_wave("5 / 15 wave") == 5
+assert parse_wave("5/15wave") == 5
+assert parse_wave("Wave 5/15") == 5
+assert parse_wave("3 1/15 wave") == 1
+assert parse_wave("1/15 wave 3") == 1
 assert parse_wave("15/15") == 15
 assert parse_wave("12/25", 25) == 12
 assert parse_wave("12/26", 25) is None  # stage total mismatch
 
 # Wave keyword
 assert parse_wave("Wave 120") == 120
+assert parse_wave("Wave: 120") == 120
+assert parse_wave("Wave: 12") == 12
 assert parse_wave("120 wave") == 120
+assert parse_wave("3 Wave 120") == 120
 assert parse_wave("Wave 1") == 1
 assert parse_wave("wave: 50") == 50
 assert parse_wave("120 wave", 200) == 120

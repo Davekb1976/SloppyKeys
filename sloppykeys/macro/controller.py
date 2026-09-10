@@ -487,6 +487,7 @@ class MacroController:
                         # Left early to the lobby mid-match. No Repeat/Result screen exists;
                         # the next rep or task will navigate from the lobby fresh.
                         self._kept_position = False
+                        self._camera_set = False
                     elif mode == "Portals":
                         self._portals_after_match(task, again=more_reps)
                     elif mode == "Expedition":
@@ -840,10 +841,11 @@ class MacroController:
         self._exp_busy = False
 
         leave_at_wave = 0
-        try:
-            leave_at_wave = max(0, int((self._current_task or {}).get("leave_at_wave", 0)))
-        except (ValueError, TypeError):
-            leave_at_wave = 0
+        if (self._current_task or {}).get("mode") == "Story" and (self._current_task or {}).get("stage") == "Infinite":
+            try:
+                leave_at_wave = max(0, int((self._current_task or {}).get("leave_at_wave", 0)))
+            except (ValueError, TypeError):
+                leave_at_wave = 0
         next_wave_check = 0.0
 
         while not self._stop_requested:

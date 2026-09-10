@@ -903,24 +903,25 @@ def parse_wave(text: str, max_wave: int = 0) -> int | None:
         return None
 
     # 1. Look for a fraction: <current> / <total>
-    for sep in ("/", "\\", "|", ":"):
+    for sep in ("/", "\\", "|"):
         if sep in text:
-            m = re.search(r"([0-9a-zA-Z]{1,4})\s*" + re.escape(sep) + r"\s*([0-9a-zA-Z]{1,4})", text)
-            if m:
-                left_str = m.group(1).translate(DIGIT_FIXES)
-                right_str = m.group(2).translate(DIGIT_FIXES)
-                if left_str.isdigit() and right_str.isdigit():
-                    current = int(left_str)
-                    total = int(right_str)
-                    if current > 0 and total > 0 and current <= total:
-                        if max_wave > 0 and total != max_wave:
-                            return None
-                        return current
+            parts = text.split(sep, 1)
+            left_clean = parts[0].translate(DIGIT_FIXES)
+            right_clean = parts[1].translate(DIGIT_FIXES)
+            m_left = re.search(r"(\d{1,4})\s*$", left_clean)
+            m_right = re.match(r"^\s*(\d{1,4})", right_clean)
+            if m_left and m_right:
+                current = int(m_left.group(1))
+                total = int(m_right.group(1))
+                if current > 0 and total > 0 and current <= total:
+                    if max_wave > 0 and total != max_wave:
+                        return None
+                    return current
 
     # 2. Look for wave keyword: 'Wave 120' or '120 wave'
     lowered = text.lower()
-    m = re.search(r"([0-9a-zA-Z]{1,4})\s*(?:wave|wav)\b", lowered) or re.search(
-        r"\b(?:wave|wav)\s*[:\-]?\s*([0-9a-zA-Z]{1,4})", lowered
+    m = re.search(r"\b(?:wave|wav)\b\s*[:\-]?\s*([0-9a-zA-Z]{1,4})\b", lowered) or re.search(
+        r"\b([0-9a-zA-Z]{1,4})\s*(?:wave|wav)\b", lowered
     )
     if m:
         val_str = m.group(1).translate(DIGIT_FIXES)
