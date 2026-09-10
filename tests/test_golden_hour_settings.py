@@ -13,7 +13,6 @@ from sloppykeys.config.unified import DEFAULTS, UnifiedSettings
 from sloppykeys.config.settings import (
     AppSettings,
     PRIORITIZE_GOLDEN_HOUR_KEY,
-    GOLDEN_HOUR_REPEATS_KEY,
     GOLDEN_HOUR_MACRO_KEY,
 )
 
@@ -21,8 +20,7 @@ from sloppykeys.config.settings import (
 assert "prioritize_golden_hour" in DEFAULTS
 assert DEFAULTS["prioritize_golden_hour"] is False
 
-assert "golden_hour_repeats" in DEFAULTS
-assert DEFAULTS["golden_hour_repeats"] == 1
+assert "golden_hour_repeats" not in DEFAULTS
 
 assert "golden_hour_macro" in DEFAULTS
 assert DEFAULTS["golden_hour_macro"] == ""
@@ -35,17 +33,12 @@ try:
 
     # Verify defaults on fresh directory
     assert settings.get_prioritize_golden_hour() is False
-    assert settings.get_golden_hour_repeats() == 1
     assert settings.get_golden_hour_macro() == ""
 
     # Test setting values via AppSettings
     settings.set_prioritize_golden_hour(True)
     assert settings.get_prioritize_golden_hour() is True
     assert unified.get(PRIORITIZE_GOLDEN_HOUR_KEY) is True
-
-    settings.set_golden_hour_repeats(5)
-    assert settings.get_golden_hour_repeats() == 5
-    assert unified.get(GOLDEN_HOUR_REPEATS_KEY) == 5
 
     settings.set_golden_hour_macro("auto play")
     assert settings.get_golden_hour_macro() == "auto play"
@@ -54,9 +47,6 @@ try:
     # Test setting via UnifiedSettings
     unified.set("prioritize_golden_hour", False)
     assert settings.get_prioritize_golden_hour() is False
-
-    unified.set("golden_hour_repeats", 3)
-    assert settings.get_golden_hour_repeats() == 3
 
     unified.set("golden_hour_macro", "raid spirit")
     assert settings.get_golden_hour_macro() == "raid spirit"

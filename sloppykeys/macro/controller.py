@@ -2175,8 +2175,7 @@ class MacroController:
           2. Clicks the Gift Box (Slot 0) via `select_act("Story", "Golden Hour", prefer_golden=True)`.
           3. Starts the stage and waits for the match to be ready.
           4. Executes the configured Golden Hour macro (or fallback).
-          5. Repeats for `golden_hour_repeats` times via `click_repeat()`.
-          6. Returns to the lobby via `_back_to_lobby()`.
+          5. Returns to the lobby via `_back_to_lobby()`.
 
         Returns True if a Golden Hour run was executed, False otherwise.
         """
@@ -2267,66 +2266,43 @@ class MacroController:
         phases = op.get("phases", {})
         self._phases = phases
 
-        repeats = self._settings.get_golden_hour_repeats()
+        if self._checkpoint():
+            return True
 
-        for rep in range(repeats):
-            if self._checkpoint():
-                return True
+        self._log(f"  Golden Hour: running match with macro '{macro_name}'...")
 
-            self._log(
-                f"  Golden Hour: running match ({rep + 1}/{repeats}) with macro '{macro_name}'..."
-            )
+        # Pre Start (walk)
+        self._run_phase_linear(phases.get("pre_start", []))
+        self._kept_position = False
+        if self._checkpoint():
+            return True
 
-            # Pre Start (walk)
-            self._run_phase_linear(phases.get("pre_start", []))
-            self._kept_position = False
-            if self._checkpoint():
-                return True
+        # Start Game
+        self._placer.park()
+        ok, msg = self._nav.click_start_game()
+        if ok:
+            self._stats.start_stage()
+            self._log(f"  Start Game: {msg or 'ok'}")
+        else:
+            self._log(f"  Start Game failed: {msg}")
 
-            # Start Game
-            self._placer.park()
-            ok, msg = self._nav.click_start_game()
-            if ok:
-                self._stats.start_stage()
-                self._log(f"  Start Game: {msg or 'ok'}")
-            else:
-                self._log(f"  Start Game failed: {msg}")
+        if self._checkpoint():
+            return True
 
-            if self._checkpoint():
-                return True
+        # Battle + Loops
+        battle_blocks = phases.get("battle", [])
+        loop_a = phases.get("loop_a", [])
+        loop_b = phases.get("loop_b", [])
+        self._run_match(battle_blocks, loop_a, loop_b)
 
-            # Battle + Loops
-            battle_blocks = phases.get("battle", [])
-            loop_a = phases.get("loop_a", [])
-            loop_b = phases.get("loop_b", [])
-            self._run_match(battle_blocks, loop_a, loop_b)
+        if self._checkpoint():
+            return True
 
-            if self._checkpoint():
-                return True
+        self._cycle += 1
 
-            self._cycle += 1
-
-            more_reps = rep < repeats - 1
-            if more_reps:
-                self._log(
-                    f"  Golden Hour: match {rep + 1}/{repeats} complete — repeating stage..."
-                )
-                ok, msg = self._nav.click_repeat()
-                self._kept_position = bool(ok)
-                if not ok:
-                    self._log(f"  Repeat: {msg} — falling through to lobby.")
-                    ok_b, msg_b = self._back_to_lobby()
-                    self._log(f"  Back to lobby: {msg_b}")
-                    break
-                ok, msg = self._nav.wait_for_match_ready()
-                if not ok:
-                    self._log(f"  Golden Hour: wait ready after repeat failed: {msg}")
-                    break
-            else:
-                self._log(f"  Golden Hour: all {repeats} repeat(s) finished — returning to lobby.")
-                ok, msg = self._back_to_lobby()
-                self._log(f"  Back to lobby: {msg}")
-
+        self._log("  Golden Hour: match finished — returning to lobby.")
+        ok, msg = self._back_to_lobby()
+        self._log(f"  Back to lobby: {msg}")
         return True
 
     def _capture_screenshot(self) -> bytes | None:
