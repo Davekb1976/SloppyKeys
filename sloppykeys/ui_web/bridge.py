@@ -1239,7 +1239,8 @@ class Api:
         """The ordered task queue."""
         if not self._app_root:
             return []
-        return UnifiedSettings(self._app_root).get_tasks()
+        from sloppykeys.content.gamemodes import sanitize_task
+        return [sanitize_task(t) for t in UnifiedSettings(self._app_root).get_tasks()]
 
     # ---- Task Queue Presets ----
 
@@ -1338,6 +1339,8 @@ class Api:
 
         if not task.get("id"):
             task["id"] = f"t{int(_time.time() * 1000)}"
+        from sloppykeys.content.gamemodes import sanitize_task
+        sanitize_task(task)
         tasks = UnifiedSettings(self._app_root).get_tasks()
         tasks.append(task)
         ok = UnifiedSettings(self._app_root).set_tasks(tasks)
@@ -1347,11 +1350,13 @@ class Api:
         """Update fields on a task by id. Auto-saves."""
         if not self._app_root:
             return {"ok": False}
+        from sloppykeys.content.gamemodes import sanitize_task
         settings = UnifiedSettings(self._app_root)
         tasks = settings.get_tasks()
         for t in tasks:
             if t.get("id") == task_id:
                 t.update(changes)
+                sanitize_task(t)
                 return {"ok": settings.set_tasks(tasks)}
         return {"ok": False, "error": "not found"}
 

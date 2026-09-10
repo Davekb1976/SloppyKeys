@@ -101,7 +101,32 @@ payload = api.list_vision_templates()
 assert payload["default_threshold"] == DEFAULT_CONFIDENCE, payload["default_threshold"]
 for cat in payload["categories"]:
     for card in cat["names"]:
-        # Untouched templates report the default; this repo ships one tuned override.
         assert 0.50 <= card["threshold"] <= 1.0, card
+
+# # Sanitize tasks: clearing inapplicable fields across gamemode changes
+from sloppykeys.content.gamemodes import sanitize_task  # noqa: E402
+
+stale_portals = {
+    "mode": "Portals",
+    "map": "Summer",
+    "stage": "Infinite",
+    "difficulty": "Hard",
+    "extract_after": 5,
+    "leave_at_wave": 120,
+    "search": "sum",
+}
+cleaned = sanitize_task(dict(stale_portals))
+assert cleaned["stage"] == "", cleaned
+assert cleaned["difficulty"] == "", cleaned
+assert cleaned["extract_after"] == 0, cleaned
+assert cleaned["leave_at_wave"] == 0, cleaned
+assert cleaned["search"] == "sum", cleaned
+assert cleaned["map"] == "Summer", cleaned
+
+stale_challenge = {"mode": "Challenge", "map": "Summer", "stage": "Infinite", "difficulty": "Hard"}
+cleaned_chal = sanitize_task(dict(stale_challenge))
+assert cleaned_chal["map"] == "", cleaned_chal
+assert cleaned_chal["stage"] == "", cleaned_chal
+assert cleaned_chal["difficulty"] == "", cleaned_chal
 
 print("mode fields: OK")

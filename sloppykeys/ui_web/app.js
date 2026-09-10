@@ -625,18 +625,15 @@
       repeat: Math.max(1, parseInt(tbRepeat.value) || 1),
       macro: tbMacro.value,
     };
-    // Challenge reads its map off the panel, so it must not store one. The control is hidden
-    // for it but still held the last mode's value, and that stale map reached the run.
-    if (tbModeFields.map !== false) changes.map = tbMap.value;
     // Only the fields this mode has a control for, so a task can't carry a stage or a
     // difficulty its mode never offered — which is what made Expedition tasks store an
-    // empty stage and Raid tasks store an Easy/Hard nothing clicked.
-    if (tbModeFields.stage) changes.stage = tbStage.value;
-    if (tbModeFields.difficulty) changes.difficulty = tbDifficulty.value;
-    if (tbModeFields.extract) {
-      changes.extract_after = Math.max(1, parseInt(tbExtract.value) || 1);
-    }
-    if (tbModeFields.search_label) changes.search = tbSearch.value.trim();
+    // empty stage, Raid tasks store an Easy/Hard nothing clicked, and switching to Portals
+    // leave a stale Infinite stage.
+    changes.map = (tbModeFields.map !== false) ? tbMap.value : "";
+    changes.stage = tbModeFields.stage ? tbStage.value : "";
+    changes.difficulty = tbModeFields.difficulty ? tbDifficulty.value : "";
+    changes.extract_after = tbModeFields.extract ? Math.max(1, parseInt(tbExtract.value) || 1) : 0;
+    changes.search = tbModeFields.search_label ? tbSearch.value.trim() : "";
     changes.leave_at_wave = (tbMode.value === "Story" && tbStage.value === "Infinite")
       ? Math.max(0, parseInt(tbLeaveWave.value) || 0)
       : 0;

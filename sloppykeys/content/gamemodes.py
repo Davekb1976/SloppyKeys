@@ -242,3 +242,29 @@ def labels_for(gamemode_name: str) -> tuple[str, str]:
     if gamemode is None:
         return ("Map", "Act")
     return (gamemode.map_label, gamemode.target_label)
+
+
+def sanitize_task(task: dict) -> dict:
+    """Clear fields a task's gamemode does not use.
+
+    Prevents stale values from surviving a mode change in the Task Builder (e.g. Story Infinite
+    leaving stage="Infinite" on a Portals task).
+    """
+    mode = str(task.get("mode") or "").strip()
+    if not mode:
+        return task
+    if not has_targets(mode):
+        task["stage"] = ""
+    if is_side_task(mode):
+        task["map"] = ""
+    from sloppykeys.content.start_stage import has_difficulty
+    if not has_difficulty(mode):
+        task["difficulty"] = ""
+    if mode != "Expedition":
+        task["extract_after"] = 0
+    if not search_label(mode):
+        task["search"] = ""
+    if not (mode == "Story" and task.get("stage") == "Infinite"):
+        task["leave_at_wave"] = 0
+    return task
+

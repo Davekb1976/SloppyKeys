@@ -327,7 +327,8 @@ class MacroController:
     def _run(self) -> tuple[bool, str]:
         loop_pass = 0
         while not self._stop_requested:
-            tasks = UnifiedSettings(self._app_root).get_tasks()
+            from sloppykeys.content.gamemodes import sanitize_task
+            tasks = [sanitize_task(t) for t in UnifiedSettings(self._app_root).get_tasks()]
             if not tasks:
                 self._log("Task queue is empty.")
                 return (True, "queue empty")
@@ -428,7 +429,11 @@ class MacroController:
                     self._phases = phases
 
                     # Pre Start
-                    self._run_phase_linear(phases.get("pre_start", []))
+                    pre_start_blocks = list(phases.get("pre_start", []))
+                    if not any(b.get("type") == "walk_path" for b in pre_start_blocks):
+                        if not self._kept_position and default_walk_path(mode, map_name, stage):
+                            pre_start_blocks.insert(0, {"type": "walk_path", "mode": "auto"})
+                    self._run_phase_linear(pre_start_blocks)
                     # Consumed. Only the match tail knows whether the *next* one respawns, and
                     # it sets this again there — leaving it up would suppress the walk for the
                     # rest of the queue.
