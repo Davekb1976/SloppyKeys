@@ -724,9 +724,15 @@ class LobbyNavigator:
         coord: tuple[int, int],
         button: str = "left",
         count: int = 1,
+        park: bool = True,
     ) -> tuple[bool, str]:
         if not self._ahk.available():
             return (False, "AutoHotkey v2 not found")
+        park_point = (
+            (rect[0] + self.park_client[0], rect[1] + self.park_client[1])
+            if park
+            else None
+        )
         return self._ahk.run(
             nudge_click_script(
                 rect[0] + coord[0],
@@ -734,7 +740,7 @@ class LobbyNavigator:
                 button=button,
                 count=count,
                 # Park from the rect we already have rather than re-reading it.
-                park=(rect[0] + self.park_client[0], rect[1] + self.park_client[1]),
+                park=park_point,
             ),
             wait=True,
             timeout=8,
@@ -1129,6 +1135,10 @@ class LobbyNavigator:
                 "not typing a portal name into the game world",
             )
 
+        # The modal or tab was just opened/transitioned; wait for fade/slide animation to finish
+        # so Roblox does not swallow the search field click.
+        time.sleep(self.panel_fade_wait)
+
         # Where the field is, from Click Points. A measurement rather than a search, because the
         # two fields look the same and only their position tells them apart.
         field = search_coord(in_match=in_match)
@@ -1142,17 +1152,20 @@ class LobbyNavigator:
         rect = self._rect()
         if rect is None:
             return (False, "Roblox not found")
-        ok, message = self._click_client(rect, field)
+        # Click without parking: moving the cursor to (8, 8) right after clicking can break
+        # or cancel text box focus in Roblox.
+        ok, message = self._click_client(rect, field, park=False)
         if not ok:
             return (False, f"search field click failed: {message}")
         if not self._ahk.available():
             return (False, "AutoHotkey v2 not found")
-        # The click above parked the cursor at the corner, which does not take focus off a
-        # text field — focus follows the click, not the pointer.
-        # The timeout has to cover the script's own sleeps: it types one character at a time
-        # with a gap between, so a long name legitimately takes longer than a short one.
+        # Settle to ensure the field has acquired focus, then clear existing text, type,
+        # and press Enter to commit the search filter and release focus.
+        time.sleep(self.click_settle)
         ok, message = self._ahk.run(
-            type_text_script(wanted), wait=True, timeout=10.0 + len(wanted) * 0.1
+            type_text_script(wanted, clear=True, enter=True),
+            wait=True,
+            timeout=10.0 + len(wanted) * 0.1,
         )
         if not ok:
             return (False, f"typing '{wanted}' failed: {message}")

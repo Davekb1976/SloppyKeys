@@ -101,7 +101,7 @@ def navigator(confirm_after_typing: bool, ahk=None) -> LobbyNavigator:
         nav.trail.append(f"click:{match.label}@{match.center_x},{match.center_y}")
         return (True, f"clicked at {match.center_x},{match.center_y}")
 
-    def _click_client(rect, coord, button="left", count=1):
+    def _click_client(rect, coord, button="left", count=1, park=True):
         # The search field *and* the tile are both measured points now, so both arrive here and
         # the trail records coordinates rather than names — that is what tells them apart.
         nav.trail.append(f"blind:{coord[0]},{coord[1]}")

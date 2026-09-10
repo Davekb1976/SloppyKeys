@@ -93,13 +93,8 @@ def act_specs() -> list[tuple[str, str, str, tuple[int, int]]]:
     The gamemode is its own field because the editor groups by it: all of Story's acts are
     set from one screenshot of Story's act list, and the number of rows differs per mode.
     """
-    specs = [
+    return [
         (act_key(gamemode, act), gamemode, act, coord)
         for gamemode, acts in ACT_COORDS.items()
         for act, coord in acts.items()
     ]
-    # Golden Hour is clicked when active on Story stages
-    specs.append(
-        (act_key("Story", "Golden Hour"), "Story", "Golden Hour", (249, 233))
-    )
-    return specs

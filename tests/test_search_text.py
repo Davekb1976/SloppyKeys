@@ -102,5 +102,9 @@ assert type_gap_ms(30) > type_gap_ms(240), (type_gap_ms(30), type_gap_ms(240))
 assert "WinActivate" in script and "ExitApp(0)" in script
 # No mouse: typing must not move the cursor off the field that was just clicked.
 assert "MouseMove" not in script and "Click(" not in script
+# Clear prefix and enter suffix for text fields that need focus clearance
+script_full = type_text_script("Summer", clear=True, enter=True)
+assert 'Send("^a{Backspace}")' in script_full
+assert 'Send("{Enter}")' in script_full
 
 print("search text: OK")

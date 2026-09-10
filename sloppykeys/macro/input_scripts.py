@@ -345,7 +345,7 @@ Loop {times} {{
     return f"{_header(80)}{body}ExitApp(0)\n"
 
 
-def type_text_script(text: str) -> str:
+def type_text_script(text: str, clear: bool = False, enter: bool = False) -> str:
     """Type a string into whatever field the game currently has focused.
 
     Callers must pass text already validated by `config.keybinds.sanitize_search_text` —
@@ -368,12 +368,21 @@ def type_text_script(text: str) -> str:
     characters it happened to read. Same failure as a click landing on a stale cursor
     position, and the same fix: give the game frames, not milliseconds.
 
+    `clear=True` selects any existing text in the field with Ctrl+A and Backspaces it first.
+    `enter=True` sends `{Enter}` after the string is typed, committing the search filter
+    and cleanly dropping focus from the text box so subsequent clicks are not absorbed as defocus events.
+
     No mouse, so no nudge and no park. The gap goes *between* characters, never after the
     last — a trailing sleep would only delay `ExitApp` while Python already waits on the
     process.
     """
     gap = type_gap_ms()
     body = f"\nSleep({gap})\n".join(f'SendText("{character}")' for character in text)
+    if clear:
+        prefix = f'Send("^a{{Backspace}}")\nSleep({gap})\n'
+        body = prefix + body if body else f'Send("^a{{Backspace}}")'
+    if enter:
+        body = f'{body}\nSleep({gap})\nSend("{{Enter}}")'
     return f"""{_header()}
 {body}
 ExitApp(0)
