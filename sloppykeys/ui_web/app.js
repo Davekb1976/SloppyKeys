@@ -468,10 +468,13 @@
     taskList.innerHTML = tasks.map((t, i) => {
       const fields = modeFields[t.mode] || {};
       const isChallenge = t.mode === "Challenge";
+      const isStoryEvent = t.mode === "Story" && (t.stage === "Eclipse" || t.stage === "Golden Hour");
       // A Challenge card names no map or stage: it plays whichever of the three rows the
       // panel offers. A task saved before that was enforced still holds a stale one.
       const title = isChallenge
         ? "Challenge"
+        : isStoryEvent
+        ? `Story · ${t.stage}`
         : [t.mode, t.map, t.stage].filter(Boolean).join(" · ") || "Unconfigured";
       // Only what this mode actually uses. Every card read "<difficulty> · ×<repeat>", which
       // for Challenge named a difficulty it has no control for and a repeat the runner
@@ -484,6 +487,9 @@
         bits.push(on.length ? "slots " + on.join(" ") : "every slot off");
         const assigned = Object.keys(t.challenge_macros || {}).filter((m) => t.challenge_macros[m]);
         bits.push(assigned.length ? assigned.length + " map macro" + (assigned.length === 1 ? "" : "s") : "no macros assigned");
+      } else if (isStoryEvent) {
+        bits.push("Auto-Detect map");
+        bits.push(t.macro || "no macro assigned");
       } else {
         if (fields.difficulty && t.difficulty) bits.push(t.difficulty);
         bits.push("×" + (t.repeat || 1));
@@ -502,6 +508,12 @@
           badge = `<span class="task-card-badge task-card-badge--warn" data-tip="All challenge slots are disabled.&#10;Enable at least one slot in Task Builder.">Disabled</span>`;
         } else {
           badge = `<span class="task-card-badge" data-tip="Runs before the other tasks whenever a challenge&#10;is available, wherever it sits in this queue.&#10;The maps re-roll every :00 and :30.">Priority</span>`;
+        }
+      } else if (isStoryEvent) {
+        if (!t.macro) {
+          badge = `<span class="task-card-badge task-card-badge--warn" data-tip="No macro operation assigned.&#10;Character will not walk and units will not be placed.">No Macro</span>`;
+        } else {
+          badge = `<span class="task-card-badge" data-tip="Runs before other tasks every 30 minutes (:00 and :30)&#10;whenever ${t.stage} is active in Story stages.">Priority</span>`;
         }
       } else {
         const missingMap = !t.map;
@@ -544,14 +556,25 @@
     if (!tasks.length) {
       queueIssue = "Queue empty";
     } else {
+      let hasEclipse = false;
+      let hasGH = false;
       for (let i = 0; i < tasks.length; i++) {
         const t = tasks[i];
         const fields = modeFields[t.mode] || {};
         const isChal = t.mode === "Challenge";
+        const isStoryEvent = t.mode === "Story" && (t.stage === "Eclipse" || t.stage === "Golden Hour");
+        if (t.mode === "Story" && t.stage === "Eclipse") hasEclipse = true;
+        if (t.mode === "Story" && t.stage === "Golden Hour") hasGH = true;
+
         if (isChal) {
           const slots = t.challenge_slots || [true, true, true];
           if (!slots.some(Boolean)) {
             queueIssue = `Task ${i + 1}: All slots off`;
+            break;
+          }
+        } else if (isStoryEvent) {
+          if (!t.macro) {
+            queueIssue = `Task ${i + 1}: No macro`;
             break;
           }
         } else {
@@ -572,6 +595,9 @@
             break;
           }
         }
+      }
+      if (!queueIssue && hasEclipse && hasGH) {
+        queueIssue = "Both Eclipse & Golden Hour queued";
       }
     }
 
@@ -606,9 +632,12 @@
         const first = tasks[0];
         const f = modeFields[first.mode] || {};
         let firstIssue = null;
+        const firstIsEvent = first.mode === "Story" && (first.stage === "Eclipse" || first.stage === "Golden Hour");
         if (first.mode === "Challenge") {
           const slots = first.challenge_slots || [true, true, true];
           if (!slots.some(Boolean)) firstIssue = "All slots off";
+        } else if (firstIsEvent) {
+          if (!first.macro) firstIssue = "No macro";
         } else {
           if (!first.map) firstIssue = "No map";
           else if (f.stage && !first.stage) firstIssue = `No ${f.target_label || "act"}`;
@@ -622,6 +651,8 @@
         } else {
           const title = first.mode === "Challenge"
             ? "Challenge"
+            : firstIsEvent
+            ? `${first.mode} · ${first.stage}`
             : [first.mode, first.map, first.stage].filter(Boolean).join(" · ");
           statGamemode.textContent = title || "Ready";
           statGamemode.className = "status-value";
@@ -657,6 +688,7 @@
       applyModeFields(task.mode);
       tbMacro.value = task.macro || "";
       updateLeaveWaveVisibility(task.mode, task.stage);
+      updateStoryEventVisibility(task.mode, task.stage);
       updateMacroWarning();
     }
   }
@@ -665,6 +697,18 @@
     const isInfinite = (mode !== undefined ? mode : tbMode.value) === "Story" &&
                        (stage !== undefined ? stage : tbStage.value) === "Infinite";
     tbLeaveWaveRow.style.display = isInfinite ? "" : "none";
+  }
+
+  function updateStoryEventVisibility(mode, stage) {
+    const currentMode = mode !== undefined ? mode : tbMode.value;
+    const currentStage = stage !== undefined ? stage : tbStage.value;
+    const isEvent = currentMode === "Story" && (currentStage === "Eclipse" || currentStage === "Golden Hour");
+    const mapRow = document.getElementById("tb-map-row");
+    const diffRow = document.getElementById("tb-difficulty-row");
+    const repeatRow = document.getElementById("tb-repeat-row");
+    if (mapRow) mapRow.style.display = isEvent ? "none" : "";
+    if (diffRow) diffRow.style.display = isEvent ? "none" : (tbModeFields.difficulty ? "" : "none");
+    if (repeatRow) repeatRow.style.display = isEvent ? "none" : "";
   }
 
   // Show only the rows this gamemode can actually use. Every answer comes from `content/`
@@ -690,6 +734,7 @@
     tbExtractRow.style.display = f.extract ? "" : "none";
     tbSearchRow.style.display = f.search_label ? "" : "none";
     if (f.search_label) document.getElementById("tb-search-label").textContent = f.search_label;
+    updateStoryEventVisibility(mode, tbStage.value);
   }
 
   function showBuilderEmpty() {
@@ -716,19 +761,22 @@
   }
 
   async function loadStages(mode, map, selected) {
-    if (!window.pywebview || !pywebview.api || !mode || !map) {
+    if (!window.pywebview || !pywebview.api || !mode || (!map && mode !== "Story")) {
       tbStage.innerHTML = '<option value="">—</option>';
       updateLeaveWaveVisibility(mode, "");
+      updateStoryEventVisibility(mode, "");
       return;
     }
-    const stages = await pywebview.api.get_targets(mode, map);
+    const stages = await pywebview.api.get_targets(mode, map || "");
     if (!stages.length) {
       tbStage.innerHTML = '<option value="">—</option>';
       updateLeaveWaveVisibility(mode, "");
+      updateStoryEventVisibility(mode, "");
       return;
     }
     tbStage.innerHTML = '<option value="">—</option>' + stages.map((s) => `<option value="${s}"${s === selected ? " selected" : ""}>${s}</option>`).join("");
     updateLeaveWaveVisibility(mode, tbStage.value);
+    updateStoryEventVisibility(mode, tbStage.value);
   }
 
   // Difficulty means two different game controls: a 1-3 cycling button on Expedition, a
@@ -745,20 +793,21 @@
     return pick;
   }
 
-  function saveCurrentTask() {
+  async function saveCurrentTask() {
     if (!selectedTaskId || !window.pywebview || !pywebview.api) return;
+    const isStoryEvent = tbMode.value === "Story" && (tbStage.value === "Eclipse" || tbStage.value === "Golden Hour");
     const changes = {
       mode: tbMode.value,
-      repeat: Math.max(1, parseInt(tbRepeat.value) || 1),
+      repeat: isStoryEvent ? 1 : Math.max(1, parseInt(tbRepeat.value) || 1),
       macro: tbMacro.value,
     };
     // Only the fields this mode has a control for, so a task can't carry a stage or a
     // difficulty its mode never offered — which is what made Expedition tasks store an
     // empty stage, Raid tasks store an Easy/Hard nothing clicked, and switching to Portals
     // leave a stale Infinite stage.
-    changes.map = (tbModeFields.map !== false) ? tbMap.value : "";
+    changes.map = isStoryEvent ? "Auto-Detect" : ((tbModeFields.map !== false) ? tbMap.value : "");
     changes.stage = tbModeFields.stage ? tbStage.value : "";
-    changes.difficulty = tbModeFields.difficulty ? tbDifficulty.value : "";
+    changes.difficulty = isStoryEvent ? "" : (tbModeFields.difficulty ? tbDifficulty.value : "");
     changes.extract_after = tbModeFields.extract ? Math.max(1, parseInt(tbExtract.value) || 1) : 0;
     changes.search = tbModeFields.search_label ? tbSearch.value.trim() : "";
     changes.leave_at_wave = (tbMode.value === "Story" && tbStage.value === "Infinite")
@@ -773,6 +822,17 @@
         document.getElementById("tb-chal-slot2")?.classList.contains("on") !== false,
         document.getElementById("tb-chal-slot3")?.classList.contains("on") !== false,
       ];
+    }
+    // Mutual exclusivity: only one Story Event prioritized in the queue at a time
+    if (isStoryEvent) {
+      const otherAct = tbStage.value === "Eclipse" ? "Golden Hour" : "Eclipse";
+      const otherTask = tasks.find(x => x.id !== selectedTaskId && x.mode === "Story" && x.stage === otherAct);
+      if (otherTask) {
+        await pywebview.api.delete_task(otherTask.id);
+        const idx = tasks.findIndex(x => x.id === otherTask.id);
+        if (idx !== -1) tasks.splice(idx, 1);
+        if (window.addLog) window.addLog(`[Queue] Replaced ${otherAct} with ${tbStage.value} (only one Story Event can be prioritized).`);
+      }
     }
     pywebview.api.update_task(selectedTaskId, changes).then(() => {
       const t = tasks.find((x) => x.id === selectedTaskId);
@@ -812,6 +872,7 @@
   });
   tbStage.addEventListener("change", () => {
     updateLeaveWaveVisibility(tbMode.value, tbStage.value);
+    updateStoryEventVisibility(tbMode.value, tbStage.value);
     saveCurrentTask();
   });
   tbDifficulty.addEventListener("change", saveCurrentTask);

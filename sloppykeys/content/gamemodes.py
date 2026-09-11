@@ -21,8 +21,19 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-# Story acts run 1-5 plus two special acts shown as icons in game.
-STORY_ACTS = ["Act 1", "Act 2", "Act 3", "Act 4", "Act 5", "Infinite", "Mastery"]
+STORY_EVENT_ACTS = ("Eclipse", "Golden Hour")
+# Story acts list Eclipse and Golden Hour first, followed by acts 1-5, Infinite, and Mastery.
+STORY_ACTS = [
+    "Eclipse",
+    "Golden Hour",
+    "Act 1",
+    "Act 2",
+    "Act 3",
+    "Act 4",
+    "Act 5",
+    "Infinite",
+    "Mastery",
+]
 # In in-game order. Named because Challenge draws from the same Story maps, and
 # two copies of the list would drift apart.
 STORY_MAPS = [
@@ -267,6 +278,10 @@ def sanitize_task(task: dict) -> dict:
         task["search"] = ""
     if not (mode == "Story" and task.get("stage") == "Infinite"):
         task["leave_at_wave"] = 0
+    if mode == "Story" and task.get("stage") in STORY_EVENT_ACTS:
+        task["map"] = "Auto-Detect"
+        task["difficulty"] = ""
+        task["repeat"] = 1
     return task
 
 
@@ -291,15 +306,18 @@ def validate_task(task: dict, app_root: Path | str | None = None) -> str | None:
             return "all challenge slots are disabled"
         return None
 
-    # Farm gamemodes require a map
+    # Story event tasks (Eclipse, Golden Hour) rotate maps dynamically every 30 mins
+    stage = str(task.get("stage") or "").strip()
+    is_story_event = mode == "Story" and stage in STORY_EVENT_ACTS
+
+    # Farm gamemodes require a map (except Story event tasks which auto-detect)
     map_name = str(task.get("map") or "").strip()
-    if not map_name:
+    if not map_name and not is_story_event:
         map_lbl, _ = labels_for(mode)
         return f"{map_lbl.lower()} is required"
 
     # Gamemodes with acts/targets require an act/stage
     if has_targets(mode):
-        stage = str(task.get("stage") or "").strip()
         if not stage:
             _, target_lbl = labels_for(mode)
             return f"{target_lbl.lower()} is required"
@@ -330,6 +348,17 @@ def validate_task_queue(tasks: list[dict], app_root: Path | str | None = None) -
     """
     if not tasks:
         return "task queue is empty"
+
+    has_eclipse = any(
+        isinstance(t, dict) and t.get("mode") == "Story" and t.get("stage") == "Eclipse"
+        for t in tasks
+    )
+    has_gh = any(
+        isinstance(t, dict) and t.get("mode") == "Story" and t.get("stage") == "Golden Hour"
+        for t in tasks
+    )
+    if has_eclipse and has_gh:
+        return "only one Story Event (Eclipse or Golden Hour) can be prioritized at a time"
 
     for i, t in enumerate(tasks, 1):
         err = validate_task(t, app_root=app_root)

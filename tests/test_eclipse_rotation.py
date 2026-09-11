@@ -74,6 +74,14 @@ try:
     t_11_00 = datetime(2026, 9, 9, 11, 0, 0)
     assert ctrl._eclipse_wants_in(t_11_00) is True, "Must want in when crossing into :00 boundary"
 
+    # 4. Queue-based task check
+    ctrl._settings.get_prioritize_eclipse.return_value = False
+    ctrl._eclipse_played_interval = None
+    ctrl._eclipse_attempted_interval = None
+    ctrl._tasks = [{"mode": "Story", "stage": "Eclipse", "macro": "ec_op"}]
+    assert ctrl._eclipse_wants_in(t_11_00) is True, "Must want in when Story Eclipse task is queued"
+    assert ctrl._eclipse_task()["macro"] == "ec_op"
+
 finally:
     os.path.isfile = orig_isfile
 

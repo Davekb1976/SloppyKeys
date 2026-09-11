@@ -133,7 +133,8 @@ with tempfile.TemporaryDirectory() as root:
     assert slot_coord(1) == (640, 300), slot_coord(1)
     assert api.set_vision_point("start.Story.hard_mode", 55, 66)["ok"]
     assert start_coords("Story")["hard_mode"] == (55, 66)
-    assert api.list_vision_points()["groups"][0]["points"][0]["edited"] is True
+    act1_pt = next(p for p in api.list_vision_points()["groups"][0]["points"] if p["key"] == "act.Story.Act 1")
+    assert act1_pt["edited"] is True
 
     # # A fresh process reads them back through the same path startup uses
     reloaded = build(root)

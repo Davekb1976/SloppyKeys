@@ -385,7 +385,7 @@
                     </div>
                     <input type="text" class="setting-input" id="tb-search" maxlength="40" placeholder="Portal name" style="width:140px;">
                   </div>
-                  <div class="setting-row">
+                  <div class="setting-row" id="tb-repeat-row">
                     <div class="setting-info"><span class="setting-label">Repeat</span></div>
                     <input type="number" class="setting-input" id="tb-repeat" min="1" max="999" value="1" style="width:70px;">
                   </div>
@@ -470,7 +470,6 @@
         <input type="text" class="settings-search" id="settings-search" placeholder="Search...">
         <button class="settings-nav-btn active" data-cat="all">All</button>
         <button class="settings-nav-btn" data-cat="general">General</button>
-        <button class="settings-nav-btn" data-cat="story-events">Story Events</button>
         <button class="settings-nav-btn" data-cat="hotkeys">Hotkeys</button>
         <button class="settings-nav-btn" data-cat="delays">Delays</button>
         <button class="settings-nav-btn" data-cat="webhook">Webhook</button>
@@ -519,48 +518,6 @@
                  changed no timing, so a user slowing the macro down got no slower macro. The
                  waits that are real are in Settings > Delays, each named for the step it
                  governs — a blanket pause after every click is not one of them. -->
-          </div>
-        </div>
-
-        <!-- Story Events -->
-        <div class="settings-category" data-cat="story-events">
-          <div class="page-header">
-            <span class="page-title">Story Events</span>
-            <span class="page-subtitle" style="margin-left:8px; font-size:10px; color:var(--text-faint);">30-minute rotating events on Story stages</span>
-          </div>
-          <div class="setting-group">
-            <div class="setting-row">
-              <div class="setting-info">
-                <span class="setting-name">Prioritize Golden Hour</span>
-                <span class="setting-desc">Scan Story stages for Golden Hour and run it before queued tasks</span>
-              </div>
-              <label class="check check--lg"><input type="checkbox" id="s-prioritize-golden-hour" data-key="prioritize_golden_hour"><span class="check-box"></span></label>
-            </div>
-            <div class="setting-row">
-              <div class="setting-info">
-                <span class="setting-name">Prioritize Eclipse</span>
-                <span class="setting-desc">Scan Story stages for Eclipse and run it before queued tasks</span>
-              </div>
-              <label class="check check--lg"><input type="checkbox" id="s-prioritize-eclipse" data-key="prioritize_eclipse"><span class="check-box"></span></label>
-            </div>
-            <div class="setting-row">
-              <div class="setting-info">
-                <span class="setting-name">Golden Hour Macro</span>
-                <span class="setting-desc">Macro operation to run during Golden Hour matches</span>
-              </div>
-              <select class="setting-select" id="s-golden-hour-macro" data-key="golden_hour_macro">
-                <option value="">Default (Current Task Macro)</option>
-              </select>
-            </div>
-            <div class="setting-row">
-              <div class="setting-info">
-                <span class="setting-name">Eclipse Macro</span>
-                <span class="setting-desc">Macro operation to run during Eclipse matches</span>
-              </div>
-              <select class="setting-select" id="s-eclipse-macro" data-key="eclipse_macro">
-                <option value="">Default (Current Task Macro)</option>
-              </select>
-            </div>
           </div>
         </div>
 

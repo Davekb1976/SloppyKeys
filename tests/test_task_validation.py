@@ -41,12 +41,25 @@ assert validate_task({"mode": "Challenge", "challenge_slots": [True, False, Fals
 # 6. Operation existence check when app_root provided
 assert validate_task({"mode": "Story", "map": "School Grounds", "stage": "Act 1", "macro": "non_existent_op_12345"}, app_root=app_root) == "macro operation 'non_existent_op_12345' not found"
 
-# 7. Multi-task queue validation
+# 7. Story Event task validation (Eclipse and Golden Hour rotate maps dynamically)
+assert validate_task({"mode": "Story", "map": "", "stage": "Eclipse", "macro": ""}) == "macro operation is required"
+assert validate_task({"mode": "Story", "map": "", "stage": "Golden Hour", "macro": ""}) == "macro operation is required"
+assert validate_task({"mode": "Story", "map": "", "stage": "Eclipse", "macro": "auto play"}, app_root=app_root) is None
+assert validate_task({"mode": "Story", "map": "", "stage": "Golden Hour", "macro": "auto play"}, app_root=app_root) is None
+
+# 8. Multi-task queue validation
 queue = [
     {"mode": "Challenge", "challenge_slots": [True, True, True]},
     {"mode": "Story", "map": "East Town", "stage": "", "macro": "auto play"},
 ]
 err = validate_task_queue(queue, app_root=app_root)
 assert err == "Task 2 (Story): act is required", f"Expected Task 2 error, got: {err}"
+
+# 9. Story Event mutual exclusivity in queue
+dual_event_queue = [
+    {"mode": "Story", "map": "", "stage": "Eclipse", "macro": "auto play"},
+    {"mode": "Story", "map": "", "stage": "Golden Hour", "macro": "auto play"},
+]
+assert validate_task_queue(dual_event_queue, app_root=app_root) == "only one Story Event (Eclipse or Golden Hour) can be prioritized at a time"
 
 print("task validation: OK")

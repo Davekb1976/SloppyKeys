@@ -74,6 +74,14 @@ try:
     t_11_00 = datetime(2026, 9, 9, 11, 0, 0)
     assert ctrl._golden_hour_wants_in(t_11_00) is True, "Must want in when crossing into :00 boundary"
 
+    # 4. Queue-based task check
+    ctrl._settings.get_prioritize_golden_hour.return_value = False
+    ctrl._golden_hour_played_interval = None
+    ctrl._golden_hour_attempted_interval = None
+    ctrl._tasks = [{"mode": "Story", "stage": "Golden Hour", "macro": "gh_op"}]
+    assert ctrl._golden_hour_wants_in(t_11_00) is True, "Must want in when Story Golden Hour task is queued"
+    assert ctrl._golden_hour_task()["macro"] == "gh_op"
+
 finally:
     os.path.isfile = orig_isfile
 

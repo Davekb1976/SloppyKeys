@@ -338,6 +338,7 @@ class MacroController:
         while not self._stop_requested:
             from sloppykeys.content.gamemodes import sanitize_task
             tasks = [sanitize_task(t) for t in UnifiedSettings(self._app_root).get_tasks()]
+            self._tasks = tasks
             if not tasks:
                 self._log("Task queue is empty.")
                 return (True, "queue empty")
@@ -347,11 +348,11 @@ class MacroController:
                 self._log(f"Queue finished — restarting (pass {loop_pass}).")
 
             # If Golden Hour or Eclipse is prioritized, scan Story stages before beginning the queue pass
-            if self._golden_hour_wants_in():
+            if self._golden_hour_wants_in(tasks=tasks):
                 self._run_golden_hour_detour()
                 if self._checkpoint():
                     return (True, f"stopped after {self._cycle} cycles")
-            if self._eclipse_wants_in():
+            if self._eclipse_wants_in(tasks=tasks):
                 self._run_eclipse_detour()
                 if self._checkpoint():
                     return (True, f"stopped after {self._cycle} cycles")
@@ -374,10 +375,20 @@ class MacroController:
                 if mode == "Challenge":
                     if self._challenge_wants_in(task):
                         self._run_challenge_task(task)
-                    if self._golden_hour_wants_in():
+                    if self._golden_hour_wants_in(tasks=tasks):
                         self._run_golden_hour_detour()
-                    if self._eclipse_wants_in():
+                    if self._eclipse_wants_in(tasks=tasks):
                         self._run_eclipse_detour()
+                    if self._checkpoint():
+                        return (True, f"stopped after {self._cycle} cycles")
+                    continue
+
+                # Story Event tasks (Eclipse, Golden Hour) are standing priority detours.
+                if mode == "Story" and stage in ("Eclipse", "Golden Hour"):
+                    if stage == "Eclipse" and self._eclipse_wants_in(tasks=tasks):
+                        self._run_eclipse_detour()
+                    elif stage == "Golden Hour" and self._golden_hour_wants_in(tasks=tasks):
+                        self._run_golden_hour_detour()
                     if self._checkpoint():
                         return (True, f"stopped after {self._cycle} cycles")
                     continue
@@ -398,13 +409,13 @@ class MacroController:
                         if self._checkpoint():
                             return (True, f"stopped after {self._cycle} cycles")
 
-                    if self._golden_hour_wants_in():
+                    if self._golden_hour_wants_in(tasks=tasks):
                         self._log("  Golden Hour available — taking it before this match.")
                         self._run_golden_hour_detour()
                         if self._checkpoint():
                             return (True, f"stopped after {self._cycle} cycles")
 
-                    if self._eclipse_wants_in():
+                    if self._eclipse_wants_in(tasks=tasks):
                         self._log("  Eclipse available — taking it before this match.")
                         self._run_eclipse_detour()
                         if self._checkpoint():
@@ -498,13 +509,13 @@ class MacroController:
                                 "  Challenge is due — ending this rep here rather than "
                                 "starting the next match."
                             )
-                        elif self._golden_hour_wants_in():
+                        elif self._golden_hour_wants_in(tasks=tasks):
                             more_reps = False
                             self._log(
                                 "  Golden Hour is due — ending this rep here rather than "
                                 "starting the next match."
                             )
-                        elif self._eclipse_wants_in():
+                        elif self._eclipse_wants_in(tasks=tasks):
                             more_reps = False
                             self._log(
                                 "  Eclipse is due — ending this rep here rather than "
@@ -537,14 +548,24 @@ class MacroController:
                             self._log(f"  Repeat: {msg} — falling through.")
 
                 # Task completed all repeats. If Golden Hour or Eclipse is prioritized, check detour.
-                if self._golden_hour_wants_in():
+                if self._golden_hour_wants_in(tasks=tasks):
                     self._run_golden_hour_detour()
                     if self._checkpoint():
                         return (True, f"stopped after {self._cycle} cycles")
-                if self._eclipse_wants_in():
+                if self._eclipse_wants_in(tasks=tasks):
                     self._run_eclipse_detour()
                     if self._checkpoint():
                         return (True, f"stopped after {self._cycle} cycles")
+
+            # If the queue has only priority/standing tasks (Challenge or Story Events)
+            # and none are due right now, rest briefly so we don't spin in a busy loop.
+            has_linear = any(
+                t.get("mode") != "Challenge"
+                and not (t.get("mode") == "Story" and t.get("stage") in ("Eclipse", "Golden Hour"))
+                for t in tasks
+            )
+            if not has_linear:
+                time.sleep(2.0)
 
         return (True, f"stopped after {self._cycle} cycles")
 
@@ -1908,6 +1929,34 @@ class MacroController:
                 return task
         return None
 
+    def _eclipse_task(self, tasks: list | None = None) -> dict | None:
+        """The queued Story Eclipse task, or None."""
+        task_list = tasks if tasks is not None else getattr(self, "_tasks", None)
+        if task_list is None and hasattr(self, "_app_root"):
+            from sloppykeys.config.unified import UnifiedSettings
+
+            task_list = UnifiedSettings(self._app_root).get_tasks()
+        if not task_list:
+            return None
+        for task in task_list:
+            if isinstance(task, dict) and task.get("mode") == "Story" and task.get("stage") == "Eclipse":
+                return task
+        return None
+
+    def _golden_hour_task(self, tasks: list | None = None) -> dict | None:
+        """The queued Story Golden Hour task, or None."""
+        task_list = tasks if tasks is not None else getattr(self, "_tasks", None)
+        if task_list is None and hasattr(self, "_app_root"):
+            from sloppykeys.config.unified import UnifiedSettings
+
+            task_list = UnifiedSettings(self._app_root).get_tasks()
+        if not task_list:
+            return None
+        for task in task_list:
+            if isinstance(task, dict) and task.get("mode") == "Story" and task.get("stage") == "Golden Hour":
+                return task
+        return None
+
     def _challenge_playable(self, task: dict) -> list:
         """Rows this task could run right now, from the last scan.
 
@@ -2249,16 +2298,18 @@ class MacroController:
         # had drawn or not, and it proved nothing either way.
         return True
 
-    def _golden_hour_wants_in(self, now: datetime | None = None) -> bool:
+    def _golden_hour_wants_in(self, now: datetime | None = None, tasks: list | None = None) -> bool:
         """Should Golden Hour run before the next match or queue pass?
 
         Golden Hour re-rolls every 30 minutes on :00 and :30 boundaries.
         It is non-repeatable: once played or attempted without finding a badge
         in the current rotation, it rests until the clock crosses the next boundary.
         """
-        settings = getattr(self, "_settings", None)
-        if settings is None or not settings.get_prioritize_golden_hour():
-            return False
+        gh_task = self._golden_hour_task(tasks)
+        if gh_task is None:
+            settings = getattr(self, "_settings", None)
+            if settings is None or not getattr(settings, "get_prioritize_golden_hour", lambda: False)():
+                return False
 
         from sloppykeys.content.nav_images import golden_hour_image
 
@@ -2361,8 +2412,13 @@ class MacroController:
         self._ensure_camera()
 
         # Load operation
-        gh_macro = self._settings.get_golden_hour_macro()
-        macro_name = gh_macro or ((self._current_task or {}).get("macro", "")) or "auto play"
+        gh_task = self._golden_hour_task()
+        macro_name = (
+            (gh_task and gh_task.get("macro"))
+            or (self._settings and getattr(self._settings, "get_golden_hour_macro", lambda: "")())
+            or ((self._current_task or {}).get("macro", ""))
+            or "auto play"
+        )
         op = load_operation(self._app_root, macro_name)
         phases = op.get("phases", {})
         self._phases = phases
@@ -2407,16 +2463,18 @@ class MacroController:
         self._log(f"  Back to lobby: {msg}")
         return True
 
-    def _eclipse_wants_in(self, now: datetime | None = None) -> bool:
+    def _eclipse_wants_in(self, now: datetime | None = None, tasks: list | None = None) -> bool:
         """Should Eclipse run before the next match or queue pass?
 
         Eclipse re-rolls every 30 minutes on :00 and :30 boundaries.
         It is non-repeatable: once played or attempted without finding a badge
         in the current rotation, it rests until the clock crosses the next boundary.
         """
-        settings = getattr(self, "_settings", None)
-        if settings is None or not settings.get_prioritize_eclipse():
-            return False
+        ec_task = self._eclipse_task(tasks)
+        if ec_task is None:
+            settings = getattr(self, "_settings", None)
+            if settings is None or not getattr(settings, "get_prioritize_eclipse", lambda: False)():
+                return False
 
         from sloppykeys.content.nav_images import eclipse_act_image, eclipse_image
 
@@ -2521,8 +2579,13 @@ class MacroController:
         self._ensure_camera()
 
         # Load operation
-        ec_macro = self._settings.get_eclipse_macro()
-        macro_name = ec_macro or ((self._current_task or {}).get("macro", "")) or "auto play"
+        ec_task = self._eclipse_task()
+        macro_name = (
+            (ec_task and ec_task.get("macro"))
+            or (self._settings and getattr(self._settings, "get_eclipse_macro", lambda: "")())
+            or ((self._current_task or {}).get("macro", ""))
+            or "auto play"
+        )
         op = load_operation(self._app_root, macro_name)
         phases = op.get("phases", {})
         self._phases = phases

@@ -701,7 +701,30 @@ class LobbyNavigator:
             elif os.path.isfile(eclipse_image()):
                 eclipse_match = self._find(eclipse_image(), timeout=0.5 if prefer_eclipse else 0.0)
 
-        if prefer_eclipse and eclipse_match is not None:
+        if act == "Eclipse":
+            if eclipse_match is not None:
+                ok, message = self._click(eclipse_match)
+                return (
+                    (True, f"clicked Eclipse ({eclipse_match.score:.2f})")
+                    if ok
+                    else (False, f"Eclipse click failed: {message}")
+                )
+            target_label = "Eclipse"
+            coord = (249, 233)
+
+        elif act == "Golden Hour":
+            if golden_match is not None:
+                ok, message = self._click(golden_match)
+                return (
+                    (True, f"clicked Golden Hour ({golden_match.score:.2f})")
+                    if ok
+                    else (False, f"Golden Hour click failed: {message}")
+                )
+            # When Eclipse is also on the same stage, Golden Hour sits at slot 1.
+            coord = (250, 287) if eclipse_match is not None else (249, 233)
+            target_label = "Golden Hour"
+
+        elif prefer_eclipse and eclipse_match is not None:
             ok, message = self._click(eclipse_match)
             return (
                 (True, f"clicked Eclipse ({eclipse_match.score:.2f})")
@@ -709,7 +732,7 @@ class LobbyNavigator:
                 else (False, f"Eclipse click failed: {message}")
             )
 
-        if prefer_golden and golden_match is not None:
+        elif prefer_golden and golden_match is not None:
             ok, message = self._click(golden_match)
             return (
                 (True, f"clicked Golden Hour ({golden_match.score:.2f})")
@@ -717,7 +740,15 @@ class LobbyNavigator:
                 else (False, f"Golden Hour click failed: {message}")
             )
 
-        if not prefer_golden and not prefer_eclipse:
+        elif prefer_golden:
+            target_label = f"{act} (Golden Hour inactive)"
+            coord = act_coord(gamemode, act)
+
+        elif prefer_eclipse:
+            target_label = f"{act} (Eclipse inactive)"
+            coord = act_coord(gamemode, act)
+
+        else:
             target_label = act
             if golden_match is not None or eclipse_match is not None:
                 # An event act is active, but a normal act is requested.
@@ -725,15 +756,6 @@ class LobbyNavigator:
                 notches = 10 if (golden_match is not None and eclipse_match is not None) else 6
                 self._scroll_at((249, 350), notches=notches)
                 time.sleep(self.scroll_settle)
-            coord = act_coord(gamemode, act)
-        elif prefer_golden:
-            target_label = f"{act} (Golden Hour inactive)"
-            coord = golden_hour_act_coord("Story", "Golden Hour") or act_coord(gamemode, act)
-        elif prefer_eclipse:
-            target_label = f"{act} (Eclipse inactive)"
-            coord = act_coord(gamemode, act)
-        else:
-            target_label = act
             coord = act_coord(gamemode, act)
 
         if coord is None:
