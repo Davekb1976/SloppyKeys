@@ -44,8 +44,19 @@ assert validate_task({"mode": "Story", "map": "School Grounds", "stage": "Act 1"
 # 7. Story Event task validation (Eclipse and Golden Hour rotate maps dynamically)
 assert validate_task({"mode": "Story", "map": "", "stage": "Eclipse", "macro": ""}) == "macro operation is required"
 assert validate_task({"mode": "Story", "map": "", "stage": "Golden Hour", "macro": ""}) == "macro operation is required"
-assert validate_task({"mode": "Story", "map": "", "stage": "Eclipse", "macro": "auto play"}, app_root=app_root) is None
-assert validate_task({"mode": "Story", "map": "", "stage": "Golden Hour", "macro": "auto play"}, app_root=app_root) is None
+assert validate_task({"mode": "Story", "map": "", "stage": "Eclipse", "macro": "auto play"}) is None
+assert validate_task({"mode": "Story", "map": "", "stage": "Golden Hour", "macro": "auto play"}) is None
+
+# Hermetic check with temporary operations folder
+import tempfile
+from pathlib import Path
+
+with tempfile.TemporaryDirectory() as tmp:
+    ops = Path(tmp) / "operations"
+    ops.mkdir()
+    (ops / "test_op.json").write_text("{}", encoding="utf-8")
+    assert validate_task({"mode": "Story", "map": "", "stage": "Eclipse", "macro": "test_op"}, app_root=tmp) is None
+    assert validate_task({"mode": "Story", "map": "", "stage": "Golden Hour", "macro": "test_op"}, app_root=tmp) is None
 
 # 8. Multi-task queue validation
 queue = [
@@ -60,6 +71,6 @@ dual_event_queue = [
     {"mode": "Story", "map": "", "stage": "Eclipse", "macro": "auto play"},
     {"mode": "Story", "map": "", "stage": "Golden Hour", "macro": "auto play"},
 ]
-assert validate_task_queue(dual_event_queue, app_root=app_root) == "only one Story Event (Eclipse or Golden Hour) can be prioritized at a time"
+assert validate_task_queue(dual_event_queue) == "only one Story Event (Eclipse or Golden Hour) can be prioritized at a time"
 
 print("task validation: OK")
