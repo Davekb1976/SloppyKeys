@@ -634,11 +634,7 @@ class LobbyNavigator:
         """
         path = eclipse_image()
         if not os.path.isfile(path):
-            gh_path = golden_hour_image()
-            if os.path.isfile(gh_path):
-                path = gh_path
-            else:
-                return (False, f"Eclipse template ({path}) not found")
+            return (False, f"Eclipse template ({path}) not found")
 
         self._park()
         if self.panel_fade_wait > 0:
@@ -689,17 +685,21 @@ class LobbyNavigator:
         golden_match = None
         eclipse_match = None
         if gamemode == "Story":
+            fade = getattr(self, "panel_fade_wait", 0.0)
+            if fade > 0:
+                time.sleep(min(fade, 0.4))
+
             act_path = golden_hour_act_image()
             if os.path.isfile(act_path):
-                golden_match = self._find(act_path, timeout=0.0)
+                golden_match = self._find(act_path, timeout=0.5 if prefer_golden else 0.0)
             elif os.path.isfile(golden_hour_image()):
-                golden_match = self._find(golden_hour_image(), timeout=0.0)
+                golden_match = self._find(golden_hour_image(), timeout=0.5 if prefer_golden else 0.0)
 
             ec_act_path = eclipse_act_image()
             if os.path.isfile(ec_act_path):
-                eclipse_match = self._find(ec_act_path, timeout=0.0)
+                eclipse_match = self._find(ec_act_path, timeout=0.5 if prefer_eclipse else 0.0)
             elif os.path.isfile(eclipse_image()):
-                eclipse_match = self._find(eclipse_image(), timeout=0.0)
+                eclipse_match = self._find(eclipse_image(), timeout=0.5 if prefer_eclipse else 0.0)
 
         if prefer_eclipse and eclipse_match is not None:
             ok, message = self._click(eclipse_match)
@@ -722,7 +722,8 @@ class LobbyNavigator:
             if golden_match is not None or eclipse_match is not None:
                 # An event act is active, but a normal act is requested.
                 # Scroll down so the event cards scroll off the top.
-                self._scroll_at((249, 350), notches=6)
+                notches = 10 if (golden_match is not None and eclipse_match is not None) else 6
+                self._scroll_at((249, 350), notches=notches)
                 time.sleep(self.scroll_settle)
             coord = act_coord(gamemode, act)
         elif prefer_golden:

@@ -91,6 +91,37 @@ try:
     assert ok is True
     assert "clicked Eclipse" in msg
     assert nav._click.called
+
+    # 6. Prioritization disabled (prefer_eclipse=False, prefer_golden=False) with Eclipse active:
+    # Must scroll down 6 notches so normal acts line up
+    nav._find = MagicMock(side_effect=lambda p, **kw: mock_act_match if "eclipse" in p else None)
+    nav._scroll_at = MagicMock(return_value=(True, ""))
+    nav._ahk.run.reset_mock()
+    ok, msg = nav.select_act("Story", "Act 1", prefer_eclipse=False, prefer_golden=False)
+    assert ok is True
+    assert msg == "clicked Act 1"
+    assert nav._scroll_at.called
+    assert nav._scroll_at.call_args[1]["notches"] == 6
+
+    # 7. Prioritization disabled with BOTH Golden Hour and Eclipse active:
+    # Must scroll down 10 notches to clear both event cards
+    nav._find = MagicMock(return_value=mock_act_match)  # matches both
+    nav._scroll_at.reset_mock()
+    ok, msg = nav.select_act("Story", "Act 1", prefer_eclipse=False, prefer_golden=False)
+    assert ok is True
+    assert msg == "clicked Act 1"
+    assert nav._scroll_at.called
+    assert nav._scroll_at.call_args[1]["notches"] == 10
+
+    # 8. Prioritization disabled with NEITHER event active:
+    # Must NOT scroll at all
+    nav._find = MagicMock(return_value=None)
+    nav._scroll_at.reset_mock()
+    ok, msg = nav.select_act("Story", "Act 1", prefer_eclipse=False, prefer_golden=False)
+    assert ok is True
+    assert msg == "clicked Act 1"
+    assert not nav._scroll_at.called, "Must NOT scroll when neither event is detected"
+
 finally:
     os.path.isfile = orig_isfile
 
