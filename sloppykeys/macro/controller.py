@@ -347,13 +347,13 @@ class MacroController:
             if loop_pass > 1:
                 self._log(f"Queue finished — restarting (pass {loop_pass}).")
 
-            # If Golden Hour or Eclipse is prioritized, scan Story stages before beginning the queue pass
-            if self._golden_hour_wants_in(tasks=tasks):
-                self._run_golden_hour_detour()
-                if self._checkpoint():
-                    return (True, f"stopped after {self._cycle} cycles")
+            # If Eclipse or Golden Hour is prioritized, scan Story stages before beginning the queue pass
             if self._eclipse_wants_in(tasks=tasks):
                 self._run_eclipse_detour()
+                if self._checkpoint():
+                    return (True, f"stopped after {self._cycle} cycles")
+            if self._golden_hour_wants_in(tasks=tasks):
+                self._run_golden_hour_detour()
                 if self._checkpoint():
                     return (True, f"stopped after {self._cycle} cycles")
 
@@ -375,10 +375,10 @@ class MacroController:
                 if mode == "Challenge":
                     if self._challenge_wants_in(task):
                         self._run_challenge_task(task)
-                    if self._golden_hour_wants_in(tasks=tasks):
-                        self._run_golden_hour_detour()
                     if self._eclipse_wants_in(tasks=tasks):
                         self._run_eclipse_detour()
+                    if self._golden_hour_wants_in(tasks=tasks):
+                        self._run_golden_hour_detour()
                     if self._checkpoint():
                         return (True, f"stopped after {self._cycle} cycles")
                     continue
@@ -409,15 +409,15 @@ class MacroController:
                         if self._checkpoint():
                             return (True, f"stopped after {self._cycle} cycles")
 
-                    if self._golden_hour_wants_in(tasks=tasks):
-                        self._log("  Golden Hour available — taking it before this match.")
-                        self._run_golden_hour_detour()
-                        if self._checkpoint():
-                            return (True, f"stopped after {self._cycle} cycles")
-
                     if self._eclipse_wants_in(tasks=tasks):
                         self._log("  Eclipse available — taking it before this match.")
                         self._run_eclipse_detour()
+                        if self._checkpoint():
+                            return (True, f"stopped after {self._cycle} cycles")
+
+                    if self._golden_hour_wants_in(tasks=tasks):
+                        self._log("  Golden Hour available — taking it before this match.")
+                        self._run_golden_hour_detour()
                         if self._checkpoint():
                             return (True, f"stopped after {self._cycle} cycles")
 
@@ -547,13 +547,13 @@ class MacroController:
                         if not ok:
                             self._log(f"  Repeat: {msg} — falling through.")
 
-                # Task completed all repeats. If Golden Hour or Eclipse is prioritized, check detour.
-                if self._golden_hour_wants_in(tasks=tasks):
-                    self._run_golden_hour_detour()
-                    if self._checkpoint():
-                        return (True, f"stopped after {self._cycle} cycles")
+                # Task completed all repeats. If Eclipse or Golden Hour is prioritized, check detour.
                 if self._eclipse_wants_in(tasks=tasks):
                     self._run_eclipse_detour()
+                    if self._checkpoint():
+                        return (True, f"stopped after {self._cycle} cycles")
+                if self._golden_hour_wants_in(tasks=tasks):
+                    self._run_golden_hour_detour()
                     if self._checkpoint():
                         return (True, f"stopped after {self._cycle} cycles")
 
