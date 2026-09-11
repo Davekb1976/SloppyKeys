@@ -77,6 +77,10 @@ class UnifiedSettings:
         """Write one key atomically. Returns True on success."""
         def mutate(payload: dict) -> None:
             payload[key] = value
+            if key == "prioritize_golden_hour" and value:
+                payload["prioritize_eclipse"] = False
+            elif key == "prioritize_eclipse" and value:
+                payload["prioritize_golden_hour"] = False
 
         return update_json(self._path, mutate)
 

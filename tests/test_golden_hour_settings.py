@@ -40,6 +40,17 @@ try:
     assert settings.get_prioritize_golden_hour() is True
     assert unified.get(PRIORITIZE_GOLDEN_HOUR_KEY) is True
 
+    # Mutual exclusivity via AppSettings: enabling Eclipse disables Golden Hour
+    settings.set_prioritize_eclipse(True)
+    assert settings.get_prioritize_eclipse() is True
+    assert settings.get_prioritize_golden_hour() is False
+    assert unified.get(PRIORITIZE_GOLDEN_HOUR_KEY) is False
+
+    # Mutual exclusivity via AppSettings: enabling Golden Hour disables Eclipse
+    settings.set_prioritize_golden_hour(True)
+    assert settings.get_prioritize_golden_hour() is True
+    assert settings.get_prioritize_eclipse() is False
+
     settings.set_golden_hour_macro("auto play")
     assert settings.get_golden_hour_macro() == "auto play"
     assert unified.get(GOLDEN_HOUR_MACRO_KEY) == "auto play"
@@ -47,6 +58,20 @@ try:
     # Test setting via UnifiedSettings
     unified.set("prioritize_golden_hour", False)
     assert settings.get_prioritize_golden_hour() is False
+
+    # Mutual exclusivity via UnifiedSettings: enabling eclipse disables golden_hour
+    unified.set("prioritize_golden_hour", True)
+    assert unified.get("prioritize_golden_hour") is True
+    unified.set("prioritize_eclipse", True)
+    assert unified.get("prioritize_eclipse") is True
+    assert unified.get("prioritize_golden_hour") is False
+    assert settings.get_prioritize_golden_hour() is False
+
+    # Mutual exclusivity via UnifiedSettings: enabling golden_hour disables eclipse
+    unified.set("prioritize_golden_hour", True)
+    assert unified.get("prioritize_golden_hour") is True
+    assert unified.get("prioritize_eclipse") is False
+    assert settings.get_prioritize_eclipse() is False
 
     unified.set("golden_hour_macro", "raid spirit")
     assert settings.get_golden_hour_macro() == "raid spirit"

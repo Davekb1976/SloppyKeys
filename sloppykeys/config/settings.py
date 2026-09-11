@@ -125,6 +125,8 @@ class AppSettings:
 
     def set_prioritize_golden_hour(self, enabled: bool) -> None:
         self._set(PRIORITIZE_GOLDEN_HOUR_KEY, bool(enabled))
+        if enabled:
+            self._set(PRIORITIZE_ECLIPSE_KEY, False)
 
     def get_golden_hour_macro(self) -> str:
         return str(self.read().get(GOLDEN_HOUR_MACRO_KEY, "")).strip()
@@ -137,6 +139,8 @@ class AppSettings:
 
     def set_prioritize_eclipse(self, enabled: bool) -> None:
         self._set(PRIORITIZE_ECLIPSE_KEY, bool(enabled))
+        if enabled:
+            self._set(PRIORITIZE_GOLDEN_HOUR_KEY, False)
 
     def get_eclipse_macro(self) -> str:
         return str(self.read().get(ECLIPSE_MACRO_KEY, "")).strip()

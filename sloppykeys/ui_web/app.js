@@ -2128,7 +2128,18 @@
       el.addEventListener(event, () => {
         if (!window.pywebview || !pywebview.api) return;
         let val;
-        if (el.type === "checkbox") val = el.checked;
+        if (el.type === "checkbox") {
+          val = el.checked;
+          if (val) {
+            if (key === "prioritize_golden_hour") {
+              const other = document.getElementById("s-prioritize-eclipse");
+              if (other) other.checked = false;
+            } else if (key === "prioritize_eclipse") {
+              const other = document.getElementById("s-prioritize-golden-hour");
+              if (other) other.checked = false;
+            }
+          }
+        }
         else if (el.type === "number") val = Number(el.value);
         else val = el.value;
         pywebview.api.set_setting(key, val);
