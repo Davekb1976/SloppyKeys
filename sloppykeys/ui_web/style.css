@@ -1023,7 +1023,8 @@ button.vp-chip { cursor: pointer; }
   display: flex; align-items: center; justify-content: space-between; gap: var(--space-4);
   padding: var(--space-3) 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
 }
-.setting-row:last-child { border-bottom: none; }
+.setting-row:last-child,
+.setting-group > .setting-row:nth-last-child(2):nth-child(odd) { border-bottom: none; }
 .setting-row.full { grid-column: 1 / -1; }
 .setting-info { flex: 1; min-width: 0; }
 .setting-name { font-size: 13px; font-weight: 600; color: var(--text); display: block; }
