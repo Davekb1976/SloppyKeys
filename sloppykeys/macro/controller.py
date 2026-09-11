@@ -49,7 +49,7 @@ from sloppykeys.content.nav_images import (
 )
 from sloppykeys.content.walk_paths import default_walk_path
 from sloppykeys.core.ahk import AhkBridge
-from sloppykeys.core.image_search import ImageProfile, ImageSearchEngine
+from sloppykeys.core.image_search import ImageProfile, ImageSearchEngine, confidence_for
 from sloppykeys.core.win32 import roblox_window as rbx
 from sloppykeys.macro.expedition import (
     ACCEPT_EXTRACT,
@@ -1248,7 +1248,7 @@ class MacroController:
             full_path = self._engine.to_absolute_path(rel_path)
             if not os.path.isfile(full_path):
                 continue
-            conf = self._engine.confidence_for(rel_path)
+            conf = confidence_for(rel_path)
             profile = ImageProfile(name=slug(name), image_path=full_path, confidence=conf)
             match = self._engine.find_first([profile], rect)
             if match:
@@ -1264,7 +1264,7 @@ class MacroController:
                 full_path = self._engine.to_absolute_path(path)
                 if not os.path.isfile(full_path):
                     continue
-                conf = self._engine.confidence_for(path)
+                conf = confidence_for(path)
                 profile = ImageProfile(name=os.path.basename(path)[:-4], image_path=full_path, confidence=conf)
                 match = self._engine.find_first([profile], rect)
                 if match:
