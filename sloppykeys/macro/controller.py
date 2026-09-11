@@ -956,6 +956,7 @@ class MacroController:
             )
             if not handled and is_eclipse and self._tick_eclipse_cards():
                 handled = True
+                parked = False
 
             # `handled` means a panel is up and was clicked, so this tick does nothing else:
             # a block's coordinate and the keep-alive click both land on that panel instead of
