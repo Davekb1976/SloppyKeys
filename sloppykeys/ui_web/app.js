@@ -2161,7 +2161,7 @@
   function switchSettingsCategory(cat) {
     categories.forEach((el) => el.style.display = (cat === "all" || el.dataset.cat === cat) ? "" : "none");
     catButtons.forEach((btn) => btn.classList.toggle("active", btn.dataset.cat === cat));
-    if (cat === "eclipse-cards" || cat === "all") {
+    if (cat === "cards" || cat === "all") {
       loadEclipseCards();
     }
   }
@@ -2370,12 +2370,9 @@
     const listEl = document.getElementById("eclipse-card-list");
     if (!listEl) return;
 
-    if (!eclipseCards.length) {
-      listEl.innerHTML = `<div class="ec-empty-state">No cards in pool yet. Click "+ Add Card" to add cards.</div>`;
-      return;
-    }
+    let dragSrcIdx = null;
 
-    listEl.innerHTML = eclipseCards.map((c, idx) => {
+    const cardsHtml = eclipseCards.map((c, idx) => {
       const rank = idx + 1;
       const isOff = !c.enabled;
       const thumbHtml = c.data_uri
@@ -2389,21 +2386,74 @@
             ${thumbHtml}
           </div>
           <div class="ec-card-info">
-            <span class="ec-card-name">${c.name}</span>
-            <span class="ec-card-meta">${c.missing ? "Missing template" : c.path}</span>
+            <span class="ec-card-name" title="${c.name}">${c.name}</span>
+            <span class="ec-card-meta" title="${c.missing ? "Missing template" : c.path}">${c.missing ? "Missing template" : c.path}</span>
           </div>
-          <label class="ec-card-switch tip-left" data-tip="${c.enabled ? "Enabled — click to disable" : "Disabled — click to enable"}">
+          <label class="check tip-left" data-tip="${c.enabled ? "Click to disable" : "Click to enable"}">
             <input type="checkbox" class="ec-card-toggle" data-idx="${idx}" ${c.enabled ? "checked" : ""}>
-            <span class="ec-card-slider"></span>
+            <span class="check-box"></span>
           </label>
           <button class="ec-card-del tip-left" data-idx="${idx}" data-tip="Remove card from pool">✕</button>
         </div>
       `;
     }).join("");
 
-    // Wire HTML5 drag and drop reordering
-    let dragSrcIdx = null;
+    const onionHtml = `
+      <div class="ec-card-onion" id="btn-ec-add-card-slot" title="Add new card to pool">
+        <span class="ec-card-onion-icon">+</span>
+        <span class="ec-card-onion-label">Add Card</span>
+      </div>
+    `;
 
+    // Fill remaining slots to maintain a complete 3-column grid (minimum 6 slots for 2 full rows: 1, 2, 3 / 4, 5, 6)
+    const totalSlots = Math.max(6, Math.ceil((eclipseCards.length + 1) / 3) * 3);
+    const emptyCount = totalSlots - (eclipseCards.length + 1);
+    let emptySlotsHtml = "";
+    for (let i = 0; i < emptyCount; i++) {
+      emptySlotsHtml += `<div class="ec-card-empty-slot"></div>`;
+    }
+
+    listEl.innerHTML = cardsHtml + onionHtml + emptySlotsHtml;
+
+    // Wire onion add card slot
+    const addSlot = listEl.querySelector("#btn-ec-add-card-slot");
+    if (addSlot) {
+      addSlot.addEventListener("click", openEcAddModal);
+
+      addSlot.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        addSlot.classList.add("drag-over");
+      });
+
+      addSlot.addEventListener("dragleave", () => {
+        addSlot.classList.remove("drag-over");
+      });
+
+      addSlot.addEventListener("drop", async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        addSlot.classList.remove("drag-over");
+        if (dragSrcIdx === null) return;
+        const destIdx = eclipseCards.length - 1;
+        if (dragSrcIdx === destIdx) return;
+        const [moved] = eclipseCards.splice(dragSrcIdx, 1);
+        eclipseCards.push(moved);
+        renderEclipseCards();
+        if (window.pywebview && pywebview.api) {
+          try {
+            const res = await pywebview.api.save_eclipse_cards(eclipseCards);
+            if (res && res.ok) {
+              eclipseCards = res.cards || eclipseCards;
+            }
+          } catch (err) {
+            console.error("Failed to save eclipse cards reorder:", err);
+          }
+        }
+      });
+    }
+
+    // Wire HTML5 drag and drop reordering
     listEl.querySelectorAll(".ec-card-row").forEach((row) => {
       row.addEventListener("dragstart", (e) => {
         dragSrcIdx = parseInt(row.dataset.idx, 10);
@@ -2456,7 +2506,7 @@
       });
     });
 
-    // Wire toggle switch
+    // Wire square check toggle
     listEl.querySelectorAll(".ec-card-toggle").forEach((chk) => {
       chk.addEventListener("change", async () => {
         const idx = parseInt(chk.dataset.idx, 10);
@@ -2464,6 +2514,8 @@
           eclipseCards[idx].enabled = chk.checked;
           const row = chk.closest(".ec-card-row");
           if (row) row.classList.toggle("disabled", !chk.checked);
+          const label = chk.closest("label");
+          if (label) label.setAttribute("data-tip", chk.checked ? "Click to disable" : "Click to enable");
           if (window.pywebview && pywebview.api) {
             try {
               await pywebview.api.save_eclipse_cards(eclipseCards);

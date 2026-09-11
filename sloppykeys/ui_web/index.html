@@ -470,7 +470,7 @@
         <input type="text" class="settings-search" id="settings-search" placeholder="Search...">
         <button class="settings-nav-btn active" data-cat="all">All</button>
         <button class="settings-nav-btn" data-cat="general">General</button>
-        <button class="settings-nav-btn" data-cat="eclipse-cards">Eclipse Cards</button>
+        <button class="settings-nav-btn" data-cat="cards">Cards</button>
         <button class="settings-nav-btn" data-cat="hotkeys">Hotkeys</button>
         <button class="settings-nav-btn" data-cat="delays">Delays</button>
         <button class="settings-nav-btn" data-cat="webhook">Webhook</button>
@@ -522,17 +522,22 @@
           </div>
         </div>
 
-        <!-- Eclipse Cards -->
-        <div class="settings-category" data-cat="eclipse-cards">
+        <!-- Cards -->
+        <div class="settings-category" data-cat="cards">
           <div class="page-header" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
             <div>
-              <span class="page-title">Eclipse Cards</span>
-              <span class="page-subtitle" style="margin-top:2px; font-size:11px; color:var(--text-faint);">Priority selection when upgrade cards appear in Eclipse</span>
+              <span class="page-title">Cards</span>
+              <span class="page-subtitle" style="margin-top:2px; font-size:11px; color:var(--text-faint);">Card priority selection across gamemodes</span>
             </div>
-            <div style="display:flex; gap:8px; align-items:center;">
+            <div>
               <button class="btn btn--sm" id="btn-ec-open-im">Open Image Manager</button>
-              <button class="btn btn--sm btn--primary" id="btn-ec-add-card">+ Add Card</button>
             </div>
+          </div>
+
+          <!-- Eclipse Section -->
+          <div class="page-header" style="margin-top:8px;">
+            <span class="page-title" style="font-size:14px;">Eclipse</span>
+            <span class="page-subtitle" style="margin-top:2px; font-size:11px; color:var(--text-faint);">Priority selection when upgrade cards appear in Eclipse</span>
           </div>
 
           <div class="setting-group">
@@ -549,12 +554,12 @@
           </div>
 
           <div class="setting-group">
-            <div class="setting-row" style="flex-direction:column; align-items:flex-start; gap:8px;">
+            <div class="setting-row" style="flex-direction:column; align-items:flex-start; gap:10px;">
               <div class="setting-info" style="width:100%;">
                 <span class="setting-name">Card Priority Order</span>
-                <span class="setting-desc">Drag rows to reorder. The macro searches from top to bottom and picks the first enabled card found on screen.</span>
+                <span class="setting-desc">Drag cards to reorder (1, 2, 3...). The macro searches in order and picks the first enabled card found on screen.</span>
               </div>
-              <div id="eclipse-card-list" class="ec-card-list" style="width:100%;"></div>
+              <div id="eclipse-card-list" class="ec-card-grid"></div>
             </div>
           </div>
         </div>
