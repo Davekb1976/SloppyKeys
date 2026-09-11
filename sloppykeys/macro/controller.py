@@ -1253,8 +1253,14 @@ class MacroController:
             match = self._engine.find_first([profile], rect)
             if match:
                 self._log(f"  [Eclipse Card] Selected '{name}' (score: {match.score:.2f})")
-                self._nav._click(match)
-                time.sleep(self._nav.click_settle)
+                from sloppykeys.macro.input_scripts import nudge_click_script, SPREAD_TIGHT
+                self._ahk.run(
+                    nudge_click_script(match.center_x, match.center_y, spread=SPREAD_TIGHT),
+                    wait=True,
+                    timeout=5.0,
+                )
+                time.sleep(0.5)
+                self._next_eclipse_card_check = time.time() + 1.5
                 return True
 
         # 2. If no enabled card matched and fallback is "first":
@@ -1270,8 +1276,14 @@ class MacroController:
                 if match:
                     card_title = os.path.basename(path)[:-4].replace("_", " ").title()
                     self._log(f"  [Eclipse Card] Fallback selected '{card_title}' (score: {match.score:.2f})")
-                    self._nav._click(match)
-                    time.sleep(self._nav.click_settle)
+                    from sloppykeys.macro.input_scripts import nudge_click_script, SPREAD_TIGHT
+                    self._ahk.run(
+                        nudge_click_script(match.center_x, match.center_y, spread=SPREAD_TIGHT),
+                        wait=True,
+                        timeout=5.0,
+                    )
+                    time.sleep(0.5)
+                    self._next_eclipse_card_check = time.time() + 1.5
                     return True
 
         return False
