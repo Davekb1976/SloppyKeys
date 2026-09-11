@@ -2022,6 +2022,12 @@
       ghMacro.innerHTML = '<option value="">Default (Current Task Macro)</option>' + names.map((n) => `<option value="${n}">${n}</option>`).join("");
       if (cur) ghMacro.value = cur;
     }
+    const ecMacro = document.getElementById("s-eclipse-macro");
+    if (ecMacro) {
+      const cur = ecMacro.dataset.pendingVal !== undefined ? ecMacro.dataset.pendingVal : ecMacro.value;
+      ecMacro.innerHTML = '<option value="">Default (Current Task Macro)</option>' + names.map((n) => `<option value="${n}">${n}</option>`).join("");
+      if (cur) ecMacro.value = cur;
+    }
   }
 
   document.getElementById("btn-op-save").addEventListener("click", async () => {

@@ -43,6 +43,9 @@ DEFAULTS: dict[str, Any] = {
     # Golden Hour
     "prioritize_golden_hour": False,
     "golden_hour_macro": "",
+    # Eclipse
+    "prioritize_eclipse": False,
+    "eclipse_macro": "",
     # Image thresholds (per-name overrides, dict)
     "image_thresholds": {},
 }

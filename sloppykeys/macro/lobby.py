@@ -38,6 +38,8 @@ from sloppykeys.content.nav_images import (
     back_lobby_image,
     close_gamemode_image,
     close_panel_image,
+    eclipse_act_image,
+    eclipse_image,
     events_image,
     gamemode_image,
     golden_hour_act_image,
@@ -623,6 +625,38 @@ class LobbyNavigator:
                 time.sleep(self.scroll_settle)
         return (False, f"Golden Hour badge not found after {max_scrolls} scrolls")
 
+    def find_and_select_eclipse_stage(
+        self, max_scrolls: int = 8, notches: int = 4
+    ) -> tuple[bool, str]:
+        """Scan the Story carousel for a stage displaying the Eclipse badge.
+
+        If found, clicks the badge/card to enter that stage's act selection screen.
+        """
+        path = eclipse_image()
+        if not os.path.isfile(path):
+            gh_path = golden_hour_image()
+            if os.path.isfile(gh_path):
+                path = gh_path
+            else:
+                return (False, f"Eclipse template ({path}) not found")
+
+        self._park()
+        if self.panel_fade_wait > 0:
+            time.sleep(self.panel_fade_wait)
+        for attempt in range(max_scrolls + 1):
+            match = self._find(path, timeout=0.0)
+            if match is not None:
+                ok, message = self._click(match)
+                if ok:
+                    return (True, f"selected Eclipse stage ({match.score:.2f})")
+                return (False, f"found Eclipse stage but click failed: {message}")
+            if attempt < max_scrolls:
+                ok, message = self._scroll(notches)
+                if not ok:
+                    return (False, f"scroll failed: {message}")
+                time.sleep(self.scroll_settle)
+        return (False, f"Eclipse badge not found after {max_scrolls} scrolls")
+
     def close_stage_list(self) -> tuple[bool, str]:
         """Close the stage chooser back towards the gamemode menu."""
         path = close_panel_image()
@@ -631,16 +665,19 @@ class LobbyNavigator:
         return (False, f"{path} is missing")
 
     def select_act(
-        self, gamemode: str, act: str, prefer_golden: bool = False
+        self,
+        gamemode: str,
+        act: str,
+        prefer_golden: bool = False,
+        prefer_eclipse: bool = False,
     ) -> tuple[bool, str]:
         """Click an act button. Coordinates are client-space; add the
         Roblox client origin to get the screen point AHK clicks.
 
-        When Golden Hour is active on a Story stage, the Gift Box is inserted at Slot 0.
-        If prefer_golden is True, the Gift Box is clicked. If prefer_golden is False,
-        coordinates are shifted down by 1 slot (and scrolled for Mastery) so the user's
-        chosen act is clicked without misclicking the Gift Box. If prefer_golden is True
-        but Golden Hour is absent, it falls back to the requested act.
+        When Golden Hour or Eclipse is active on a Story stage, their act cards appear.
+        If prefer_golden is True, Golden Hour is clicked. If prefer_eclipse is True,
+        Eclipse is clicked. If neither is True, coordinates are shifted down by scrolling
+        so normal acts (Acts 1-5, Infinite, Mastery) are clicked cleanly.
         """
         rect = self._rect()
         if rect is None:
@@ -648,8 +685,9 @@ class LobbyNavigator:
         if not self._ahk.available():
             return (False, "AutoHotkey v2 not found")
 
-        # Check for the Golden Hour act on screen
+        # Check for Golden Hour and Eclipse acts on screen
         golden_match = None
+        eclipse_match = None
         if gamemode == "Story":
             act_path = golden_hour_act_image()
             if os.path.isfile(act_path):
@@ -657,30 +695,45 @@ class LobbyNavigator:
             elif os.path.isfile(golden_hour_image()):
                 golden_match = self._find(golden_hour_image(), timeout=0.0)
 
-        if golden_match is not None:
-            if prefer_golden:
-                # Click the matched Golden Hour act directly (no hardcoded click point)
-                ok, message = self._click(golden_match)
-                return (
-                    (True, f"clicked Golden Hour ({golden_match.score:.2f})")
-                    if ok
-                    else (False, f"Golden Hour click failed: {message}")
-                )
-            else:
-                target_label = act
-                # Golden Hour is active, but a normal act is requested (or Golden Hour toggled off).
-                # Scroll down so the Gift Box scrolls off the top, exposing Acts 1-5,
-                # Infinite, and Mastery without clicking on Golden Hour.
+            ec_act_path = eclipse_act_image()
+            if os.path.isfile(ec_act_path):
+                eclipse_match = self._find(ec_act_path, timeout=0.0)
+            elif os.path.isfile(eclipse_image()):
+                eclipse_match = self._find(eclipse_image(), timeout=0.0)
+
+        if prefer_eclipse and eclipse_match is not None:
+            ok, message = self._click(eclipse_match)
+            return (
+                (True, f"clicked Eclipse ({eclipse_match.score:.2f})")
+                if ok
+                else (False, f"Eclipse click failed: {message}")
+            )
+
+        if prefer_golden and golden_match is not None:
+            ok, message = self._click(golden_match)
+            return (
+                (True, f"clicked Golden Hour ({golden_match.score:.2f})")
+                if ok
+                else (False, f"Golden Hour click failed: {message}")
+            )
+
+        if not prefer_golden and not prefer_eclipse:
+            target_label = act
+            if golden_match is not None or eclipse_match is not None:
+                # An event act is active, but a normal act is requested.
+                # Scroll down so the event cards scroll off the top.
                 self._scroll_at((249, 350), notches=6)
                 time.sleep(self.scroll_settle)
-                coord = act_coord(gamemode, act)
+            coord = act_coord(gamemode, act)
+        elif prefer_golden:
+            target_label = f"{act} (Golden Hour inactive)"
+            coord = golden_hour_act_coord("Story", "Golden Hour") or act_coord(gamemode, act)
+        elif prefer_eclipse:
+            target_label = f"{act} (Eclipse inactive)"
+            coord = act_coord(gamemode, act)
         else:
-            if prefer_golden:
-                target_label = f"{act} (Golden Hour inactive)"
-                coord = golden_hour_act_coord("Story", "Golden Hour") or act_coord(gamemode, act)
-            else:
-                target_label = act
-                coord = act_coord(gamemode, act)
+            target_label = act
+            coord = act_coord(gamemode, act)
 
         if coord is None:
             return (False, f"no act coordinates for {gamemode} / {act}")

@@ -21,6 +21,8 @@ WEBHOOK_KEY = "discord_webhook"
 HARD_MODE_KEY = "hard_mode"
 PRIORITIZE_GOLDEN_HOUR_KEY = "prioritize_golden_hour"
 GOLDEN_HOUR_MACRO_KEY = "golden_hour_macro"
+PRIORITIZE_ECLIPSE_KEY = "prioritize_eclipse"
+ECLIPSE_MACRO_KEY = "eclipse_macro"
 # Opt-in: run the ~8s camera sequence once per Roblox session instead of once per match.
 # Default **off** because placement coordinates are stored against one camera angle, so if
 # Roblox resets the camera on a stage load, skipping misplaces every unit silently. Cheap to
@@ -129,6 +131,18 @@ class AppSettings:
 
     def set_golden_hour_macro(self, macro_name: str) -> None:
         self._set(GOLDEN_HOUR_MACRO_KEY, (macro_name or "").strip())
+
+    def get_prioritize_eclipse(self) -> bool:
+        return bool(self.read().get(PRIORITIZE_ECLIPSE_KEY, False))
+
+    def set_prioritize_eclipse(self, enabled: bool) -> None:
+        self._set(PRIORITIZE_ECLIPSE_KEY, bool(enabled))
+
+    def get_eclipse_macro(self) -> str:
+        return str(self.read().get(ECLIPSE_MACRO_KEY, "")).strip()
+
+    def set_eclipse_macro(self, macro_name: str) -> None:
+        self._set(ECLIPSE_MACRO_KEY, (macro_name or "").strip())
 
 
 # Roblox's share page hands the client a deep link rather than a resolved server

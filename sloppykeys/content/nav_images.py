@@ -64,6 +64,10 @@ EVENTS_IMAGE = "events.png"
 GOLDEN_HOUR_IMAGE = "golden_hour.png"
 # The Golden Hour act / Gift Box card in the stage act selection list.
 GOLDEN_HOUR_ACT_IMAGE = "golden_hour_act.png"
+# The Eclipse badge on a stage card in the carousel.
+ECLIPSE_IMAGE = "eclipse.png"
+# The Eclipse act card in the stage act selection list.
+ECLIPSE_ACT_IMAGE = "eclipse_act.png"
 # # Closing the intermission menu back to the lobby proper
 # The **X** every panel in the gamemode UI is dismissed by — the challenge list included.
 # One file rather than one per panel because it is literally the same control drawn in the
@@ -268,6 +272,16 @@ def golden_hour_image() -> str:
 def golden_hour_act_image() -> str:
     """The Golden Hour act / Gift Box card in the stage act selection list."""
     return os.path.join(IMAGES_DIR, LOBBY_DIR, GOLDEN_HOUR_ACT_IMAGE)
+
+
+def eclipse_image() -> str:
+    """The Eclipse badge on a stage card in the carousel."""
+    return os.path.join(IMAGES_DIR, LOBBY_DIR, ECLIPSE_IMAGE)
+
+
+def eclipse_act_image() -> str:
+    """The Eclipse act card in the stage act selection list."""
+    return os.path.join(IMAGES_DIR, LOBBY_DIR, ECLIPSE_ACT_IMAGE)
 
 
 def events_templates_dir() -> str:
@@ -490,6 +504,8 @@ def expected_paths() -> list[str]:
         start_match_image(),
         golden_hour_image(),
         golden_hour_act_image(),
+        eclipse_image(),
+        eclipse_act_image(),
         start_game_image(),
         repeat_image(),
         win_change_image(),

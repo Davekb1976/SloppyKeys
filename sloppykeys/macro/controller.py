@@ -90,6 +90,8 @@ class MacroController:
 
     _golden_hour_played_interval: tuple[int, int, int, int, int] | None = None
     _golden_hour_attempted_interval: tuple[int, int, int, int, int] | None = None
+    _eclipse_played_interval: tuple[int, int, int, int, int] | None = None
+    _eclipse_attempted_interval: tuple[int, int, int, int, int] | None = None
     _left_early: bool = False
 
     def __init__(
@@ -159,6 +161,8 @@ class MacroController:
         self._last_reopen_time = 0.0
         self._golden_hour_played_interval = None
         self._golden_hour_attempted_interval = None
+        self._eclipse_played_interval = None
+        self._eclipse_attempted_interval = None
 
     @staticmethod
     def _default_rect() -> tuple[int, int, int, int] | None:
@@ -215,6 +219,8 @@ class MacroController:
         self._cycle = 0
         self._golden_hour_played_interval = None
         self._golden_hour_attempted_interval = None
+        self._eclipse_played_interval = None
+        self._eclipse_attempted_interval = None
         # So the first decline of this run is said out loud even when it repeats the reason the
         # last run ended on — which is exactly the case a user restarting to watch for it hits.
         self._challenge_decline = ""
@@ -340,9 +346,13 @@ class MacroController:
             if loop_pass > 1:
                 self._log(f"Queue finished — restarting (pass {loop_pass}).")
 
-            # If Golden Hour is prioritized, scan Story stages before beginning the queue pass
+            # If Golden Hour or Eclipse is prioritized, scan Story stages before beginning the queue pass
             if self._golden_hour_wants_in():
                 self._run_golden_hour_detour()
+                if self._checkpoint():
+                    return (True, f"stopped after {self._cycle} cycles")
+            if self._eclipse_wants_in():
+                self._run_eclipse_detour()
                 if self._checkpoint():
                     return (True, f"stopped after {self._cycle} cycles")
 
@@ -366,6 +376,8 @@ class MacroController:
                         self._run_challenge_task(task)
                     if self._golden_hour_wants_in():
                         self._run_golden_hour_detour()
+                    if self._eclipse_wants_in():
+                        self._run_eclipse_detour()
                     if self._checkpoint():
                         return (True, f"stopped after {self._cycle} cycles")
                     continue
@@ -389,6 +401,12 @@ class MacroController:
                     if self._golden_hour_wants_in():
                         self._log("  Golden Hour available — taking it before this match.")
                         self._run_golden_hour_detour()
+                        if self._checkpoint():
+                            return (True, f"stopped after {self._cycle} cycles")
+
+                    if self._eclipse_wants_in():
+                        self._log("  Eclipse available — taking it before this match.")
+                        self._run_eclipse_detour()
                         if self._checkpoint():
                             return (True, f"stopped after {self._cycle} cycles")
 
@@ -486,6 +504,12 @@ class MacroController:
                                 "  Golden Hour is due — ending this rep here rather than "
                                 "starting the next match."
                             )
+                        elif self._eclipse_wants_in():
+                            more_reps = False
+                            self._log(
+                                "  Eclipse is due — ending this rep here rather than "
+                                "starting the next match."
+                            )
 
                     if self._left_early:
                         self._left_early = False
@@ -512,9 +536,13 @@ class MacroController:
                         if not ok:
                             self._log(f"  Repeat: {msg} — falling through.")
 
-                # Task completed all repeats. If Golden Hour is prioritized, check detour.
+                # Task completed all repeats. If Golden Hour or Eclipse is prioritized, check detour.
                 if self._golden_hour_wants_in():
                     self._run_golden_hour_detour()
+                    if self._checkpoint():
+                        return (True, f"stopped after {self._cycle} cycles")
+                if self._eclipse_wants_in():
+                    self._run_eclipse_detour()
                     if self._checkpoint():
                         return (True, f"stopped after {self._cycle} cycles")
 
@@ -2375,6 +2403,166 @@ class MacroController:
         self._golden_hour_played_interval = interval_key()
 
         self._log("  Golden Hour: match finished — returning to lobby.")
+        ok, msg = self._back_to_lobby()
+        self._log(f"  Back to lobby: {msg}")
+        return True
+
+    def _eclipse_wants_in(self, now: datetime | None = None) -> bool:
+        """Should Eclipse run before the next match or queue pass?
+
+        Eclipse re-rolls every 30 minutes on :00 and :30 boundaries.
+        It is non-repeatable: once played or attempted without finding a badge
+        in the current rotation, it rests until the clock crosses the next boundary.
+        """
+        settings = getattr(self, "_settings", None)
+        if settings is None or not settings.get_prioritize_eclipse():
+            return False
+
+        from sloppykeys.content.nav_images import eclipse_act_image, eclipse_image
+
+        if not os.path.isfile(eclipse_image()) and not os.path.isfile(eclipse_act_image()):
+            from sloppykeys.content.nav_images import golden_hour_image
+            if not os.path.isfile(golden_hour_image()):
+                return False
+
+        current_interval = interval_key(now)
+        if self._eclipse_played_interval == current_interval:
+            return False
+        if self._eclipse_attempted_interval == current_interval:
+            return False
+
+        return True
+
+    def _run_eclipse_detour(self) -> bool:
+        """If Eclipse is prioritized, scan Story stages for the Eclipse badge.
+
+        If a stage is found with Eclipse active:
+          1. Enters that stage's act selection screen.
+          2. Clicks the Eclipse act via `select_act("Story", "Eclipse", prefer_eclipse=True)`.
+          3. Starts the stage and waits for the match to be ready.
+          4. Executes the configured Eclipse macro (or fallback).
+          5. Returns to the lobby via `_back_to_lobby()`.
+
+        Returns True if an Eclipse run was executed, False otherwise.
+        """
+        if not self._eclipse_wants_in():
+            return False
+
+        previous_task = self._current_task
+        previous_phases = getattr(self, "_phases", None)
+        try:
+            return self._run_eclipse_detour_inner()
+        finally:
+            self._current_task = previous_task
+            self._phases = previous_phases
+
+    def _run_eclipse_detour_inner(self) -> bool:
+        self._log("  Eclipse: prioritizing — opening Story to scan for active stage...")
+
+        # If on a result screen from a previous match, leave it first
+        if self._nav.result_screen_up():
+            ok, msg = self._nav.leave_match()
+            self._log(f"  Leave match: {msg}")
+            if not ok:
+                return False
+            time.sleep(self._nav.click_settle)
+            ok, msg = self._nav.change_gamemode()
+            self._log(f"  Change gamemode: {msg}")
+            if not ok:
+                return False
+            time.sleep(self._nav.click_settle)
+        else:
+            ok, msg = self._nav.click_play()
+            if not ok:
+                self._log(f"  Eclipse: click Play failed: {msg}")
+                return False
+            time.sleep(self._nav.click_settle)
+
+        ok, msg = self._nav.open_gamemode("Story")
+        if not ok:
+            self._log(f"  Eclipse: open Story failed: {msg}")
+            return False
+        time.sleep(self._nav.click_settle)
+
+        # Scan stages in carousel
+        ok, msg = self._nav.find_and_select_eclipse_stage()
+        if not ok:
+            self._eclipse_attempted_interval = interval_key()
+            self._log(f"  Eclipse: {msg} — resting until next 30-min rotation.")
+            # Close stage list and gamemode menu to return cleanly to lobby
+            self._nav.close_stage_list()
+            time.sleep(self._nav.click_settle)
+            self._nav.close_gamemode_menu()
+            return False
+
+        self._log("  Eclipse: entered stage — selecting Eclipse act...")
+
+        # Inside stage: select Eclipse act
+        ok, msg = self._nav.select_act("Story", "Eclipse", prefer_eclipse=True)
+        if not ok:
+            self._log(f"  Eclipse: select Eclipse act failed: {msg}")
+            self._nav.close_stage_list()
+            time.sleep(self._nav.click_settle)
+            self._nav.close_gamemode_menu()
+            return False
+        time.sleep(self._nav.click_settle)
+
+        # Start stage (Eclipse has no Hard Mode toggle)
+        ok, msg = self._nav.start_stage("Story", hard_mode=False)
+        if not ok:
+            self._log(f"  Eclipse: start stage failed: {msg}")
+            return False
+
+        ok, msg = self._nav.wait_for_match_ready()
+        if not ok:
+            self._log(f"  Eclipse: match ready wait failed: {msg}")
+            return False
+
+        self._ensure_camera()
+
+        # Load operation
+        ec_macro = self._settings.get_eclipse_macro()
+        macro_name = ec_macro or ((self._current_task or {}).get("macro", "")) or "auto play"
+        op = load_operation(self._app_root, macro_name)
+        phases = op.get("phases", {})
+        self._phases = phases
+
+        if self._checkpoint():
+            return True
+
+        self._log(f"  Eclipse: running match with macro '{macro_name}'...")
+
+        # Pre Start (walk)
+        self._run_phase_linear(phases.get("pre_start", []))
+        self._kept_position = False
+        if self._checkpoint():
+            return True
+
+        # Start Game
+        self._placer.park()
+        ok, msg = self._nav.click_start_game()
+        if ok:
+            self._stats.start_stage()
+            self._log(f"  Start Game: {msg or 'ok'}")
+        else:
+            self._log(f"  Start Game failed: {msg}")
+
+        if self._checkpoint():
+            return True
+
+        # Battle + Loops
+        battle_blocks = phases.get("battle", [])
+        loop_a = phases.get("loop_a", [])
+        loop_b = phases.get("loop_b", [])
+        self._run_match(battle_blocks, loop_a, loop_b)
+
+        if self._checkpoint():
+            return True
+
+        self._cycle += 1
+        self._eclipse_played_interval = interval_key()
+
+        self._log("  Eclipse: match finished — returning to lobby.")
         ok, msg = self._back_to_lobby()
         self._log(f"  Back to lobby: {msg}")
         return True
