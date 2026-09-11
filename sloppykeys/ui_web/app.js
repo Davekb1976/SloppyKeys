@@ -2416,9 +2416,9 @@
       </div>
     `;
 
-    // Fill remaining slots to maintain a complete 3-column grid (minimum 6 slots for 2 full rows: 1, 2, 3 / 4, 5, 6)
-    const totalSlots = Math.max(6, Math.ceil((eclipseCards.length + 1) / 3) * 3);
-    const emptyCount = totalSlots - (eclipseCards.length + 1);
+    // Fill remaining slots in the active row so the 3-column row stays aligned (no trailing empty rows)
+    const remainder = (eclipseCards.length + 1) % 3;
+    const emptyCount = remainder === 0 ? 0 : 3 - remainder;
     let emptySlotsHtml = "";
     for (let i = 0; i < emptyCount; i++) {
       emptySlotsHtml += `<div class="ec-card-empty-slot"></div>`;
