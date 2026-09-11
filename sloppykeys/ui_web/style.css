@@ -1168,68 +1168,198 @@ button.vp-chip { cursor: pointer; }
   .loader { transition: opacity 0.3s ease; }
 }
 
-/* ---- Cards Grid ---- */
+/* ---- Cards Screen & Gamemode Sections ---- */
+.cards-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+  margin-top: var(--space-2);
+}
+
+.card-gamemode-section {
+  border: 1px solid var(--border);
+  background: var(--surface-panel);
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.card-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--surface-panel);
+  border-bottom: 1px solid var(--border);
+  min-height: 38px;
+  box-sizing: border-box;
+  flex-wrap: wrap;
+}
+
+.card-section-tag {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 2px 6px;
+  border-radius: 0;
+  flex-shrink: 0;
+}
+.tag-event {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: #c4b5fd;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.card-section-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.01em;
+}
+
+.card-section-desc {
+  font-size: 11px;
+  color: var(--text-faint);
+  margin-left: 2px;
+}
+
+.card-section-header-controls {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.card-fallback-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.card-fallback-lbl {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.card-fallback-select {
+  height: 24px;
+  font-size: 11px;
+  padding: 0 6px;
+  background: var(--surface-sunken);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.card-fallback-select:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.card-section-count {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.card-section-body {
+  padding: 12px;
+  background: var(--surface-sunken);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.card-section-hint {
+  font-size: 11px;
+  color: var(--text-faint);
+  line-height: 1.4;
+}
+
+/* 3-Column Cards Grid: spans full 100% width */
 .ec-card-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-2);
+  gap: 10px;
   width: 100%;
+  box-sizing: border-box;
 }
+
+/* Card Cell: matching Macro Manager .block-row aesthetics */
 .ec-card-row {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: 8px 10px;
+  gap: 10px;
+  padding: 8px 12px;
   background: var(--surface-panel);
   border: 1px solid var(--border);
-  transition: border-color 0.12s, background 0.12s, opacity 0.12s;
+  border-left: 3px solid var(--accent);
+  transition: border-color 0.12s, background 0.12s, transform 0.12s, box-shadow 0.12s, opacity 0.15s;
   user-select: none;
   min-width: 0;
   box-sizing: border-box;
-  min-height: 52px;
+  min-height: 56px;
+  cursor: grab;
 }
 .ec-card-row:hover {
-  border-color: var(--border-hover);
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+  border-left-color: var(--accent);
   background: var(--surface-raised);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+.ec-card-row:active {
+  cursor: grabbing;
 }
 .ec-card-row.dragging {
   opacity: 0.35;
   border-style: dashed;
   border-color: var(--accent);
+  transform: none;
 }
 .ec-card-row.drag-over {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent);
 }
+
 .ec-card-handle {
-  cursor: grab;
   color: var(--text-faint);
   font-size: 13px;
   letter-spacing: -2px;
-  padding: 2px 2px;
+  padding: 2px;
   line-height: 1;
   flex-shrink: 0;
+  cursor: grab;
 }
-.ec-card-handle:active {
-  cursor: grabbing;
+.ec-card-handle:hover {
+  color: var(--text);
 }
+
 .ec-card-rank {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
-  background: var(--surface-sunken);
-  border: 1px solid var(--border);
+  padding: 2px 6px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 700;
-  color: var(--text-muted);
+  color: var(--accent);
   flex-shrink: 0;
+  border-radius: 2px;
 }
+
 .ec-card-thumb-wrap {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border: 1px solid var(--border);
   background: var(--surface-sunken);
   overflow: hidden;
@@ -1245,15 +1375,17 @@ button.vp-chip { cursor: pointer; }
   display: block;
 }
 .ec-card-thumb-placeholder {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-faint);
 }
+
 .ec-card-info {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 3px;
+  justify-content: center;
   overflow: hidden;
 }
 .ec-card-name {
@@ -1263,24 +1395,52 @@ button.vp-chip { cursor: pointer; }
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  transition: color 0.12s, opacity 0.12s;
+  letter-spacing: 0.01em;
+}
+
+.ec-card-badge {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 1px 5px;
+  border-radius: 2px;
+  width: fit-content;
+  line-height: 1.2;
+}
+.ec-card-badge--ok {
+  background: rgba(76, 175, 114, 0.12);
+  color: var(--teal);
+  border: 1px solid rgba(76, 175, 114, 0.3);
+}
+.ec-card-badge--warn {
+  background: rgba(232, 162, 58, 0.12);
+  color: var(--amber);
+  border: 1px solid rgba(232, 162, 58, 0.3);
+}
+
+.ec-card-row.disabled {
+  border-left-color: var(--border-strong);
+  opacity: 0.5;
+}
+.ec-card-row.disabled:hover {
+  transform: none;
+  background: var(--surface-panel);
 }
 .ec-card-row.disabled .ec-card-name {
   text-decoration: line-through;
   color: var(--text-faint);
-  opacity: 0.55;
+}
+.ec-card-row.disabled .ec-card-rank {
+  background: var(--surface-sunken);
+  border-color: var(--border);
+  color: var(--text-faint);
 }
 .ec-card-row.disabled .ec-card-thumb-wrap {
   opacity: 0.45;
   filter: grayscale(100%);
 }
-.ec-card-meta {
-  font-size: 9px;
-  color: var(--text-faint);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+
 .ec-card-del {
   display: inline-flex;
   align-items: center;
@@ -1291,7 +1451,7 @@ button.vp-chip { cursor: pointer; }
   border: 1px solid transparent;
   color: var(--text-faint);
   cursor: pointer;
-  font-size: 11px;
+  font-size: 12px;
   flex-shrink: 0;
   transition: color 0.12s, border-color 0.12s, background 0.12s;
 }
@@ -1306,29 +1466,30 @@ button.vp-chip { cursor: pointer; }
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 8px 10px;
-  min-height: 52px;
-  border: 1px dashed var(--border-strong);
+  gap: 8px;
+  padding: 8px 12px;
+  min-height: 56px;
+  border: 1.5px dashed var(--border-strong);
   background: rgba(255, 255, 255, 0.015);
   color: var(--text-faint);
   cursor: pointer;
   box-sizing: border-box;
-  transition: border-color 0.15s, background 0.15s, color 0.15s;
+  transition: border-color 0.15s, background 0.15s, color 0.15s, transform 0.12s;
   user-select: none;
 }
 .ec-card-onion:hover {
   border-color: var(--accent);
   background: var(--accent-soft);
   color: var(--accent);
+  transform: translateY(-1px);
 }
 .ec-card-onion-icon {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   line-height: 1;
 }
 .ec-card-onion-label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.02em;
 }
@@ -1336,9 +1497,9 @@ button.vp-chip { cursor: pointer; }
 /* Faint empty outline slot to round out the 3-column row */
 .ec-card-empty-slot {
   display: flex;
-  min-height: 52px;
-  border: 1px dashed color-mix(in srgb, var(--border) 40%, transparent);
-  background: transparent;
+  min-height: 56px;
+  border: 1px dashed color-mix(in srgb, var(--border) 35%, transparent);
+  background: rgba(0, 0, 0, 0.08);
   pointer-events: none;
   box-sizing: border-box;
 }

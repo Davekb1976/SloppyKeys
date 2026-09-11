@@ -534,32 +534,32 @@
             </div>
           </div>
 
-          <!-- Eclipse Section -->
-          <div class="page-header" style="margin-top:8px;">
-            <span class="page-title" style="font-size:14px;">Eclipse</span>
-            <span class="page-subtitle" style="margin-top:2px; font-size:11px; color:var(--text-faint);">Priority selection when upgrade cards appear in Eclipse</span>
-          </div>
+          <div class="cards-container">
+            <!-- Eclipse Gamemode Section -->
+            <div class="card-gamemode-section" id="section-eclipse-cards">
+              <div class="card-section-header">
+                <span class="card-section-tag tag-event">Event</span>
+                <span class="card-section-label">Eclipse</span>
+                <span class="card-section-desc">Priority upgrade card selection when cards appear</span>
 
-          <div class="setting-group">
-            <div class="setting-row">
-              <div class="setting-info">
-                <span class="setting-name">Fallback Choice</span>
-                <span class="setting-desc">Action when no enabled card matches or all cards are disabled</span>
+                <div class="card-section-header-controls">
+                  <div class="card-fallback-control">
+                    <span class="card-fallback-lbl">Fallback:</span>
+                    <select class="card-fallback-select" id="s-ec-fallback">
+                      <option value="skip">Skip appearance</option>
+                      <option value="first">Pick first available card</option>
+                    </select>
+                  </div>
+                  <span class="card-section-count" id="ec-card-count">0/0 active</span>
+                </div>
               </div>
-              <select class="setting-select" id="s-ec-fallback" style="min-width:180px;">
-                <option value="skip">Skip appearance</option>
-                <option value="first">Pick first available card</option>
-              </select>
-            </div>
-          </div>
 
-          <div class="setting-group">
-            <div class="setting-row" style="flex-direction:column; align-items:flex-start; gap:10px;">
-              <div class="setting-info" style="width:100%;">
-                <span class="setting-name">Card Priority Order</span>
-                <span class="setting-desc">Drag cards to reorder (1, 2, 3...). The macro searches in order and picks the first enabled card found on screen.</span>
+              <div class="card-section-body">
+                <div class="card-section-hint">
+                  Drag cards to reorder (1, 2, 3...). The macro searches in order and picks the first enabled card found on screen.
+                </div>
+                <div id="eclipse-card-list" class="ec-card-grid"></div>
               </div>
-              <div id="eclipse-card-list" class="ec-card-grid"></div>
             </div>
           </div>
         </div>

@@ -2182,6 +2182,12 @@
         row.style.display = match ? "" : "none";
         if (match) hasMatch = true;
       });
+      cat.querySelectorAll(".card-gamemode-section").forEach((sec) => {
+        const text = sec.textContent.toLowerCase();
+        const match = !q || text.includes(q);
+        sec.style.display = match ? "" : "none";
+        if (match) hasMatch = true;
+      });
       // Hide the entire section header if no rows match
       const header = cat.querySelector(".page-header");
       if (q) {
@@ -2189,6 +2195,7 @@
       } else {
         cat.style.display = "";
         cat.querySelectorAll(".setting-row").forEach((row) => { row.style.display = ""; });
+        cat.querySelectorAll(".card-gamemode-section").forEach((sec) => { sec.style.display = ""; });
       }
     });
   });
@@ -2378,16 +2385,20 @@
       const thumbHtml = c.data_uri
         ? `<img class="ec-card-thumb" src="${c.data_uri}" alt="${c.name}">`
         : `<span class="ec-card-thumb-placeholder">🎴</span>`;
+      const badgeHtml = c.missing
+        ? `<span class="ec-card-badge ec-card-badge--warn">Missing Template</span>`
+        : `<span class="ec-card-badge ec-card-badge--ok">Active</span>`;
+
       return `
         <div class="ec-card-row${isOff ? " disabled" : ""}" data-idx="${idx}" draggable="true">
           <span class="ec-card-handle" title="Drag to reorder">⋮⋮</span>
-          <span class="ec-card-rank">${rank}</span>
+          <span class="ec-card-rank">#${rank}</span>
           <div class="ec-card-thumb-wrap" title="${c.missing ? "Template not captured yet" : c.name}">
             ${thumbHtml}
           </div>
           <div class="ec-card-info">
             <span class="ec-card-name" title="${c.name}">${c.name}</span>
-            <span class="ec-card-meta" title="${c.missing ? "Missing template" : c.path}">${c.missing ? "Missing template" : c.path}</span>
+            ${badgeHtml}
           </div>
           <label class="check tip-left" data-tip="${c.enabled ? "Click to disable" : "Click to enable"}">
             <input type="checkbox" class="ec-card-toggle" data-idx="${idx}" ${c.enabled ? "checked" : ""}>
@@ -2414,6 +2425,13 @@
     }
 
     listEl.innerHTML = cardsHtml + onionHtml + emptySlotsHtml;
+
+    // Update section active count badge
+    const countEl = document.getElementById("ec-card-count");
+    if (countEl) {
+      const activeCount = eclipseCards.filter((c) => c.enabled).length;
+      countEl.textContent = `${activeCount}/${eclipseCards.length} active`;
+    }
 
     // Wire onion add card slot
     const addSlot = listEl.querySelector("#btn-ec-add-card-slot");
@@ -2516,6 +2534,11 @@
           if (row) row.classList.toggle("disabled", !chk.checked);
           const label = chk.closest("label");
           if (label) label.setAttribute("data-tip", chk.checked ? "Click to disable" : "Click to enable");
+          const countEl = document.getElementById("ec-card-count");
+          if (countEl) {
+            const activeCount = eclipseCards.filter((c) => c.enabled).length;
+            countEl.textContent = `${activeCount}/${eclipseCards.length} active`;
+          }
           if (window.pywebview && pywebview.api) {
             try {
               await pywebview.api.save_eclipse_cards(eclipseCards);
