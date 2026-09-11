@@ -125,6 +125,8 @@ SHIPPED_SETTINGS_KEYS = (
     "game_keys",
     "delays",
     "start_position",
+    "eclipse_cards",
+    "eclipse_card_fallback",
 )
 
 

@@ -15,7 +15,10 @@ from sloppykeys.ui_web.bridge import Api
 
 # 1. Check DEFAULTS
 assert "eclipse_cards" in DEFAULTS
-assert DEFAULTS["eclipse_cards"] == []
+assert DEFAULTS["eclipse_cards"] == [
+    {"name": "Redemption", "enabled": True},
+    {"name": "Sacrifice", "enabled": True},
+]
 assert "eclipse_card_fallback" in DEFAULTS
 assert DEFAULTS["eclipse_card_fallback"] == "skip"
 
@@ -30,7 +33,10 @@ try:
     settings = UnifiedSettings(tmp_dir)
 
     # Defaults on clean directory
-    assert settings.get_eclipse_cards() == []
+    assert settings.get_eclipse_cards() == [
+        {"name": "Redemption", "enabled": True},
+        {"name": "Sacrifice", "enabled": True},
+    ]
     assert settings.get_eclipse_card_fallback() == "skip"
 
     # Set cards with order and enabled flags

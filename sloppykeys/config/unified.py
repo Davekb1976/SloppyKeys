@@ -47,7 +47,10 @@ DEFAULTS: dict[str, Any] = {
     "prioritize_eclipse": False,
     "eclipse_macro": "",
     # Eclipse Cards
-    "eclipse_cards": [],
+    "eclipse_cards": [
+        {"name": "Redemption", "enabled": True},
+        {"name": "Sacrifice", "enabled": True},
+    ],
     "eclipse_card_fallback": "skip",
     # Image thresholds (per-name overrides, dict)
     "image_thresholds": {},
@@ -178,7 +181,7 @@ class UnifiedSettings:
     # -- Eclipse Cards (nested under "eclipse_cards" key) --
 
     def get_eclipse_cards(self) -> list[dict]:
-        raw = read_json(self._path).get("eclipse_cards", [])
+        raw = read_json(self._path).get("eclipse_cards", DEFAULTS["eclipse_cards"])
         return [c for c in raw if isinstance(c, dict) and "name" in c] if isinstance(raw, list) else []
 
     def set_eclipse_cards(self, cards: list[dict]) -> bool:
