@@ -44,6 +44,8 @@ CHALLENGE_DIR = "challenge"
 # Placement backdrops, not search templates: whole client-area screenshots the position
 # picker draws coordinates on. See assets/reference/README.md.
 REFERENCE_DIR = "reference"
+# Where Eclipse upgrade card templates live.
+CARDS_DIR = "cards"
 
 PLAY_IMAGE = "play.png"
 # The lobby's Start button — the last click before the stage loads, on the panel that
@@ -282,6 +284,23 @@ def eclipse_image() -> str:
 def eclipse_act_image() -> str:
     """The Eclipse act card in the stage act selection list."""
     return os.path.join(IMAGES_DIR, LOBBY_DIR, ECLIPSE_ACT_IMAGE)
+
+
+def card_image(name: str) -> str:
+    """The template image for an Eclipse upgrade card."""
+    return os.path.join(IMAGES_DIR, CARDS_DIR, f"{slug(name)}.png")
+
+
+def card_image_paths(app_root: str = "") -> list[str]:
+    """All card templates currently present in assets/cards/."""
+    cards_folder = os.path.join(app_root, IMAGES_DIR, CARDS_DIR) if app_root else os.path.join(IMAGES_DIR, CARDS_DIR)
+    if not os.path.isdir(cards_folder):
+        return []
+    res = []
+    for f in sorted(os.listdir(cards_folder)):
+        if f.lower().endswith(".png"):
+            res.append(os.path.join(IMAGES_DIR, CARDS_DIR, f).replace("\\", "/"))
+    return res
 
 
 def events_templates_dir() -> str:

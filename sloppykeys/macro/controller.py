@@ -36,17 +36,20 @@ from sloppykeys.content.start_stage import (
 from sloppykeys.content.nav_images import (
     autoplay_active_image,
     autoplay_image,
+    card_image,
+    card_image_paths,
     exp_continue_2_image,
     exp_continue_image,
     exp_extract_confirm_image,
     exp_extract_image,
     exp_upgrade_card_image,
     portal_select_image,
+    slug,
     start_game_image,
 )
 from sloppykeys.content.walk_paths import default_walk_path
 from sloppykeys.core.ahk import AhkBridge
-from sloppykeys.core.image_search import ImageSearchEngine
+from sloppykeys.core.image_search import ImageProfile, ImageSearchEngine
 from sloppykeys.core.win32 import roblox_window as rbx
 from sloppykeys.macro.expedition import (
     ACCEPT_EXTRACT,
@@ -907,6 +910,9 @@ class MacroController:
                 leave_at_wave = 0
         next_wave_check = 0.0
 
+        is_eclipse = self._is_eclipse_active()
+        self._next_eclipse_card_check = 0.0
+
         while not self._stop_requested:
             if self._checkpoint():
                 # Nobody saw this match end, so its clock must not keep running into the next
@@ -948,6 +954,8 @@ class MacroController:
                 self._exp is not None
                 and self._expedition_tick(battle_idx < len(battle)) == "handled"
             )
+            if not handled and is_eclipse and self._tick_eclipse_cards():
+                handled = True
 
             # `handled` means a panel is up and was clicked, so this tick does nothing else:
             # a block's coordinate and the keep-alive click both land on that panel instead of
@@ -1203,6 +1211,68 @@ class MacroController:
                 return ok
             time.sleep(self._nav.search_poll)
         self._log(f"  {label}: no second button appeared in {FOLLOWUP_TIMEOUT:.0f}s — retrying.")
+        return False
+
+    def _is_eclipse_active(self) -> bool:
+        if getattr(self, "_is_eclipse_match", False):
+            return True
+        task = self._current_task or {}
+        return task.get("mode") == "Story" and (
+            task.get("stage") == "Eclipse" or task.get("target") == "Eclipse"
+        )
+
+    def _tick_eclipse_cards(self) -> bool:
+        """Scan for and click Eclipse upgrade cards if currently present on screen.
+
+        Returns True if a card was clicked (handled), False otherwise.
+        """
+        now = time.time()
+        if now < getattr(self, "_next_eclipse_card_check", 0.0):
+            return False
+        self._next_eclipse_card_check = now + 1.0
+
+        settings = UnifiedSettings(self._app_root)
+        cards = settings.get_eclipse_cards()
+        fallback = settings.get_eclipse_card_fallback()
+
+        rect = self._rect()
+        if not rect:
+            return False
+
+        # 1. Search enabled cards in priority order
+        enabled_cards = [c for c in cards if c.get("enabled", True) and c.get("name")]
+        for c in enabled_cards:
+            name = str(c["name"]).strip()
+            rel_path = card_image(name).replace("\\", "/")
+            full_path = self._engine.to_absolute_path(rel_path)
+            if not os.path.isfile(full_path):
+                continue
+            conf = self._engine.confidence_for(rel_path)
+            profile = ImageProfile(name=slug(name), image_path=full_path, confidence=conf)
+            match = self._engine.find_first([profile], rect)
+            if match:
+                self._log(f"  [Eclipse Card] Selected '{name}' (score: {match.score:.2f})")
+                self._nav._click(match)
+                time.sleep(self._nav.click_settle)
+                return True
+
+        # 2. If no enabled card matched and fallback is "first":
+        if fallback == "first":
+            disk_paths = card_image_paths(self._app_root)
+            for path in disk_paths:
+                full_path = self._engine.to_absolute_path(path)
+                if not os.path.isfile(full_path):
+                    continue
+                conf = self._engine.confidence_for(path)
+                profile = ImageProfile(name=os.path.basename(path)[:-4], image_path=full_path, confidence=conf)
+                match = self._engine.find_first([profile], rect)
+                if match:
+                    card_title = os.path.basename(path)[:-4].replace("_", " ").title()
+                    self._log(f"  [Eclipse Card] Fallback selected '{card_title}' (score: {match.score:.2f})")
+                    self._nav._click(match)
+                    time.sleep(self._nav.click_settle)
+                    return True
+
         return False
 
     def _execute_battle_block(self, block: dict) -> bool:
@@ -2522,8 +2592,10 @@ class MacroController:
         previous_task = self._current_task
         previous_phases = getattr(self, "_phases", None)
         try:
+            self._is_eclipse_match = True
             return self._run_eclipse_detour_inner()
         finally:
+            self._is_eclipse_match = False
             self._current_task = previous_task
             self._phases = previous_phases
 

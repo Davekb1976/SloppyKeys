@@ -749,6 +749,93 @@ class Api:
             self._ctrl.reload_delays()
         return {"ok": ok}
 
+    # ---- Eclipse Cards ----
+
+    def get_eclipse_cards(self) -> dict:
+        """Get the configured Eclipse cards in priority order, with thumbnails and missing status."""
+        if not self._app_root:
+            return {"ok": False, "cards": [], "fallback": "skip"}
+        settings = UnifiedSettings(self._app_root)
+        raw_cards = settings.get_eclipse_cards()
+        fallback = settings.get_eclipse_card_fallback()
+        from sloppykeys.content.nav_images import card_image
+
+        cards = []
+        for c in raw_cards:
+            name = str(c.get("name", "")).strip()
+            if not name:
+                continue
+            enabled = bool(c.get("enabled", True))
+            rel_path = card_image(name).replace("\\", "/")
+            full_path = os.path.join(self._app_root, rel_path)
+            exists = os.path.isfile(full_path)
+            thumb = self._thumb_data_uri(full_path) if exists else ""
+            cards.append({
+                "name": name,
+                "enabled": enabled,
+                "path": rel_path,
+                "data_uri": thumb,
+                "missing": not exists,
+            })
+        return {"ok": True, "cards": cards, "fallback": fallback}
+
+    def save_eclipse_cards(self, cards: list[dict]) -> dict:
+        """Save the reordered and toggled Eclipse cards."""
+        if not self._app_root:
+            return {"ok": False}
+        settings = UnifiedSettings(self._app_root)
+        clean = []
+        if isinstance(cards, list):
+            for c in cards:
+                if isinstance(c, dict) and "name" in c:
+                    name = str(c["name"]).strip()
+                    if name:
+                        clean.append({
+                            "name": name,
+                            "enabled": bool(c.get("enabled", True)),
+                        })
+        settings.set_eclipse_cards(clean)
+        return self.get_eclipse_cards()
+
+    def add_eclipse_card(self, name: str) -> dict:
+        """Add a new card to the Eclipse card pool."""
+        if not self._app_root:
+            return {"ok": False, "reason": "No app root"}
+        name = str(name or "").strip()
+        if not name:
+            return {"ok": False, "reason": "Card name cannot be empty"}
+        settings = UnifiedSettings(self._app_root)
+        cards = settings.get_eclipse_cards()
+        for c in cards:
+            if c.get("name", "").strip().lower() == name.lower():
+                return {"ok": False, "reason": f"Card '{name}' is already in the pool"}
+        cards.append({"name": name, "enabled": True})
+        settings.set_eclipse_cards(cards)
+        return self.get_eclipse_cards()
+
+    def remove_eclipse_card(self, name: str) -> dict:
+        """Remove a card from the Eclipse card pool."""
+        if not self._app_root:
+            return {"ok": False, "reason": "No app root"}
+        name = str(name or "").strip().lower()
+        settings = UnifiedSettings(self._app_root)
+        cards = [c for c in settings.get_eclipse_cards() if c.get("name", "").strip().lower() != name]
+        settings.set_eclipse_cards(cards)
+        return self.get_eclipse_cards()
+
+    def get_eclipse_card_fallback(self) -> str:
+        """Get the Eclipse card fallback choice ('skip' or 'first')."""
+        if not self._app_root:
+            return "skip"
+        return UnifiedSettings(self._app_root).get_eclipse_card_fallback()
+
+    def set_eclipse_card_fallback(self, fallback: str) -> dict:
+        """Set the Eclipse card fallback choice ('skip' or 'first')."""
+        if not self._app_root:
+            return {"ok": False}
+        UnifiedSettings(self._app_root).set_eclipse_card_fallback(fallback)
+        return {"ok": True, "fallback": UnifiedSettings(self._app_root).get_eclipse_card_fallback()}
+
     # ---- Game Keybinds (in-game keys the macro presses) ----
 
     # Every table of OCR boxes, in the order the editor shows them. `where` says which
@@ -1602,6 +1689,7 @@ class Api:
             "challenge": ("Challenge", "template"),
             "events": ("Events", "template"),
             "portals": ("Portals", "template"),
+            "cards": ("Cards", "template"),
             "reference": ("Maps", "map"),
         }
         # This table is not a display detail: the missing-template pass below filters
@@ -1626,11 +1714,15 @@ class Api:
         # come from the same schema: an uncaptured backdrop is only a fallback to a live
         # capture, but without a card here there is nowhere to capture it — which is why
         # Expedition had no maps at all.
-        from sloppykeys.content.nav_images import expected_paths, map_reference_paths
+        from sloppykeys.content.nav_images import expected_paths, map_reference_paths, card_image
         expected = set()
         try:
             expected = set(p.replace("\\", "/") for p in expected_paths())
             expected |= set(p.replace("\\", "/") for p in map_reference_paths())
+            for card in settings.get_eclipse_cards():
+                cname = card.get("name", "").strip()
+                if cname:
+                    expected.add(card_image(cname).replace("\\", "/"))
         except Exception:
             pass
 
@@ -1692,7 +1784,7 @@ class Api:
                     "missing": True,
                 })
 
-            if names:
+            if names or key == "cards":
                 categories.append({"key": key, "label": label, "kind": kind, "names": names})
 
         return {"ok": True, "categories": categories, "default_threshold": default_threshold}

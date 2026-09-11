@@ -20,6 +20,7 @@ assert callable(getattr(MacroController, "_run_golden_hour_detour_inner", None))
 ctrl = MacroController.__new__(MacroController)
 ctrl._app_root = ROOT
 ctrl._settings = MagicMock()
+ctrl._tasks = []
 ctrl._golden_hour_played_interval = None
 ctrl._golden_hour_attempted_interval = None
 

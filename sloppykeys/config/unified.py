@@ -46,6 +46,9 @@ DEFAULTS: dict[str, Any] = {
     # Eclipse
     "prioritize_eclipse": False,
     "eclipse_macro": "",
+    # Eclipse Cards
+    "eclipse_cards": [],
+    "eclipse_card_fallback": "skip",
     # Image thresholds (per-name overrides, dict)
     "image_thresholds": {},
 }
@@ -171,3 +174,30 @@ class UnifiedSettings:
             "wins": max(0, int(raw.get("wins", 0))),
             "losses": max(0, int(raw.get("losses", 0))),
         }
+
+    # -- Eclipse Cards (nested under "eclipse_cards" key) --
+
+    def get_eclipse_cards(self) -> list[dict]:
+        raw = read_json(self._path).get("eclipse_cards", [])
+        return [c for c in raw if isinstance(c, dict) and "name" in c] if isinstance(raw, list) else []
+
+    def set_eclipse_cards(self, cards: list[dict]) -> bool:
+        clean = []
+        for c in cards:
+            if isinstance(c, dict) and "name" in c:
+                clean.append({
+                    "name": str(c["name"]).strip(),
+                    "enabled": bool(c.get("enabled", True)),
+                })
+
+        def mutate(payload: dict) -> None:
+            payload["eclipse_cards"] = clean
+
+        return update_json(self._path, mutate)
+
+    def get_eclipse_card_fallback(self) -> str:
+        return str(self.get("eclipse_card_fallback", "skip") or "skip")
+
+    def set_eclipse_card_fallback(self, fallback: str) -> bool:
+        choice = "first" if fallback == "first" else "skip"
+        return self.set("eclipse_card_fallback", choice)

@@ -470,6 +470,7 @@
         <input type="text" class="settings-search" id="settings-search" placeholder="Search...">
         <button class="settings-nav-btn active" data-cat="all">All</button>
         <button class="settings-nav-btn" data-cat="general">General</button>
+        <button class="settings-nav-btn" data-cat="eclipse-cards">Eclipse Cards</button>
         <button class="settings-nav-btn" data-cat="hotkeys">Hotkeys</button>
         <button class="settings-nav-btn" data-cat="delays">Delays</button>
         <button class="settings-nav-btn" data-cat="webhook">Webhook</button>
@@ -518,6 +519,43 @@
                  changed no timing, so a user slowing the macro down got no slower macro. The
                  waits that are real are in Settings > Delays, each named for the step it
                  governs — a blanket pause after every click is not one of them. -->
+          </div>
+        </div>
+
+        <!-- Eclipse Cards -->
+        <div class="settings-category" data-cat="eclipse-cards">
+          <div class="page-header" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+            <div>
+              <span class="page-title">Eclipse Cards</span>
+              <span class="page-subtitle" style="margin-top:2px; font-size:11px; color:var(--text-faint);">Priority selection when upgrade cards appear in Eclipse</span>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <button class="btn btn--sm" id="btn-ec-open-im">Open Image Manager</button>
+              <button class="btn btn--sm btn--primary" id="btn-ec-add-card">+ Add Card</button>
+            </div>
+          </div>
+
+          <div class="setting-group">
+            <div class="setting-row">
+              <div class="setting-info">
+                <span class="setting-name">Fallback Choice</span>
+                <span class="setting-desc">Action when no enabled card matches or all cards are disabled</span>
+              </div>
+              <select class="setting-select" id="s-ec-fallback" style="min-width:180px;">
+                <option value="skip">Skip appearance</option>
+                <option value="first">Pick first available card</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="setting-group">
+            <div class="setting-row" style="flex-direction:column; align-items:flex-start; gap:8px;">
+              <div class="setting-info" style="width:100%;">
+                <span class="setting-name">Card Priority Order</span>
+                <span class="setting-desc">Drag rows to reorder. The macro searches from top to bottom and picks the first enabled card found on screen.</span>
+              </div>
+              <div id="eclipse-card-list" class="ec-card-list" style="width:100%;"></div>
+            </div>
           </div>
         </div>
 
@@ -664,6 +702,25 @@
       <div style="display:flex; gap:8px; justify-content:flex-end;">
         <button class="btn btn--sm" id="rec-name-discard">Discard</button>
         <button class="btn btn--sm btn--primary" id="rec-name-save">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Eclipse Card modal -->
+<div class="modal-overlay" id="ec-add-modal" style="display:none;">
+  <div class="modal-box" style="width:380px; display:flex; flex-direction:column;">
+    <div class="modal-header">
+      <span class="modal-title">Add Eclipse Card</span>
+      <button class="modal-close" id="ec-add-close">&times;</button>
+    </div>
+    <div class="modal-body" style="padding:16px; display:flex; flex-direction:column; gap:12px;">
+      <div style="font-size:11px; color:var(--text-muted);">Enter card name (e.g. Divine Regeneration, Trait Purge):</div>
+      <input type="text" class="setting-input" id="ec-add-input" placeholder="Card name..." style="width:100%;">
+      <div id="ec-add-error" style="font-size:11px; color:var(--danger, #ef4444); display:none;"></div>
+      <div style="display:flex; gap:8px; justify-content:flex-end;">
+        <button class="btn btn--sm" id="ec-add-cancel">Cancel</button>
+        <button class="btn btn--sm btn--primary" id="ec-add-save">Add Card</button>
       </div>
     </div>
   </div>

@@ -2161,6 +2161,9 @@
   function switchSettingsCategory(cat) {
     categories.forEach((el) => el.style.display = (cat === "all" || el.dataset.cat === cat) ? "" : "none");
     catButtons.forEach((btn) => btn.classList.toggle("active", btn.dataset.cat === cat));
+    if (cat === "eclipse-cards" || cat === "all") {
+      loadEclipseCards();
+    }
   }
 
   catButtons.forEach((btn) => {
@@ -2240,6 +2243,8 @@
         }
       });
     } catch (e) {}
+
+    loadEclipseCards();
 
     // Hotkeys
     try {
@@ -2340,6 +2345,245 @@
   });
 
   wireAutoSave();
+
+  // ---- Eclipse Cards Settings ----
+  let eclipseCards = [];
+  let eclipseFallback = "skip";
+
+  async function loadEclipseCards() {
+    if (!window.pywebview || !pywebview.api || !pywebview.api.get_eclipse_cards) return;
+    try {
+      const res = await pywebview.api.get_eclipse_cards();
+      if (res && res.ok) {
+        eclipseCards = res.cards || [];
+        eclipseFallback = res.fallback || "skip";
+        const fbSelect = document.getElementById("s-ec-fallback");
+        if (fbSelect) fbSelect.value = eclipseFallback;
+        renderEclipseCards();
+      }
+    } catch (e) {
+      console.error("Failed to load eclipse cards:", e);
+    }
+  }
+
+  function renderEclipseCards() {
+    const listEl = document.getElementById("eclipse-card-list");
+    if (!listEl) return;
+
+    if (!eclipseCards.length) {
+      listEl.innerHTML = `<div class="ec-empty-state">No cards in pool yet. Click "+ Add Card" to add cards.</div>`;
+      return;
+    }
+
+    listEl.innerHTML = eclipseCards.map((c, idx) => {
+      const rank = idx + 1;
+      const isOff = !c.enabled;
+      const thumbHtml = c.data_uri
+        ? `<img class="ec-card-thumb" src="${c.data_uri}" alt="${c.name}">`
+        : `<span class="ec-card-thumb-placeholder">🎴</span>`;
+      return `
+        <div class="ec-card-row${isOff ? " disabled" : ""}" data-idx="${idx}" draggable="true">
+          <span class="ec-card-handle" title="Drag to reorder">⋮⋮</span>
+          <span class="ec-card-rank">${rank}</span>
+          <div class="ec-card-thumb-wrap" title="${c.missing ? "Template not captured yet" : c.name}">
+            ${thumbHtml}
+          </div>
+          <div class="ec-card-info">
+            <span class="ec-card-name">${c.name}</span>
+            <span class="ec-card-meta">${c.missing ? "Missing template" : c.path}</span>
+          </div>
+          <label class="ec-card-switch tip-left" data-tip="${c.enabled ? "Enabled — click to disable" : "Disabled — click to enable"}">
+            <input type="checkbox" class="ec-card-toggle" data-idx="${idx}" ${c.enabled ? "checked" : ""}>
+            <span class="ec-card-slider"></span>
+          </label>
+          <button class="ec-card-del tip-left" data-idx="${idx}" data-tip="Remove card from pool">✕</button>
+        </div>
+      `;
+    }).join("");
+
+    // Wire HTML5 drag and drop reordering
+    let dragSrcIdx = null;
+
+    listEl.querySelectorAll(".ec-card-row").forEach((row) => {
+      row.addEventListener("dragstart", (e) => {
+        dragSrcIdx = parseInt(row.dataset.idx, 10);
+        row.classList.add("dragging");
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", String(dragSrcIdx));
+      });
+
+      row.addEventListener("dragend", () => {
+        row.classList.remove("dragging");
+        listEl.querySelectorAll(".ec-card-row").forEach((r) => r.classList.remove("drag-over"));
+        dragSrcIdx = null;
+      });
+
+      row.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        row.classList.add("drag-over");
+      });
+
+      row.addEventListener("dragleave", () => {
+        row.classList.remove("drag-over");
+      });
+
+      row.addEventListener("drop", async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        row.classList.remove("drag-over");
+        const destIdx = parseInt(row.dataset.idx, 10);
+        if (dragSrcIdx === null || dragSrcIdx === destIdx) return;
+
+        // Move item in eclipseCards array
+        const [moved] = eclipseCards.splice(dragSrcIdx, 1);
+        eclipseCards.splice(destIdx, 0, moved);
+
+        // Render immediately from state
+        renderEclipseCards();
+
+        // Save to backend
+        if (window.pywebview && pywebview.api) {
+          try {
+            const res = await pywebview.api.save_eclipse_cards(eclipseCards);
+            if (res && res.ok) {
+              eclipseCards = res.cards || eclipseCards;
+            }
+          } catch (err) {
+            console.error("Failed to save eclipse cards reorder:", err);
+          }
+        }
+      });
+    });
+
+    // Wire toggle switch
+    listEl.querySelectorAll(".ec-card-toggle").forEach((chk) => {
+      chk.addEventListener("change", async () => {
+        const idx = parseInt(chk.dataset.idx, 10);
+        if (eclipseCards[idx]) {
+          eclipseCards[idx].enabled = chk.checked;
+          const row = chk.closest(".ec-card-row");
+          if (row) row.classList.toggle("disabled", !chk.checked);
+          if (window.pywebview && pywebview.api) {
+            try {
+              await pywebview.api.save_eclipse_cards(eclipseCards);
+            } catch (err) {
+              console.error("Failed to save eclipse card toggle:", err);
+            }
+          }
+        }
+      });
+    });
+
+    // Wire delete button
+    listEl.querySelectorAll(".ec-card-del").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const idx = parseInt(btn.dataset.idx, 10);
+        const card = eclipseCards[idx];
+        if (!card) return;
+        if (window.pywebview && pywebview.api) {
+          try {
+            const res = await pywebview.api.remove_eclipse_card(card.name);
+            if (res && res.ok) {
+              eclipseCards = res.cards || [];
+              renderEclipseCards();
+            }
+          } catch (err) {
+            console.error("Failed to remove eclipse card:", err);
+          }
+        }
+      });
+    });
+  }
+
+  // Fallback select
+  const ecFallbackSelect = document.getElementById("s-ec-fallback");
+  if (ecFallbackSelect) {
+    ecFallbackSelect.addEventListener("change", async () => {
+      eclipseFallback = ecFallbackSelect.value;
+      if (window.pywebview && pywebview.api && pywebview.api.set_eclipse_card_fallback) {
+        pywebview.api.set_eclipse_card_fallback(eclipseFallback);
+      }
+    });
+  }
+
+  // Open Image Manager to Cards tab
+  const btnEcOpenIm = document.getElementById("btn-ec-open-im");
+  if (btnEcOpenIm) {
+    btnEcOpenIm.addEventListener("click", () => {
+      imCategory = "cards";
+      if (window.openImageManager) window.openImageManager();
+    });
+  }
+
+  // Add Card modal
+  const ecAddModal = document.getElementById("ec-add-modal");
+  const ecAddInput = document.getElementById("ec-add-input");
+  const ecAddError = document.getElementById("ec-add-error");
+  const btnEcAddCard = document.getElementById("btn-ec-add-card");
+  const btnEcAddCancel = document.getElementById("ec-add-cancel");
+  const btnEcAddClose = document.getElementById("ec-add-close");
+  const btnEcAddSave = document.getElementById("ec-add-save");
+
+  function openEcAddModal() {
+    if (!ecAddModal) return;
+    setGameVisible(false);
+    if (ecAddInput) ecAddInput.value = "";
+    if (ecAddError) {
+      ecAddError.style.display = "none";
+      ecAddError.textContent = "";
+    }
+    ecAddModal.style.display = "flex";
+    setTimeout(() => ecAddInput && ecAddInput.focus(), 50);
+  }
+
+  function closeEcAddModal() {
+    if (!ecAddModal) return;
+    ecAddModal.style.display = "none";
+    restoreGameIfDashboard();
+  }
+
+  if (btnEcAddCard) btnEcAddCard.addEventListener("click", openEcAddModal);
+  if (btnEcAddCancel) btnEcAddCancel.addEventListener("click", closeEcAddModal);
+  if (btnEcAddClose) btnEcAddClose.addEventListener("click", closeEcAddModal);
+
+  async function handleEcAddSave() {
+    const name = (ecAddInput ? ecAddInput.value : "").trim();
+    if (!name) {
+      if (ecAddError) {
+        ecAddError.textContent = "Card name cannot be empty.";
+        ecAddError.style.display = "block";
+      }
+      return;
+    }
+    if (window.pywebview && pywebview.api && pywebview.api.add_eclipse_card) {
+      try {
+        const res = await pywebview.api.add_eclipse_card(name);
+        if (res && res.ok) {
+          eclipseCards = res.cards || [];
+          renderEclipseCards();
+          closeEcAddModal();
+        } else if (ecAddError) {
+          ecAddError.textContent = (res && res.reason) || "Failed to add card.";
+          ecAddError.style.display = "block";
+        }
+      } catch (err) {
+        if (ecAddError) {
+          ecAddError.textContent = "Error: " + err;
+          ecAddError.style.display = "block";
+        }
+      }
+    }
+  }
+
+  if (btnEcAddSave) btnEcAddSave.addEventListener("click", handleEcAddSave);
+  if (ecAddInput) {
+    ecAddInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") handleEcAddSave();
+      if (e.key === "Escape") closeEcAddModal();
+    });
+  }
 
   // ---- Image Manager Modal ----
   let imData = null;

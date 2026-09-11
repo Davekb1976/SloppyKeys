@@ -20,6 +20,7 @@ assert callable(getattr(MacroController, "_run_eclipse_detour_inner", None))
 ctrl = MacroController.__new__(MacroController)
 ctrl._app_root = ROOT
 ctrl._settings = MagicMock()
+ctrl._tasks = []
 ctrl._eclipse_played_interval = None
 ctrl._eclipse_attempted_interval = None
 
