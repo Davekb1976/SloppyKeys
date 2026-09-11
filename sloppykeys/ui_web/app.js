@@ -468,13 +468,14 @@
     taskList.innerHTML = tasks.map((t, i) => {
       const fields = modeFields[t.mode] || {};
       const isChallenge = t.mode === "Challenge";
-      const isStoryEvent = t.mode === "Story" && (t.stage === "Eclipse" || t.stage === "Golden Hour");
+      const isStoryEvent = t.mode === "Story" && (t.map === "Eclipse" || t.map === "Golden Hour" || t.stage === "Eclipse" || t.stage === "Golden Hour");
+      const eventName = (t.map === "Eclipse" || t.map === "Golden Hour") ? t.map : t.stage;
       // A Challenge card names no map or stage: it plays whichever of the three rows the
       // panel offers. A task saved before that was enforced still holds a stale one.
       const title = isChallenge
         ? "Challenge"
         : isStoryEvent
-        ? `Story · ${t.stage}`
+        ? `Story · ${eventName}`
         : [t.mode, t.map, t.stage].filter(Boolean).join(" · ") || "Unconfigured";
       // Only what this mode actually uses. Every card read "<difficulty> · ×<repeat>", which
       // for Challenge named a difficulty it has no control for and a repeat the runner
@@ -513,7 +514,7 @@
         if (!t.macro) {
           badge = `<span class="task-card-badge task-card-badge--warn" data-tip="No macro operation assigned.&#10;Character will not walk and units will not be placed.">No Macro</span>`;
         } else {
-          badge = `<span class="task-card-badge" data-tip="Runs before other tasks every 30 minutes (:00 and :30)&#10;whenever ${t.stage} is active in Story stages.">Priority</span>`;
+          badge = `<span class="task-card-badge" data-tip="Runs before other tasks every 30 minutes (:00 and :30)&#10;whenever ${eventName} is active in Story stages.">Priority</span>`;
         }
       } else {
         const missingMap = !t.map;
@@ -562,9 +563,9 @@
         const t = tasks[i];
         const fields = modeFields[t.mode] || {};
         const isChal = t.mode === "Challenge";
-        const isStoryEvent = t.mode === "Story" && (t.stage === "Eclipse" || t.stage === "Golden Hour");
-        if (t.mode === "Story" && t.stage === "Eclipse") hasEclipse = true;
-        if (t.mode === "Story" && t.stage === "Golden Hour") hasGH = true;
+        const isStoryEvent = t.mode === "Story" && (t.map === "Eclipse" || t.map === "Golden Hour" || t.stage === "Eclipse" || t.stage === "Golden Hour");
+        if (t.mode === "Story" && (t.map === "Eclipse" || t.stage === "Eclipse")) hasEclipse = true;
+        if (t.mode === "Story" && (t.map === "Golden Hour" || t.stage === "Golden Hour")) hasGH = true;
 
         if (isChal) {
           const slots = t.challenge_slots || [true, true, true];
@@ -632,7 +633,7 @@
         const first = tasks[0];
         const f = modeFields[first.mode] || {};
         let firstIssue = null;
-        const firstIsEvent = first.mode === "Story" && (first.stage === "Eclipse" || first.stage === "Golden Hour");
+        const firstIsEvent = first.mode === "Story" && (first.map === "Eclipse" || first.map === "Golden Hour" || first.stage === "Eclipse" || first.stage === "Golden Hour");
         if (first.mode === "Challenge") {
           const slots = first.challenge_slots || [true, true, true];
           if (!slots.some(Boolean)) firstIssue = "All slots off";
@@ -688,7 +689,7 @@
       applyModeFields(task.mode);
       tbMacro.value = task.macro || "";
       updateLeaveWaveVisibility(task.mode, task.stage);
-      updateStoryEventVisibility(task.mode, task.stage);
+      updateStoryEventVisibility(task.mode, task.map || task.stage);
       updateMacroWarning();
     }
   }
@@ -699,16 +700,18 @@
     tbLeaveWaveRow.style.display = isInfinite ? "" : "none";
   }
 
-  function updateStoryEventVisibility(mode, stage) {
+  function updateStoryEventVisibility(mode, map) {
     const currentMode = mode !== undefined ? mode : tbMode.value;
-    const currentStage = stage !== undefined ? stage : tbStage.value;
-    const isEvent = currentMode === "Story" && (currentStage === "Eclipse" || currentStage === "Golden Hour");
-    const mapRow = document.getElementById("tb-map-row");
+    const currentMap = map !== undefined ? map : tbMap.value;
+    const isEvent = currentMode === "Story" && (currentMap === "Eclipse" || currentMap === "Golden Hour" || tbStage.value === "Eclipse" || tbStage.value === "Golden Hour");
+    const stageRow = document.getElementById("tb-stage-row");
     const diffRow = document.getElementById("tb-difficulty-row");
     const repeatRow = document.getElementById("tb-repeat-row");
-    if (mapRow) mapRow.style.display = isEvent ? "none" : "";
+    const leaveWaveRow = document.getElementById("tb-leave-wave-row");
+    if (stageRow) stageRow.style.display = isEvent ? "none" : (tbModeFields.stage ? "" : "none");
     if (diffRow) diffRow.style.display = isEvent ? "none" : (tbModeFields.difficulty ? "" : "none");
     if (repeatRow) repeatRow.style.display = isEvent ? "none" : "";
+    if (leaveWaveRow && isEvent) leaveWaveRow.style.display = "none";
   }
 
   // Show only the rows this gamemode can actually use. Every answer comes from `content/`
@@ -718,7 +721,7 @@
   // A row that does nothing is worse than a missing one: it reads as a setting that was
   // applied. Expedition's Stage could only ever say "—", and Raid, Events and Portals all
   // offered Easy/Hard with no toggle for the macro to click.
-  async function applyModeFields(mode) {
+  async function applyModeFields(mode, map) {
     if (!mode) return;
     let f = modeFields[mode];
     if (!f) {
@@ -734,7 +737,7 @@
     tbExtractRow.style.display = f.extract ? "" : "none";
     tbSearchRow.style.display = f.search_label ? "" : "none";
     if (f.search_label) document.getElementById("tb-search-label").textContent = f.search_label;
-    updateStoryEventVisibility(mode, tbStage.value);
+    updateStoryEventVisibility(mode, map !== undefined ? map : tbMap.value);
   }
 
   function showBuilderEmpty() {
@@ -758,25 +761,29 @@
     }
     const maps = await pywebview.api.get_maps(mode);
     tbMap.innerHTML = '<option value="">—</option>' + maps.map((m) => `<option value="${m}"${m === selected ? " selected" : ""}>${m}</option>`).join("");
+    if (selected) {
+      updateStoryEventVisibility(mode, selected);
+    }
   }
 
   async function loadStages(mode, map, selected) {
-    if (!window.pywebview || !pywebview.api || !mode || (!map && mode !== "Story")) {
+    const isEvent = mode === "Story" && (map === "Eclipse" || map === "Golden Hour");
+    if (isEvent || !window.pywebview || !pywebview.api || !mode || !map) {
       tbStage.innerHTML = '<option value="">—</option>';
       updateLeaveWaveVisibility(mode, "");
-      updateStoryEventVisibility(mode, "");
+      updateStoryEventVisibility(mode, map);
       return;
     }
     const stages = await pywebview.api.get_targets(mode, map || "");
     if (!stages.length) {
       tbStage.innerHTML = '<option value="">—</option>';
       updateLeaveWaveVisibility(mode, "");
-      updateStoryEventVisibility(mode, "");
+      updateStoryEventVisibility(mode, map);
       return;
     }
     tbStage.innerHTML = '<option value="">—</option>' + stages.map((s) => `<option value="${s}"${s === selected ? " selected" : ""}>${s}</option>`).join("");
     updateLeaveWaveVisibility(mode, tbStage.value);
-    updateStoryEventVisibility(mode, tbStage.value);
+    updateStoryEventVisibility(mode, map);
   }
 
   // Difficulty means two different game controls: a 1-3 cycling button on Expedition, a
@@ -795,7 +802,7 @@
 
   async function saveCurrentTask() {
     if (!selectedTaskId || !window.pywebview || !pywebview.api) return;
-    const isStoryEvent = tbMode.value === "Story" && (tbStage.value === "Eclipse" || tbStage.value === "Golden Hour");
+    const isStoryEvent = tbMode.value === "Story" && (tbMap.value === "Eclipse" || tbMap.value === "Golden Hour" || tbStage.value === "Eclipse" || tbStage.value === "Golden Hour");
     const changes = {
       mode: tbMode.value,
       repeat: isStoryEvent ? 1 : Math.max(1, parseInt(tbRepeat.value) || 1),
@@ -805,8 +812,8 @@
     // difficulty its mode never offered — which is what made Expedition tasks store an
     // empty stage, Raid tasks store an Easy/Hard nothing clicked, and switching to Portals
     // leave a stale Infinite stage.
-    changes.map = isStoryEvent ? "Auto-Detect" : ((tbModeFields.map !== false) ? tbMap.value : "");
-    changes.stage = tbModeFields.stage ? tbStage.value : "";
+    changes.map = (tbModeFields.map !== false) ? tbMap.value : "";
+    changes.stage = isStoryEvent ? "" : (tbModeFields.stage ? tbStage.value : "");
     changes.difficulty = isStoryEvent ? "" : (tbModeFields.difficulty ? tbDifficulty.value : "");
     changes.extract_after = tbModeFields.extract ? Math.max(1, parseInt(tbExtract.value) || 1) : 0;
     changes.search = tbModeFields.search_label ? tbSearch.value.trim() : "";
@@ -825,13 +832,14 @@
     }
     // Mutual exclusivity: only one Story Event prioritized in the queue at a time
     if (isStoryEvent) {
-      const otherAct = tbStage.value === "Eclipse" ? "Golden Hour" : "Eclipse";
-      const otherTask = tasks.find(x => x.id !== selectedTaskId && x.mode === "Story" && x.stage === otherAct);
+      const currentEvent = (tbMap.value === "Eclipse" || tbMap.value === "Golden Hour") ? tbMap.value : tbStage.value;
+      const otherEvent = currentEvent === "Eclipse" ? "Golden Hour" : "Eclipse";
+      const otherTask = tasks.find(x => x.id !== selectedTaskId && x.mode === "Story" && (x.map === otherEvent || x.stage === otherEvent));
       if (otherTask) {
         await pywebview.api.delete_task(otherTask.id);
         const idx = tasks.findIndex(x => x.id === otherTask.id);
         if (idx !== -1) tasks.splice(idx, 1);
-        if (window.addLog) window.addLog(`[Queue] Replaced ${otherAct} with ${tbStage.value} (only one Story Event can be prioritized).`);
+        if (window.addLog) window.addLog(`[Queue] Replaced ${otherEvent} with ${currentEvent} (only one Story Event can be prioritized).`);
       }
     }
     pywebview.api.update_task(selectedTaskId, changes).then(() => {
@@ -868,11 +876,12 @@
   });
   tbMap.addEventListener("change", () => {
     loadStages(tbMode.value, tbMap.value, "");
+    updateStoryEventVisibility(tbMode.value, tbMap.value);
     saveCurrentTask();
   });
   tbStage.addEventListener("change", () => {
     updateLeaveWaveVisibility(tbMode.value, tbStage.value);
-    updateStoryEventVisibility(tbMode.value, tbStage.value);
+    updateStoryEventVisibility(tbMode.value, tbMap.value);
     saveCurrentTask();
   });
   tbDifficulty.addEventListener("change", saveCurrentTask);

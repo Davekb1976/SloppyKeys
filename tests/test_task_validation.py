@@ -41,9 +41,12 @@ assert validate_task({"mode": "Challenge", "challenge_slots": [True, False, Fals
 # 6. Operation existence check when app_root provided
 assert validate_task({"mode": "Story", "map": "School Grounds", "stage": "Act 1", "macro": "non_existent_op_12345"}, app_root=app_root) == "macro operation 'non_existent_op_12345' not found"
 
-# 7. Story Event task validation (Eclipse and Golden Hour rotate maps dynamically)
-assert validate_task({"mode": "Story", "map": "", "stage": "Eclipse", "macro": ""}) == "macro operation is required"
-assert validate_task({"mode": "Story", "map": "", "stage": "Golden Hour", "macro": ""}) == "macro operation is required"
+# 7. Story Event task validation (Eclipse and Golden Hour in map dropdown rotate maps dynamically)
+assert validate_task({"mode": "Story", "map": "Eclipse", "stage": "", "macro": ""}) == "macro operation is required"
+assert validate_task({"mode": "Story", "map": "Golden Hour", "stage": "", "macro": ""}) == "macro operation is required"
+assert validate_task({"mode": "Story", "map": "Eclipse", "stage": "", "macro": "auto play"}) is None
+assert validate_task({"mode": "Story", "map": "Golden Hour", "stage": "", "macro": "auto play"}) is None
+# Backwards compatibility when stored as stage
 assert validate_task({"mode": "Story", "map": "", "stage": "Eclipse", "macro": "auto play"}) is None
 assert validate_task({"mode": "Story", "map": "", "stage": "Golden Hour", "macro": "auto play"}) is None
 
@@ -55,8 +58,8 @@ with tempfile.TemporaryDirectory() as tmp:
     ops = Path(tmp) / "operations"
     ops.mkdir()
     (ops / "test_op.json").write_text("{}", encoding="utf-8")
-    assert validate_task({"mode": "Story", "map": "", "stage": "Eclipse", "macro": "test_op"}, app_root=tmp) is None
-    assert validate_task({"mode": "Story", "map": "", "stage": "Golden Hour", "macro": "test_op"}, app_root=tmp) is None
+    assert validate_task({"mode": "Story", "map": "Eclipse", "stage": "", "macro": "test_op"}, app_root=tmp) is None
+    assert validate_task({"mode": "Story", "map": "Golden Hour", "stage": "", "macro": "test_op"}, app_root=tmp) is None
 
 # 8. Multi-task queue validation
 queue = [
@@ -68,8 +71,8 @@ assert err == "Task 2 (Story): act is required", f"Expected Task 2 error, got: {
 
 # 9. Story Event mutual exclusivity in queue
 dual_event_queue = [
-    {"mode": "Story", "map": "", "stage": "Eclipse", "macro": "auto play"},
-    {"mode": "Story", "map": "", "stage": "Golden Hour", "macro": "auto play"},
+    {"mode": "Story", "map": "Eclipse", "stage": "", "macro": "auto play"},
+    {"mode": "Story", "map": "Golden Hour", "stage": "", "macro": "auto play"},
 ]
 assert validate_task_queue(dual_event_queue) == "only one Story Event (Eclipse or Golden Hour) can be prioritized at a time"
 

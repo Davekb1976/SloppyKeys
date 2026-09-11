@@ -17,8 +17,6 @@ from __future__ import annotations
 # gamemode -> { act name -> (client_x, client_y) }
 ACT_COORDS: dict[str, dict[str, tuple[int, int]]] = {
     "Story": {
-        "Eclipse": (249, 233),
-        "Golden Hour": (249, 233),
         "Act 1": (249, 233),
         "Act 2": (250, 287),
         "Act 3": (246, 341),

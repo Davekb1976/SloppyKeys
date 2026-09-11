@@ -292,7 +292,12 @@ class Api:
             from sloppykeys.config.nav_routes import RouteStore
 
             return RouteStore(self._app_root).maps()
-        return maps_for(gamemode)
+        maps = maps_for(gamemode)
+        if gamemode == "Story":
+            from sloppykeys.content.gamemodes import STORY_EVENT_NAMES
+
+            return list(STORY_EVENT_NAMES) + maps
+        return maps
 
     def get_difficulty_options(self, gamemode: str) -> list[str]:
         """What the task builder's Difficulty control offers for a gamemode: 1-3 where the

@@ -384,10 +384,12 @@ class MacroController:
                     continue
 
                 # Story Event tasks (Eclipse, Golden Hour) are standing priority detours.
-                if mode == "Story" and stage in ("Eclipse", "Golden Hour"):
-                    if stage == "Eclipse" and self._eclipse_wants_in(tasks=tasks):
+                is_story_event = mode == "Story" and (map_name in ("Eclipse", "Golden Hour") or stage in ("Eclipse", "Golden Hour"))
+                if is_story_event:
+                    event_name = map_name if map_name in ("Eclipse", "Golden Hour") else stage
+                    if event_name == "Eclipse" and self._eclipse_wants_in(tasks=tasks):
                         self._run_eclipse_detour()
-                    elif stage == "Golden Hour" and self._golden_hour_wants_in(tasks=tasks):
+                    elif event_name == "Golden Hour" and self._golden_hour_wants_in(tasks=tasks):
                         self._run_golden_hour_detour()
                     if self._checkpoint():
                         return (True, f"stopped after {self._cycle} cycles")
@@ -561,7 +563,10 @@ class MacroController:
             # and none are due right now, rest briefly so we don't spin in a busy loop.
             has_linear = any(
                 t.get("mode") != "Challenge"
-                and not (t.get("mode") == "Story" and t.get("stage") in ("Eclipse", "Golden Hour"))
+                and not (
+                    t.get("mode") == "Story"
+                    and (t.get("map") in ("Eclipse", "Golden Hour") or t.get("stage") in ("Eclipse", "Golden Hour"))
+                )
                 for t in tasks
             )
             if not has_linear:
@@ -1939,7 +1944,11 @@ class MacroController:
         if not task_list:
             return None
         for task in task_list:
-            if isinstance(task, dict) and task.get("mode") == "Story" and task.get("stage") == "Eclipse":
+            if (
+                isinstance(task, dict)
+                and task.get("mode") == "Story"
+                and (task.get("map") == "Eclipse" or task.get("stage") == "Eclipse")
+            ):
                 return task
         return None
 
@@ -1953,7 +1962,11 @@ class MacroController:
         if not task_list:
             return None
         for task in task_list:
-            if isinstance(task, dict) and task.get("mode") == "Story" and task.get("stage") == "Golden Hour":
+            if (
+                isinstance(task, dict)
+                and task.get("mode") == "Story"
+                and (task.get("map") == "Golden Hour" or task.get("stage") == "Golden Hour")
+            ):
                 return task
         return None
 

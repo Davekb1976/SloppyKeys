@@ -78,9 +78,13 @@ try:
     ctrl._settings.get_prioritize_golden_hour.return_value = False
     ctrl._golden_hour_played_interval = None
     ctrl._golden_hour_attempted_interval = None
-    ctrl._tasks = [{"mode": "Story", "stage": "Golden Hour", "macro": "gh_op"}]
-    assert ctrl._golden_hour_wants_in(t_11_00) is True, "Must want in when Story Golden Hour task is queued"
+    ctrl._tasks = [{"mode": "Story", "map": "Golden Hour", "macro": "gh_op"}]
+    assert ctrl._golden_hour_wants_in(t_11_00) is True, "Must want in when Story Golden Hour task is queued by map"
     assert ctrl._golden_hour_task()["macro"] == "gh_op"
+    # Backwards compatibility when stored by stage
+    ctrl._tasks = [{"mode": "Story", "stage": "Golden Hour", "macro": "gh_op_stage"}]
+    assert ctrl._golden_hour_wants_in(t_11_00) is True, "Must want in when Story Golden Hour task is queued by stage"
+    assert ctrl._golden_hour_task()["macro"] == "gh_op_stage"
 
 finally:
     os.path.isfile = orig_isfile
