@@ -1240,6 +1240,9 @@ class MacroController:
         if not rect:
             return False
 
+        MAX_CARD_ATTEMPTS = 3
+        card_clicks = getattr(self, "_eclipse_card_clicks", {})
+
         # 1. Search enabled cards in priority order
         enabled_cards = [c for c in cards if c.get("enabled", True) and c.get("name")]
         for c in enabled_cards:
@@ -1252,7 +1255,16 @@ class MacroController:
             profile = ImageProfile(name=slug(name), image_path=full_path, confidence=conf)
             match = self._engine.find_first([profile], rect)
             if match:
-                self._log(f"  [Eclipse Card] Selected '{name}' (score: {match.score:.2f})")
+                attempts = card_clicks.get(name, 0) + 1
+                card_clicks[name] = attempts
+                self._eclipse_card_clicks = card_clicks
+                if attempts > MAX_CARD_ATTEMPTS:
+                    self._log(f"  [Eclipse Card] '{name}' reached max attempts ({MAX_CARD_ATTEMPTS}) — cooling down 5s.")
+                    self._next_eclipse_card_check = time.time() + 5.0
+                    card_clicks[name] = 0
+                    return False
+
+                self._log(f"  [Eclipse Card] Selected '{name}' (attempt {attempts}/{MAX_CARD_ATTEMPTS}, score: {match.score:.2f})")
                 from sloppykeys.macro.input_scripts import nudge_click_script, SPREAD_TIGHT
                 self._ahk.run(
                     nudge_click_script(match.center_x, match.center_y, spread=SPREAD_TIGHT),
@@ -1275,7 +1287,16 @@ class MacroController:
                 match = self._engine.find_first([profile], rect)
                 if match:
                     card_title = os.path.basename(path)[:-4].replace("_", " ").title()
-                    self._log(f"  [Eclipse Card] Fallback selected '{card_title}' (score: {match.score:.2f})")
+                    attempts = card_clicks.get(card_title, 0) + 1
+                    card_clicks[card_title] = attempts
+                    self._eclipse_card_clicks = card_clicks
+                    if attempts > MAX_CARD_ATTEMPTS:
+                        self._log(f"  [Eclipse Card] '{card_title}' reached max attempts ({MAX_CARD_ATTEMPTS}) — cooling down 5s.")
+                        self._next_eclipse_card_check = time.time() + 5.0
+                        card_clicks[card_title] = 0
+                        return False
+
+                    self._log(f"  [Eclipse Card] Fallback selected '{card_title}' (attempt {attempts}/{MAX_CARD_ATTEMPTS}, score: {match.score:.2f})")
                     from sloppykeys.macro.input_scripts import nudge_click_script, SPREAD_TIGHT
                     self._ahk.run(
                         nudge_click_script(match.center_x, match.center_y, spread=SPREAD_TIGHT),
@@ -1286,6 +1307,8 @@ class MacroController:
                     self._next_eclipse_card_check = time.time() + 1.5
                     return True
 
+        if hasattr(self, "_eclipse_card_clicks") and self._eclipse_card_clicks:
+            self._eclipse_card_clicks.clear()
         return False
 
     def _execute_battle_block(self, block: dict) -> bool:

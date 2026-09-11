@@ -237,7 +237,7 @@ class UnitPlacer:
         the interval; the corner is empty ground, so the click can't select or place
         anything.
         """
-        self._click_client(*PARK_CLIENT)
+        self._click_client(*PARK_CLIENT, spread=SPREAD_TIGHT)
 
     def _park(self) -> None:
         point = self._screen(*PARK_CLIENT)
@@ -695,7 +695,7 @@ class UnitPlacer:
                 last_click = time.monotonic()
                 continue
             if now - last_click >= max(1.0, self.won_poll_click):
-                self._click_client(*PARK_CLIENT)
+                self._click_client(*PARK_CLIENT, spread=SPREAD_TIGHT)
                 clicks += 1
                 last_click = time.monotonic()
             time.sleep(OUTCOME_POLL)
