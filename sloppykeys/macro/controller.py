@@ -549,7 +549,13 @@ class MacroController:
                         # Repeat Stage drops you back in standing where you already were, so
                         # the next rep must not walk again. Every mode, not just Portals.
                         self._kept_position = bool(ok)
-                        if not ok:
+                        if ok:
+                            if hasattr(self._nav, "wait_for_match_ready"):
+                                ready, rmsg = self._nav.wait_for_match_ready()
+                                self._log(f"  Stage loaded: {rmsg}")
+                                if not ready:
+                                    self._kept_position = False
+                        else:
                             self._log(f"  Repeat: {msg} — falling through.")
 
                 # Task completed all repeats. If Eclipse or Golden Hour is prioritized, check detour.

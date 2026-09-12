@@ -946,8 +946,10 @@ class LobbyNavigator:
         path = repeat_image()
         if not self._engine.template_exists(path):
             return (True, f"skipped Repeat — {path} is missing, waiting for Start Game instead")
-        budget = self.search_timeout if timeout is None else float(timeout)
-        return self._find_click(path, "Repeat", timeout=budget)
+        budget = max(self.search_timeout if timeout is None else float(timeout), 6.0)
+        return self._find_click(
+            path, "Repeat", timeout=budget, fade_wait=self.panel_fade_wait
+        )
 
     def click_button(
         self, path: str, label: str, timeout: float = 0.0, fade_wait: float = 0.0
