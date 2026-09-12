@@ -1690,6 +1690,7 @@ class Api:
             "events": ("Events", "template"),
             "portals": ("Portals", "template"),
             "cards": ("Cards", "template"),
+            "fishing": ("Fishing", "template"),
             "reference": ("Maps", "map"),
         }
         # This table is not a display detail: the missing-template pass below filters

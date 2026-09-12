@@ -1523,6 +1523,7 @@
     else if (type === "upgrade_unit") { b.autograde = false; b.params = { times: 1 }; }
     else if (type === "walk") { b.pathName = ""; b.sprint = false; }
     else if (type === "record") b.recordingName = "";
+    else if (type === "fishing") b.params = {};
     else if (type === "detect") {
       b.image = ""; b.threshold = 0.8; b.loop = false; b.loopAttempts = 5;
       b.then = []; b.else = [];
@@ -1642,6 +1643,9 @@
     // because "it verifies itself" is the part worth knowing.
     if (t === "autoplay") {
       return `<span class="blk-field-label tip-left" data-tip="Clicks the game's Auto Play button, then confirms it turned on&#10;by finding its active state. Needs both autoplay.png and&#10;autoplay_active.png captured (Image Manager &rarr; Match State).">clicks Auto Play and confirms it turned on</span>`;
+    }
+    if (t === "fishing") {
+      return `<span class="blk-field-label tip-left" data-tip="Searches for fishing_icon.png to equip the rod, and confirms via fishing_rank.png.&#10;If fishing_rank is already visible, skips clicking.&#10;Capture both in Image Manager &rarr; Fishing.">equips rod; skips if fishing rank detected</span>`;
     }
     if (t === "target_priority") {
       // Options come from content/units.py so the order matches the in-game cycle the

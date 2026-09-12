@@ -38,6 +38,8 @@ from sloppykeys.content.nav_images import (
     autoplay_image,
     card_image,
     card_image_paths,
+    fishing_icon_image,
+    fishing_rank_image,
     exp_continue_2_image,
     exp_continue_image,
     exp_extract_confirm_image,
@@ -84,6 +86,8 @@ AUTOPLAY_CLICKS = 3
 # ~34ms against a 50ms tick, so looking every tick would burn the budget re-asking a question
 # the game has not had time to answer.
 AUTOPLAY_RECHECK = 1.0
+FISHING_CLICKS = 3
+FISHING_RECHECK = 1.0
 
 RectProvider = Callable[[], tuple[int, int, int, int] | None]
 
@@ -1333,6 +1337,8 @@ class MacroController:
             return self._tick_wait_wave(block)
         elif btype == "autoplay":
             return self._tick_autoplay(block)
+        elif btype == "fishing":
+            return self._tick_fishing(block)
         else:
             # All other blocks are one-shot (execute and move on)
             self._execute_block(block)
@@ -1614,6 +1620,60 @@ class MacroController:
         self._log(f"    [block] autoplay click {state['clicks']}/{AUTOPLAY_CLICKS}: {message}")
         return False
 
+    def _tick_fishing(self, block: dict) -> bool:
+        """Equip the fishing rod via the fishing icon, and confirm it equipped via fishing rank.
+
+        Two templates, because finding the fishing icon does not mean the rod is equipped:
+        `fishing_icon.png` is the equip button, `fishing_rank.png` is the proof.
+        If `fishing_rank.png` is already on screen, the rod is already equipped: the block
+        takes one look, does NOT click the fishing icon (which would unequip or toggle it off),
+        and returns True immediately.
+
+        If `fishing_rank.png` is not visible, it searches for `fishing_icon.png`, clicks it,
+        parks the cursor away from the control, and re-checks for `fishing_rank.png` on the
+        subsequent tick.
+        """
+        if not hasattr(self, "_fishing_state"):
+            self._fishing_state = {}
+        state = self._fishing_state.setdefault(id(block), {"clicks": 0, "next_look": 0.0})
+
+        icon_path = fishing_icon_image()
+        rank_path = fishing_rank_image()
+
+        for path in (icon_path, rank_path):
+            if not self._engine.template_exists(path):
+                self._log(f"    [block] fishing: {path} not captured — skipping (capture in Image Manager -> Fishing)")
+                del self._fishing_state[id(block)]
+                return True
+
+        now = time.time()
+        if now < state["next_look"]:
+            return False
+
+        if self._nav.sighted(rank_path):
+            if state["clicks"]:
+                self._log(f"    [block] fishing rod equipped (after {state['clicks']} click(s))")
+            else:
+                self._log("    [block] fishing rod already equipped — skipping click")
+            del self._fishing_state[id(block)]
+            return True
+
+        if state["clicks"] >= FISHING_CLICKS:
+            self._log(
+                f"    [block] fishing: clicked {state['clicks']}× and "
+                f"{rank_path} never matched — moving on"
+            )
+            del self._fishing_state[id(block)]
+            return True
+
+        fade = getattr(self._nav, "panel_fade_wait", 1.0)
+        ok, message = self._nav.click_button(icon_path, "Fishing Icon", fade_wait=fade)
+        self._placer.park()
+        state["clicks"] += 1
+        state["next_look"] = time.time() + FISHING_RECHECK
+        self._log(f"    [block] fishing click {state['clicks']}/{FISHING_CLICKS}: {message}")
+        return False
+
     def _read_current_wave(self) -> int | None:
         """Read the live match wave number via OCR on the calibrated wave region."""
         try:
@@ -1866,6 +1926,13 @@ class MacroController:
             # here. Without this branch the block would fall off the end of this chain and
             # be silently counted as done — the way any unknown type is.
             while not self._tick_autoplay(block):
+                if self._checkpoint():
+                    break
+                time.sleep(TICK_SLEEP)
+
+        elif btype == "fishing":
+            # Drain the equip/verify cycle here when executed in a linear phase.
+            while not self._tick_fishing(block):
                 if self._checkpoint():
                     break
                 time.sleep(TICK_SLEEP)

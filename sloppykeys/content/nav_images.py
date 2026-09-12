@@ -46,6 +46,8 @@ CHALLENGE_DIR = "challenge"
 REFERENCE_DIR = "reference"
 # Where Eclipse upgrade card templates live.
 CARDS_DIR = "cards"
+# Where Fishing templates live.
+FISHING_DIR = "fishing"
 
 PLAY_IMAGE = "play.png"
 # The lobby's Start button — the last click before the stage loads, on the panel that
@@ -173,6 +175,10 @@ EXP_UPGRADE_CARD_IMAGE = "exp_upgrade_card.png"
 # instant it finds the off state and place nothing all match.
 AUTOPLAY_IMAGE = "autoplay.png"
 AUTOPLAY_ACTIVE_IMAGE = "autoplay_active.png"
+
+# Fishing: icon to equip the rod, and rank badge as proof it is equipped.
+FISHING_ICON_IMAGE = "fishing_icon.png"
+FISHING_RANK_IMAGE = "fishing_rank.png"
 
 # # The post-match panel's "change gamemode" control
 # Leaving a finished match lands on a panel showing the mode just played; this is the
@@ -430,6 +436,16 @@ def autoplay_active_image() -> str:
     return os.path.join(IMAGES_DIR, MATCH_DIR, AUTOPLAY_ACTIVE_IMAGE)
 
 
+def fishing_icon_image() -> str:
+    """The Fishing Icon button clicked to equip the fishing rod."""
+    return os.path.join(IMAGES_DIR, FISHING_DIR, FISHING_ICON_IMAGE)
+
+
+def fishing_rank_image() -> str:
+    """The Fishing Rank icon — proof that the fishing rod is currently equipped."""
+    return os.path.join(IMAGES_DIR, FISHING_DIR, FISHING_RANK_IMAGE)
+
+
 def portal_bag_image() -> str:
     """The lobby's inventory bag — how a Portals run enters, instead of Play."""
     return os.path.join(IMAGES_DIR, PORTALS_DIR, PORTAL_BAG_IMAGE)
@@ -533,6 +549,9 @@ def expected_paths() -> list[str]:
         # card. `sighted` returns False for a missing file, which leaves the block inert.
         autoplay_image(),
         autoplay_active_image(),
+        # The fishing block searches for these to equip and confirm the rod
+        fishing_icon_image(),
+        fishing_rank_image(),
         # The two-step way out of a challenge detour that started nothing. Both are listed
         # even though each has a survivable miss, because the failure they prevent lands on
         # the *next* task: an unclosed panel covers whatever that task's chain starts from.
