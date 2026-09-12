@@ -26,28 +26,28 @@ ctrl._eclipse_attempted_interval = None
 
 orig_isfile = os.path.isfile
 
-# 1. Disabled in settings
-ctrl._settings.get_prioritize_eclipse.return_value = False
+# 1. Not queued in tasks
+ctrl._tasks = []
 os.path.isfile = lambda p: True if "eclipse.png" in p else orig_isfile(p)
 try:
     t_10_05 = datetime(2026, 9, 9, 10, 5, 0)
-    assert ctrl._eclipse_wants_in(t_10_05) is False, "Must not want in when setting is disabled"
+    assert ctrl._eclipse_wants_in(t_10_05) is False, "Must not want in when task is not queued"
 finally:
     os.path.isfile = orig_isfile
 
-# 2. Enabled in settings, but templates missing on disk
-ctrl._settings.get_prioritize_eclipse.return_value = True
+# 2. Queued, but templates missing on disk
+ctrl._tasks = [{"mode": "Story", "map": "Eclipse"}]
 os.path.isfile = lambda p: False if ("eclipse" in p or "golden_hour" in p) else orig_isfile(p)
 try:
     assert ctrl._eclipse_wants_in(t_10_05) is False, "Must not want in when template is missing"
 finally:
     os.path.isfile = orig_isfile
 
-# 3. Enabled and eclipse template present
+# 3. Queued and eclipse template present
 os.path.isfile = lambda p: True if "eclipse.png" in p else orig_isfile(p)
 try:
     # Initially fresh: wants in at 10:05
-    assert ctrl._eclipse_wants_in(t_10_05) is True, "Must want in initially when enabled and template present"
+    assert ctrl._eclipse_wants_in(t_10_05) is True, "Must want in initially when queued and template present"
 
     # Mark played in 10:00-10:30 rotation
     ctrl._eclipse_played_interval = interval_key(t_10_05)
@@ -76,7 +76,6 @@ try:
     assert ctrl._eclipse_wants_in(t_11_00) is True, "Must want in when crossing into :00 boundary"
 
     # 4. Queue-based task check
-    ctrl._settings.get_prioritize_eclipse.return_value = False
     ctrl._eclipse_played_interval = None
     ctrl._eclipse_attempted_interval = None
     ctrl._tasks = [{"mode": "Story", "map": "Eclipse", "macro": "ec_op"}]

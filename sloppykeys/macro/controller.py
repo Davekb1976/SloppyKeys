@@ -2499,9 +2499,7 @@ class MacroController:
         """
         gh_task = self._golden_hour_task(tasks)
         if gh_task is None:
-            settings = getattr(self, "_settings", None)
-            if settings is None or not getattr(settings, "get_prioritize_golden_hour", lambda: False)():
-                return False
+            return False
 
         from sloppykeys.content.nav_images import golden_hour_image
 
@@ -2664,9 +2662,7 @@ class MacroController:
         """
         ec_task = self._eclipse_task(tasks)
         if ec_task is None:
-            settings = getattr(self, "_settings", None)
-            if settings is None or not getattr(settings, "get_prioritize_eclipse", lambda: False)():
-                return False
+            return False
 
         from sloppykeys.content.nav_images import eclipse_act_image, eclipse_image
 
