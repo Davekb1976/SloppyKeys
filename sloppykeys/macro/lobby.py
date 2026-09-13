@@ -70,6 +70,7 @@ from sloppykeys.content.nav_images import (
     win_change_image,
 )
 from sloppykeys.content.portals import search_coord, slot_coord
+from sloppykeys.content.teams_regions import unit_teams_region
 from sloppykeys.content.nav_route import (
     KIND_CLICK,
     KIND_EXPECT,
@@ -1118,7 +1119,7 @@ class LobbyNavigator:
         units_icon = teams_units_icon_image()
         if not self._engine.template_exists(units_icon):
             return (False, f"template {units_icon} missing — capture Units icon in Image Manager > Teams")
-        ok, msg = self._find_click(units_icon, "Units Icon", timeout=self.search_timeout, fade_wait=0.2)
+        ok, msg = self._find_click(units_icon, "Units Icon", timeout=self.search_timeout, fade_wait=0.15)
         if not ok:
             return (False, f"Units icon: {msg}")
         time.sleep(self.click_settle)
@@ -1127,7 +1128,7 @@ class LobbyNavigator:
         teams_btn = teams_btn_image()
         if not self._engine.template_exists(teams_btn):
             return (False, f"template {teams_btn} missing — capture Teams button in Image Manager > Teams")
-        ok, msg = self._find_click(teams_btn, "Teams Button", timeout=self.search_timeout, fade_wait=0.3)
+        ok, msg = self._find_click(teams_btn, "Teams Button", timeout=self.search_timeout, fade_wait=0.2)
         if not ok:
             return (False, f"Teams button: {msg}")
 
@@ -1136,6 +1137,7 @@ class LobbyNavigator:
         header_match = self._find(header_path, timeout=self.search_timeout)
         if header_match is None:
             return (False, self._miss(header_path, "Unit Teams Dialog"))
+        time.sleep(0.35)
 
         # 4. Locate target team via OCR and click its Load Team button
         load_path = teams_load_btn_image()
@@ -1146,8 +1148,10 @@ class LobbyNavigator:
         if not ready:
             return (False, f"OCR unavailable for team scanning: {ocr_msg}")
 
-        scroll_client = (header_match.center_x - rect[0], header_match.center_y - rect[1] + 150)
+        px, py, pw, ph = unit_teams_region()
+        scroll_client = (px + pw // 2, py + 150)
         team_num_re = re.compile(r"\bteam\s*#?\s*([1-8])\b", re.IGNORECASE)
+        step_settle = min(0.35, self.scroll_settle)
 
         target_btn_click: tuple[int, int] | None = None
         max_scan_attempts = 16
@@ -1160,8 +1164,11 @@ class LobbyNavigator:
             if rect is None:
                 return (False, "Roblox not found")
 
-            # Capture client area for OCR and template search
-            frame = self._engine.capture_bgr(rect)
+            rx, ry, _rw, _rh = rect
+            panel_screen = (rx + px, ry + py, pw, ph)
+
+            # Capture focused panel area for OCR and button search
+            frame = self._engine.capture_bgr(panel_screen)
             if frame is None:
                 time.sleep(self.search_poll)
                 continue
@@ -1179,16 +1186,16 @@ class LobbyNavigator:
                         target_block = b
 
             if target_block is not None:
-                target_top_screen = rect[1] + target_block.y
-                modal_bottom = header_match.top + 370
+                target_top_screen = ry + py + target_block.y
+                modal_bottom = ry + py + ph
 
-                # Search for Load Team button in this team's row
+                # Search for Load Team button in this team's row within the panel
                 load_profile = ImageProfile(
                     name="load_team",
                     image_path=self._engine.to_absolute_path(load_path),
                     confidence=confidence_for(load_path),
                 )
-                matches = self._engine.find_instances(load_profile, rect, limit=6)
+                matches = self._engine.find_instances(load_profile, panel_screen, limit=6)
 
                 # Filter for matches whose center_y falls within this team's row and inside visible modal
                 row_matches = [
@@ -1205,17 +1212,17 @@ class LobbyNavigator:
                 if target_top_screen + 85 > modal_bottom:
                     # Cut off at bottom of dialog, nudge down 1 notch to reveal
                     self._scroll_at(scroll_client, notches=1)
-                    time.sleep(self.scroll_settle)
+                    time.sleep(step_settle)
                     continue
 
-                if target_top_screen < header_match.top + 40:
+                if target_top_screen < ry + py + 40:
                     # Cut off at top of dialog, nudge up 1 notch to reveal
                     self._scroll_at(scroll_client, notches=-1)
-                    time.sleep(self.scroll_settle)
+                    time.sleep(step_settle)
                     continue
 
-                # Calibrated fallback relative to header and target_block
-                fallback_x = header_match.left + 569
+                # Calibrated fallback relative to panel and target_block
+                fallback_x = rx + px + pw - 120
                 fallback_y = target_top_screen + 75
                 target_btn_click = (fallback_x, fallback_y)
                 break
@@ -1233,7 +1240,7 @@ class LobbyNavigator:
                 notches = 1 if team_num > 2 else -1
 
             self._scroll_at(scroll_client, notches=notches)
-            time.sleep(self.scroll_settle)
+            time.sleep(step_settle)
 
         if target_btn_click is None:
             return (False, f"Team #{team_num} not found in Unit Teams dialog after scrolling")
@@ -1250,7 +1257,7 @@ class LobbyNavigator:
         # 5. Confirm Popup
         confirm_path = teams_confirm_image()
         if self._engine.template_exists(confirm_path):
-            ok, msg = self._find_click(confirm_path, "Confirm Load Team", timeout=self.search_timeout, fade_wait=0.4)
+            ok, msg = self._find_click(confirm_path, "Confirm Load Team", timeout=self.search_timeout, fade_wait=0.2)
             if not ok:
                 return (False, f"Confirm popup: {msg}")
             time.sleep(self.click_settle)
@@ -1260,7 +1267,7 @@ class LobbyNavigator:
         # 6. Include Equipments Popup
         include_path = teams_include_image()
         if self._engine.template_exists(include_path):
-            ok, msg = self._find_click(include_path, "Include Equipments", timeout=self.search_timeout, fade_wait=0.4)
+            ok, msg = self._find_click(include_path, "Include Equipments", timeout=self.search_timeout, fade_wait=0.2)
             if not ok:
                 return (False, f"Include equipments popup: {msg}")
             time.sleep(self.click_settle)
@@ -1270,12 +1277,12 @@ class LobbyNavigator:
         # 7. Close Dialog
         close_path = teams_close_image()
         if self._engine.template_exists(close_path):
-            ok, msg = self._find_click(close_path, "Close Teams", timeout=self.search_timeout, fade_wait=0.2)
+            ok, msg = self._find_click(close_path, "Close Teams", timeout=self.search_timeout, fade_wait=0.15)
             if not ok:
                 return (False, f"Close Teams: {msg}")
         else:
-            close_x = header_match.left + 620
-            close_y = header_match.top + 30
+            close_x = rx + px + pw - 45
+            close_y = ry + py + 30
             self._ahk.run(nudge_click_script(close_x, close_y, park=self._park_point()), wait=True)
 
         time.sleep(self.click_settle)

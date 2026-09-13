@@ -166,7 +166,22 @@ assert team_num_re.search("Save Team") is None
 assert team_num_re.search("Load Team") is None
 assert team_num_re.search("Team #10") is None
 
-# 6. Test LobbyNavigator.equip_team with OCR row matching
+# 6. Test unit_teams_region defaults and overrides
+from sloppykeys.content.teams_regions import (
+    UNIT_TEAMS_DEFAULT_REGION,
+    apply_region_overrides,
+    region_key,
+    unit_teams_region,
+)
+
+assert unit_teams_region() == UNIT_TEAMS_DEFAULT_REGION
+apply_region_overrides({region_key("panel"): (200, 150, 700, 420)})
+assert unit_teams_region() == (200, 150, 700, 420)
+# Reset to default
+apply_region_overrides({})
+assert unit_teams_region() == UNIT_TEAMS_DEFAULT_REGION
+
+# 7. Test LobbyNavigator.equip_team with OCR row matching
 import numpy as np
 
 class MockOcr:
@@ -201,14 +216,17 @@ class RecordingAhk:
         self.scripts.append(script)
         return (True, "ok")
 
+# Default panel is (230, 170, 695, 415).
+# Target blocks inside panel: Team #1 at y=47, Team #2 at y=172.
+# In screen space: Team #2 top = 170 + 172 = 342, button center_y = 417.
 blocks_f1 = [
-    TextBlock(text="Unit Teams", score=0.96, x=56, y=35, width=97, height=23),
-    TextBlock(text="Team #1", score=0.92, x=83, y=92, width=51, height=15),
-    TextBlock(text="Team #2", score=0.95, x=83, y=217, width=54, height=15),
+    TextBlock(text="Unit Teams", score=0.96, x=56, y=15, width=97, height=23),
+    TextBlock(text="Team #1", score=0.92, x=83, y=47, width=51, height=15),
+    TextBlock(text="Team #2", score=0.95, x=83, y=172, width=54, height=15),
 ]
 load_matches = [
-    ImageMatch(profile_name="load_team", score=0.99, center_x=630, center_y=167, left=597, top=159, width=67, height=16),
-    ImageMatch(profile_name="load_team", score=0.95, center_x=630, center_y=292, left=597, top=284, width=67, height=16),
+    ImageMatch(profile_name="load_team", score=0.99, center_x=630, center_y=292, left=597, top=284, width=67, height=16),
+    ImageMatch(profile_name="load_team", score=0.95, center_x=630, center_y=417, left=597, top=409, width=67, height=16),
 ]
 
 mock_ocr = MockOcr([blocks_f1])
@@ -229,14 +247,14 @@ test_nav._find = lambda path, **kw: ImageMatch(profile_name="header", score=0.99
 ok, msg = test_nav.equip_team(2)
 assert ok is True, f"Expected success, got: {msg}"
 assert "Team #2 equipped" in msg
-# Load Team click must be for Team 2 (y=292), not Team 1 (y=167)
-assert "292" in mock_ahk.scripts[0]
+# Load Team click must be for Team 2 (y=417), not Team 1 (y=292)
+assert "417" in mock_ahk.scripts[0]
 assert "630" in mock_ahk.scripts[0]
 
-# 7. Test scroll-down then equip
+# 8. Test scroll-down then equip
 blocks_f2 = [
-    TextBlock(text="Team #4", score=0.94, x=83, y=92, width=51, height=15),
-    TextBlock(text="Team #5", score=0.97, x=83, y=217, width=54, height=15),
+    TextBlock(text="Team #4", score=0.94, x=83, y=47, width=51, height=15),
+    TextBlock(text="Team #5", score=0.97, x=83, y=172, width=54, height=15),
 ]
 mock_ocr_scroll = MockOcr([blocks_f1, blocks_f2])
 mock_ahk_scroll = RecordingAhk()
@@ -255,6 +273,7 @@ ok, msg = scroll_nav.equip_team(5)
 assert ok is True, f"Expected success, got: {msg}"
 assert "Team #5 equipped" in msg
 assert "WheelDown" in mock_ahk_scroll.scripts[0]
-assert "292" in mock_ahk_scroll.scripts[1]
+assert "417" in mock_ahk_scroll.scripts[1]
 
 print("team loadout tests: OK")
+

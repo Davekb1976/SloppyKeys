@@ -902,6 +902,7 @@ class Api:
     # read means anything. Add a table here and the OCR tab grows a section for it.
     _REGION_GROUPS = (
         ("challenge", "Challenge Panel", "the Challenge panel must be open"),
+        ("teams", "Unit Teams", "the Unit Teams dialog must be open"),
         ("match", "In Match", "a stage must be running"),
     )
 
@@ -909,8 +910,9 @@ class Api:
     def _region_tables():
         from sloppykeys.content import challenge as _challenge
         from sloppykeys.content import match_regions as _match
+        from sloppykeys.content import teams_regions as _teams
 
-        return {"challenge": _challenge, "match": _match}
+        return {"challenge": _challenge, "match": _match, "teams": _teams}
 
     def get_vision_region_specs(self) -> list:
         """Every editable OCR box, tagged with the group whose screen it belongs to."""
@@ -1272,6 +1274,11 @@ class Api:
             ok_avail, msg = ocr.available()
             if not ok_avail:
                 return {"ok": False, "reason": msg}
+            if h > 80:
+                blocks = ocr.read_all(img)
+                text = ", ".join(b.text for b in blocks if b.text)[:120]
+                score = round(sum(b.score for b in blocks) / len(blocks), 3) if blocks else 0.0
+                return {"ok": True, "text": text or "(empty)", "score": score}
             result = ocr.read_line(img)
             return {"ok": True, "text": result.text or "(empty)", "score": round(result.score, 3)}
         except Exception as exc:
