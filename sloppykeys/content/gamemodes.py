@@ -288,6 +288,8 @@ def sanitize_task(task: dict) -> dict:
         task["stage"] = ""
         task["difficulty"] = ""
         task["repeat"] = 1
+    raw_team = str(task.get("team") or "").strip()
+    task["team"] = raw_team if raw_team in {"1", "2", "3", "4", "5", "6", "7", "8"} else ""
     return task
 
 

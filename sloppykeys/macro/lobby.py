@@ -56,6 +56,13 @@ from sloppykeys.content.nav_images import (
     stage_image,
     start_game_image,
     start_match_image,
+    teams_btn_image,
+    teams_close_image,
+    teams_confirm_image,
+    teams_include_image,
+    teams_load_btn_image,
+    teams_units_icon_image,
+    unit_teams_header_image,
     win_change_image,
 )
 from sloppykeys.content.portals import search_coord, slot_coord
@@ -1084,6 +1091,110 @@ class LobbyNavigator:
                 return (False, difficulty_message)
             time.sleep(self.click_settle)
         return self.start_stage(gamemode, hard_mode)
+
+    def equip_team(self, team_num: int, in_match: bool = False) -> tuple[bool, str]:
+        """Equip Team 1-8 via the Units menu -> Unit Teams dialog."""
+        if not (1 <= team_num <= 8):
+            return (False, f"invalid team number {team_num} (must be 1-8)")
+
+        rect = self._rect()
+        if rect is None:
+            return (False, "Roblox not found")
+
+        # 1. Open Units UI
+        units_icon = teams_units_icon_image()
+        if not self._engine.template_exists(units_icon):
+            return (False, f"template {units_icon} missing — capture Units icon in Image Manager > Teams")
+        ok, msg = self._find_click(units_icon, "Units Icon", timeout=self.search_timeout, fade_wait=0.2)
+        if not ok:
+            return (False, f"Units icon: {msg}")
+        time.sleep(self.click_settle)
+
+        # 2. Open Unit Teams
+        teams_btn = teams_btn_image()
+        if not self._engine.template_exists(teams_btn):
+            return (False, f"template {teams_btn} missing — capture Teams button in Image Manager > Teams")
+        ok, msg = self._find_click(teams_btn, "Teams Button", timeout=self.search_timeout, fade_wait=0.3)
+        if not ok:
+            return (False, f"Teams button: {msg}")
+
+        # 3. Verify Unit Teams dialog appeared
+        header_path = unit_teams_header_image()
+        header_match = self._find(header_path, timeout=self.search_timeout)
+        if header_match is None:
+            return (False, self._miss(header_path, "Unit Teams Dialog"))
+
+        # 4. Scroll to target team if needed (Teams 3-8)
+        load_path = teams_load_btn_image()
+        if not self._engine.template_exists(load_path):
+            return (False, f"template {load_path} missing — capture Load Team button in Image Manager > Teams")
+
+        if team_num >= 3:
+            scroll_client = (header_match.center_x - rect[0], header_match.center_y - rect[1] + 150)
+            scroll_steps = team_num - 2
+            for _ in range(scroll_steps):
+                self._scroll_at(scroll_client, notches=4)
+                time.sleep(self.scroll_settle)
+
+        rect = self._rect()
+        if rect is None:
+            return (False, "Roblox not found")
+
+        matches = self._engine.find_instances(rect, load_path, limit=4)
+        if not matches:
+            # Fallback: estimate button position relative to header
+            rel_y = 141 if team_num == 1 else 266
+            target_x = header_match.left + 586
+            target_y = header_match.top + rel_y
+            ok, click_msg = self._ahk.run(
+                nudge_click_script(target_x, target_y, park=self._park_point()),
+                wait=True,
+                timeout=8,
+            )
+            if not ok:
+                return (False, f"Load Team click failed: {click_msg}")
+        else:
+            matches.sort(key=lambda m: m.top)
+            idx = 0 if team_num == 1 else min(1, len(matches) - 1)
+            target_button = matches[idx]
+            ok, click_msg = self._click(target_button)
+            if not ok:
+                return (False, f"Load Team click failed: {click_msg}")
+
+        time.sleep(self.click_settle)
+
+        # 5. Confirm Popup
+        confirm_path = teams_confirm_image()
+        if self._engine.template_exists(confirm_path):
+            ok, msg = self._find_click(confirm_path, "Confirm Load Team", timeout=self.search_timeout, fade_wait=0.4)
+            if not ok:
+                return (False, f"Confirm popup: {msg}")
+            time.sleep(self.click_settle)
+        else:
+            self._log(f"  Notice: {confirm_path} missing — capture Confirm button in Image Manager > Teams")
+
+        # 6. Include Equipments Popup
+        include_path = teams_include_image()
+        if self._engine.template_exists(include_path):
+            ok, msg = self._find_click(include_path, "Include Equipments", timeout=self.search_timeout, fade_wait=0.4)
+            if not ok:
+                return (False, f"Include equipments popup: {msg}")
+            time.sleep(self.click_settle)
+        else:
+            self._log(f"  Notice: {include_path} missing — capture Include button in Image Manager > Teams")
+
+        # 7. Close Dialog
+        close_path = teams_close_image()
+        if self._engine.template_exists(close_path):
+            ok, msg = self._find_click(close_path, "Close Teams", timeout=self.search_timeout, fade_wait=0.2)
+        else:
+            close_x = header_match.left + 610
+            close_y = header_match.top + 25
+            self._ahk.run(nudge_click_script(close_x, close_y, park=self._park_point()), wait=True)
+
+        time.sleep(self.click_settle)
+        return (True, f"Team #{team_num} equipped")
+
 
     # # Events routes
     def click_events(self) -> tuple[bool, str]:

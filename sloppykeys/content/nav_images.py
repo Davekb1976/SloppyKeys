@@ -48,6 +48,8 @@ REFERENCE_DIR = "reference"
 CARDS_DIR = "cards"
 # Where Fishing templates live.
 FISHING_DIR = "fishing"
+# Where Unit Teams loadout templates live.
+TEAMS_DIR = "teams"
 
 PLAY_IMAGE = "play.png"
 # The lobby's Start button — the last click before the stage loads, on the panel that
@@ -482,6 +484,63 @@ def portal_paths() -> list[str]:
     ]
 
 
+TEAMS_UNITS_ICON_IMAGE = "units_icon.png"
+TEAMS_BTN_IMAGE = "teams_btn.png"
+TEAMS_LOAD_BTN_IMAGE = "load_team.png"
+TEAMS_CONFIRM_IMAGE = "confirm_btn.png"
+TEAMS_INCLUDE_IMAGE = "include_btn.png"
+TEAMS_CLOSE_IMAGE = "close_teams.png"
+UNIT_TEAMS_HEADER_IMAGE = "unit_teams_header.png"
+
+
+def teams_units_icon_image() -> str:
+    """The Units icon in the lobby or in-match to open the units menu."""
+    return os.path.join(IMAGES_DIR, TEAMS_DIR, TEAMS_UNITS_ICON_IMAGE).replace("\\", "/")
+
+
+def teams_btn_image() -> str:
+    """The Teams button inside the Units menu that opens the Unit Teams modal."""
+    return os.path.join(IMAGES_DIR, TEAMS_DIR, TEAMS_BTN_IMAGE).replace("\\", "/")
+
+
+def teams_load_btn_image() -> str:
+    """The green 'Load Team' button in the Unit Teams list."""
+    return os.path.join(IMAGES_DIR, TEAMS_DIR, TEAMS_LOAD_BTN_IMAGE).replace("\\", "/")
+
+
+def teams_confirm_image() -> str:
+    """The 'Confirm' button on the load team confirmation popup."""
+    return os.path.join(IMAGES_DIR, TEAMS_DIR, TEAMS_CONFIRM_IMAGE).replace("\\", "/")
+
+
+def teams_include_image() -> str:
+    """The 'Include' button on the equipment load popup."""
+    return os.path.join(IMAGES_DIR, TEAMS_DIR, TEAMS_INCLUDE_IMAGE).replace("\\", "/")
+
+
+def teams_close_image() -> str:
+    """The close button ('X') on the Unit Teams modal."""
+    return os.path.join(IMAGES_DIR, TEAMS_DIR, TEAMS_CLOSE_IMAGE).replace("\\", "/")
+
+
+def unit_teams_header_image() -> str:
+    """The 'Unit Teams' header banner proving the teams modal is open."""
+    return os.path.join(IMAGES_DIR, TEAMS_DIR, UNIT_TEAMS_HEADER_IMAGE).replace("\\", "/")
+
+
+def teams_paths() -> list[str]:
+    """Every template a Team Loadout routine looks for."""
+    return [
+        teams_units_icon_image(),
+        teams_btn_image(),
+        teams_load_btn_image(),
+        teams_confirm_image(),
+        teams_include_image(),
+        teams_close_image(),
+        unit_teams_header_image(),
+    ]
+
+
 
 
 
@@ -559,6 +618,7 @@ def expected_paths() -> list[str]:
         close_gamemode_image(),
     ]
     paths += expedition_match_paths()
+    paths += teams_paths()
     # Listed before the gamemode loop because Portals' chain is not derived from the
     # schema: it enters through the bag, so it has neither a card in `gamemodes/` nor
     # stage cards, and the loop below would produce nothing for it.

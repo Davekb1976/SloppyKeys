@@ -433,6 +433,7 @@
   const taskBuilderEmpty = document.getElementById("task-builder-empty");
   const queueCount = document.getElementById("queue-count");
   const tbMode = document.getElementById("tb-mode");
+  const tbTeam = document.getElementById("tb-team");
   const tbMap = document.getElementById("tb-map");
   const tbStage = document.getElementById("tb-stage");
   const tbDifficulty = document.getElementById("tb-difficulty");
@@ -486,10 +487,12 @@
           .map((enabled, n) => (enabled ? "#" + (n + 1) : null))
           .filter(Boolean);
         bits.push(on.length ? "slots " + on.join(" ") : "every slot off");
+        if (t.team) bits.push("Team " + t.team);
         const assigned = Object.keys(t.challenge_macros || {}).filter((m) => t.challenge_macros[m]);
         bits.push(assigned.length ? assigned.length + " map macro" + (assigned.length === 1 ? "" : "s") : "no macros assigned");
       } else if (isStoryEvent) {
         bits.push("Auto-Detect map");
+        if (t.team) bits.push("Team " + t.team);
         bits.push(t.macro || "no macro assigned");
       } else {
         if (fields.difficulty && t.difficulty) bits.push(t.difficulty);
@@ -498,6 +501,7 @@
         if (t.mode === "Story" && t.stage === "Infinite" && t.leave_at_wave) {
           bits.push("leave @ w" + t.leave_at_wave);
         }
+        if (t.team) bits.push("Team " + t.team);
         if (t.macro) bits.push(t.macro);
       }
       // Challenge is taken by availability, not by position, so the number on the left is
@@ -671,6 +675,7 @@
     taskBuilderEmpty.style.display = "none";
     // Populate fields
     tbMode.value = task.mode || "";
+    tbTeam.value = task.team || "";
     // Toggle Challenge vs Standard fields based on mode
     const isChallenge = tbMode.value === "Challenge";
     document.getElementById("tb-standard-fields").style.display = isChallenge ? "none" : "contents";
@@ -805,6 +810,7 @@
     const isStoryEvent = tbMode.value === "Story" && (tbMap.value === "Eclipse" || tbMap.value === "Golden Hour" || tbStage.value === "Eclipse" || tbStage.value === "Golden Hour");
     const changes = {
       mode: tbMode.value,
+      team: tbTeam.value || "",
       repeat: isStoryEvent ? 1 : Math.max(1, parseInt(tbRepeat.value) || 1),
       macro: tbMacro.value,
     };
@@ -868,12 +874,12 @@
       applyModeFields(tbMode.value).then(() =>
         // The new mode may not offer the difficulty the old one had, so save after the
         // rebuild rather than storing a value the control no longer lists.
-        loadDifficulty(tbMode.value, tbDifficulty.value).then(() => saveCurrentTask())
+        loadDifficulty(tbMode.value, "").then(saveCurrentTask)
       );
-      return;
     }
     saveCurrentTask();
   });
+  tbTeam.addEventListener("change", saveCurrentTask);
   tbMap.addEventListener("change", () => {
     loadStages(tbMode.value, tbMap.value, "");
     updateStoryEventVisibility(tbMode.value, tbMap.value);
@@ -898,7 +904,7 @@
 
   document.getElementById("btn-add-task").addEventListener("click", () => {
     if (!window.pywebview || !pywebview.api) return;
-    const newTask = { mode: "Story", map: "", stage: "", difficulty: "Normal", repeat: 1, macro: "" };
+    const newTask = { mode: "Story", map: "", stage: "", difficulty: "Normal", repeat: 1, macro: "", team: "" };
     pywebview.api.add_task(newTask).then((r) => {
       if (r.ok) {
         newTask.id = r.id;

@@ -162,6 +162,7 @@ class MacroController:
         # into the stage exactly where you stood, so the pre-start walk must not replay. Any
         self._kept_position = False
         self._left_early = False
+        self._equipped_team: int | None = None
         from sloppykeys.core.ocr import OcrReader
         self._ocr = OcrReader()
         self._cycle = 0
@@ -223,6 +224,7 @@ class MacroController:
         self._camera_set = False
         self._kept_position = False
         self._left_early = False
+        self._equipped_team = None
         self._cycle = 0
         self._golden_hour_played_interval = None
         self._golden_hour_attempted_interval = None
@@ -592,8 +594,23 @@ class MacroController:
         # Check if already in match
         if self._nav.in_match():
             self._log("  Already in a match — skipping lobby.")
+            self._ensure_team_equipped()
             self._ensure_camera()
             return True
+
+        target_team = (self._current_task or {}).get("team")
+        needs_team_change = bool(target_team) and (
+            str(target_team).isdigit() and int(target_team) != self._equipped_team
+        )
+        if needs_team_change and self._nav.result_screen_up():
+            ok, msg = self._back_to_lobby()
+            self._log(f"  Back to lobby for team change: {msg}")
+            if not ok:
+                return False
+            time.sleep(self._nav.click_settle)
+
+        if not self._ensure_team_equipped():
+            self._log("  Notice: could not equip requested team — continuing with current team.")
 
         # Standing on a finished match — a loss, or a win whose Repeat was not taken. Every
         # chain below opens with a click that does not exist on that screen, so leave it
@@ -831,6 +848,31 @@ class MacroController:
         if ok:
             self._camera_set = False
         return (ok, msg)
+
+    def _ensure_team_equipped(self, task: dict | None = None) -> bool:
+        """Equip the team specified in task if different from currently equipped team."""
+        t = task or self._current_task or {}
+        raw_team = t.get("team")
+        if not raw_team:
+            return True
+        try:
+            team_num = int(raw_team)
+        except (ValueError, TypeError):
+            return True
+        if team_num < 1 or team_num > 8:
+            return True
+        if self._equipped_team == team_num:
+            return True
+
+        in_match = self._nav.in_match()
+        self._log(f"  Equipping Team #{team_num} ({'in match' if in_match else 'in lobby'})...")
+        ok, msg = self._nav.equip_team(team_num, in_match=in_match)
+        if ok:
+            self._equipped_team = team_num
+            self._log(f"  {msg}")
+            return True
+        self._log(f"  Failed to equip Team #{team_num}: {msg}")
+        return False
 
     def run_camera(self) -> None:
         """Camera setup — pitch down, then zoom out. Public because the Image Manager runs
@@ -2262,6 +2304,9 @@ class MacroController:
 
         self._log("  Challenge: scanning panel...")
 
+        # Equip challenge team if specified
+        self._ensure_team_equipped(task)
+
         # Navigate to the challenge panel
         ok = self._navigate_to_challenge()
         if not ok:
@@ -2535,7 +2580,10 @@ class MacroController:
 
         previous_task = self._current_task
         previous_phases = getattr(self, "_phases", None)
+        gh_task = self._golden_hour_task()
+        self._current_task = gh_task
         try:
+            self._ensure_team_equipped(gh_task)
             return self._run_golden_hour_detour_inner()
         finally:
             self._current_task = previous_task
@@ -2700,8 +2748,11 @@ class MacroController:
 
         previous_task = self._current_task
         previous_phases = getattr(self, "_phases", None)
+        ec_task = self._eclipse_task()
+        self._current_task = ec_task
         try:
             self._is_eclipse_match = True
+            self._ensure_team_equipped(ec_task)
             return self._run_eclipse_detour_inner()
         finally:
             self._is_eclipse_match = False

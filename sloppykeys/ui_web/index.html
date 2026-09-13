@@ -353,9 +353,26 @@
           <div class="panel-body">
             <div id="task-builder" class="task-builder" style="display:none;">
               <div class="setting-group" style="display:grid; grid-template-columns:1fr 1fr; gap:10px 20px;">
-                <div class="setting-row" style="grid-column:1/3;">
+                <div class="setting-row" id="tb-mode-row">
                   <div class="setting-info"><span class="setting-label">Mode</span></div>
-                  <select class="setting-select" id="tb-mode" style="width:160px;"></select>
+                  <select class="setting-select" id="tb-mode" style="width:140px;"></select>
+                </div>
+                <div class="setting-row" id="tb-team-row">
+                  <div class="setting-info">
+                    <span class="setting-label">Team</span>
+                    <span class="setting-desc">Loadout (1–8)</span>
+                  </div>
+                  <select class="setting-select" id="tb-team" style="width:140px;">
+                    <option value="">Default (don't change)</option>
+                    <option value="1">Team 1</option>
+                    <option value="2">Team 2</option>
+                    <option value="3">Team 3</option>
+                    <option value="4">Team 4</option>
+                    <option value="5">Team 5</option>
+                    <option value="6">Team 6</option>
+                    <option value="7">Team 7</option>
+                    <option value="8">Team 8</option>
+                  </select>
                 </div>
                 <div id="tb-standard-fields" style="display:contents;">
                   <div class="setting-row" id="tb-map-row">
