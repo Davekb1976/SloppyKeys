@@ -1115,20 +1115,22 @@ class LobbyNavigator:
         if rect is None:
             return (False, "Roblox not found")
 
+        btn_fade_wait = 0.08
+
         # 1. Open Units UI
         units_icon = teams_units_icon_image()
         if not self._engine.template_exists(units_icon):
             return (False, f"template {units_icon} missing — capture Units icon in Image Manager > Teams")
-        ok, msg = self._find_click(units_icon, "Units Icon", timeout=self.search_timeout, fade_wait=0.15)
+        ok, msg = self._find_click(units_icon, "Units Icon", timeout=self.search_timeout, fade_wait=btn_fade_wait)
         if not ok:
             return (False, f"Units icon: {msg}")
-        time.sleep(self.click_settle)
+        time.sleep(btn_fade_wait)
 
         # 2. Open Unit Teams
         teams_btn = teams_btn_image()
         if not self._engine.template_exists(teams_btn):
             return (False, f"template {teams_btn} missing — capture Teams button in Image Manager > Teams")
-        ok, msg = self._find_click(teams_btn, "Teams Button", timeout=self.search_timeout, fade_wait=0.2)
+        ok, msg = self._find_click(teams_btn, "Teams Button", timeout=self.search_timeout, fade_wait=btn_fade_wait)
         if not ok:
             return (False, f"Teams button: {msg}")
 
@@ -1137,7 +1139,7 @@ class LobbyNavigator:
         header_match = self._find(header_path, timeout=self.search_timeout)
         if header_match is None:
             return (False, self._miss(header_path, "Unit Teams Dialog"))
-        time.sleep(0.35)
+        time.sleep(btn_fade_wait)
 
         # 4. Locate target team via OCR and click its Load Team button
         load_path = teams_load_btn_image()
@@ -1151,7 +1153,7 @@ class LobbyNavigator:
         px, py, pw, ph = unit_teams_region()
         scroll_client = (px + pw // 2, py + 150)
         team_num_re = re.compile(r"\bteam\s*#?\s*([1-8])\b", re.IGNORECASE)
-        step_settle = min(0.35, self.scroll_settle)
+        step_settle = min(0.2, self.scroll_settle)
 
         target_btn_click: tuple[int, int] | None = None
         max_scan_attempts = 16
@@ -1227,17 +1229,17 @@ class LobbyNavigator:
                 target_btn_click = (fallback_x, fallback_y)
                 break
 
-            # Target team not visible yet -> scroll 1 notch in the right direction
+            # Target team not visible yet -> scroll 2 notches in the right direction
             if visible_teams:
                 team_numbers = [num for num, _ in visible_teams]
                 if all(n < team_num for n in team_numbers):
-                    notches = 1
+                    notches = 2
                 elif all(n > team_num for n in team_numbers):
-                    notches = -1
+                    notches = -2
                 else:
-                    notches = 1 if (sum(team_numbers) / len(team_numbers)) < team_num else -1
+                    notches = 2 if (sum(team_numbers) / len(team_numbers)) < team_num else -2
             else:
-                notches = 1 if team_num > 2 else -1
+                notches = 2 if team_num > 2 else -2
 
             self._scroll_at(scroll_client, notches=notches)
             time.sleep(step_settle)
@@ -1252,32 +1254,32 @@ class LobbyNavigator:
         )
         if not ok:
             return (False, f"Load Team click failed: {click_msg}")
-        time.sleep(self.click_settle)
+        time.sleep(btn_fade_wait)
 
         # 5. Confirm Popup
         confirm_path = teams_confirm_image()
         if self._engine.template_exists(confirm_path):
-            ok, msg = self._find_click(confirm_path, "Confirm Load Team", timeout=self.search_timeout, fade_wait=0.2)
+            ok, msg = self._find_click(confirm_path, "Confirm Load Team", timeout=self.search_timeout, fade_wait=btn_fade_wait)
             if not ok:
                 return (False, f"Confirm popup: {msg}")
-            time.sleep(self.click_settle)
+            time.sleep(btn_fade_wait)
         else:
             self._log(f"  Notice: {confirm_path} missing — capture Confirm button in Image Manager > Teams")
 
         # 6. Include Equipments Popup
         include_path = teams_include_image()
         if self._engine.template_exists(include_path):
-            ok, msg = self._find_click(include_path, "Include Equipments", timeout=self.search_timeout, fade_wait=0.2)
+            ok, msg = self._find_click(include_path, "Include Equipments", timeout=self.search_timeout, fade_wait=btn_fade_wait)
             if not ok:
                 return (False, f"Include equipments popup: {msg}")
-            time.sleep(self.click_settle)
+            time.sleep(btn_fade_wait)
         else:
             self._log(f"  Notice: {include_path} missing — capture Include button in Image Manager > Teams")
 
         # 7. Close Dialog
         close_path = teams_close_image()
         if self._engine.template_exists(close_path):
-            ok, msg = self._find_click(close_path, "Close Teams", timeout=self.search_timeout, fade_wait=0.15)
+            ok, msg = self._find_click(close_path, "Close Teams", timeout=self.search_timeout, fade_wait=btn_fade_wait)
             if not ok:
                 return (False, f"Close Teams: {msg}")
         else:
@@ -1285,7 +1287,7 @@ class LobbyNavigator:
             close_y = ry + py + 30
             self._ahk.run(nudge_click_script(close_x, close_y, park=self._park_point()), wait=True)
 
-        time.sleep(self.click_settle)
+        time.sleep(min(0.2, self.click_settle))
         return (True, f"Team #{team_num} equipped")
 
 
