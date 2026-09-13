@@ -865,11 +865,11 @@ class MacroController:
             time.sleep(TICK_SLEEP)
 
     def _run_match(self, battle: list, loop_a: list, loop_b: list) -> None:
-        """Tick-based match execution: Battle runs once through, Loop A/B repeat
-        continuously, all interleaved with outcome detection.
+        """Tick-based match execution: Battle runs once through, then Loop A/B repeat
+        continuously once Battle completes, all interleaved with outcome detection.
 
-        Each tick: advance Battle by one block (if not exhausted), then Loop A by
-        one, then Loop B by one, then poll for win/loss. This cooperative approach
+        Each tick: advance Battle by one block (if not exhausted), or advance Loop A/B
+        by one once Battle is spent, then poll for win/loss. This cooperative approach
         means Victory/Defeat detection runs between every block execution.
         """
         # Per-match, keyed by `id(block)`, and these dicts live on the **instance** — so an
@@ -1012,15 +1012,15 @@ class MacroController:
                     done = self._execute_battle_block(block)
                     if done:
                         battle_idx += 1
+                else:
+                    # Advance Loop A by one block once Battle is spent (wraps around, skipping
+                    # blocks that have had their one run)
+                    if loop_a:
+                        loop_a_idx = self._advance_loop(loop_a, loop_a_idx, spent_once)
 
-                # Advance Loop A by one block (wraps around, skipping blocks that have had
-                # their one run)
-                if loop_a:
-                    loop_a_idx = self._advance_loop(loop_a, loop_a_idx, spent_once)
-
-                # Advance Loop B by one block (wraps around)
-                if loop_b:
-                    loop_b_idx = self._advance_loop(loop_b, loop_b_idx, spent_once)
+                    # Advance Loop B by one block once Battle is spent (wraps around)
+                    if loop_b:
+                        loop_b_idx = self._advance_loop(loop_b, loop_b_idx, spent_once)
 
             # Poll for outcome (win/loss)
             outcome = self._check_outcome()
