@@ -156,6 +156,29 @@ assert not tracker.is_skipped(1), "new maps, so old losses stop applying"
 assert tracker.reads == {}, "and the old reads are stale"
 assert tracker.candidates() == [], "nothing until it is read again"
 
+# mark_done decrements shared daily allowance on all rows when spent=True
+t_daily = ChallengeTracker()
+t_daily.note_reads(
+    [
+        ChallengeRead(slot=1, state=STATE_RUNNABLE, runs_remaining=10, runs_total=10),
+        ChallengeRead(slot=2, state=STATE_RUNNABLE, runs_remaining=10, runs_total=10),
+        ChallengeRead(slot=3, state=STATE_RUNNABLE, runs_remaining=10, runs_total=10),
+    ]
+)
+t_daily.mark_done(1, spent=True)
+assert t_daily.reads[1].runs_remaining == 9
+assert t_daily.reads[1].state == STATE_EXHAUSTED
+assert t_daily.reads[2].runs_remaining == 9
+assert t_daily.reads[2].state == STATE_RUNNABLE
+assert t_daily.reads[3].runs_remaining == 9
+assert t_daily.reads[3].state == STATE_RUNNABLE
+
+# When spent=False (e.g. stage failed to load), daily limit is preserved
+t_daily.mark_done(2, spent=False)
+assert t_daily.reads[2].runs_remaining == 9
+assert t_daily.reads[2].state == STATE_EXHAUSTED
+assert t_daily.reads[3].runs_remaining == 9
+
 
 
 # There was a `TaskDirector` section here. It tested a decision layer that preempted a

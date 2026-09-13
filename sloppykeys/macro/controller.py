@@ -2358,7 +2358,9 @@ class MacroController:
             ok, msg = self._nav.wait_for_match_ready()
             if not ok:
                 self._log(f"  Challenge: stage didn't load — {msg}")
-                self._challenges.mark_done(read.slot)
+                self._challenges.mark_done(read.slot, spent=False)
+                if self._on_challenge_reads is not None:
+                    self._on_challenge_reads([self._challenges.reads[s] for s in SLOTS if s in self._challenges.reads])
                 started = False
                 break
 
@@ -2408,7 +2410,9 @@ class MacroController:
             # since replaying a row spends another of the day's ten either way. Marking it
             # here rather than on a win also means a row that failed technically doesn't
             # preempt every following match forever.
-            self._challenges.mark_done(read.slot)
+            self._challenges.mark_done(read.slot, spent=True)
+            if self._on_challenge_reads is not None:
+                self._on_challenge_reads([self._challenges.reads[s] for s in SLOTS if s in self._challenges.reads])
 
             # Leave the result screen. Without this the next task finds itself on a screen
             # it doesn't recognise: Portals can't see the bag, Story can't see Play, and the
