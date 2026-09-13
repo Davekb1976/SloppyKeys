@@ -1107,11 +1107,15 @@ class LobbyNavigator:
             if play_exists:
                 match = self._find(play_path, timeout=0.0)
                 if match is not None:
+                    if checks > 1:
+                        time.sleep(0.35)
                     return (True, f"lobby loaded ({match.score:.2f}) after {checks} checks")
 
             if units_exists:
                 match = self._find(units_path, timeout=0.0)
                 if match is not None:
+                    if checks > 1:
+                        time.sleep(0.35)
                     return (True, f"lobby loaded ({match.score:.2f}) after {checks} checks")
 
             if time.monotonic() >= deadline:
@@ -1362,6 +1366,9 @@ class LobbyNavigator:
         The events list is its own lobby section, not a card in the gamemode menu,
         so this replaces both `click_play` and `open_gamemode` for that mode.
         """
+        ready, ready_msg = self.wait_for_lobby()
+        if not ready:
+            return (False, f"Events: {ready_msg}")
         return self._find_click(events_image(), "Events", timeout=self.search_timeout)
 
     def enter_portal(self, name: str) -> tuple[bool, str]:
