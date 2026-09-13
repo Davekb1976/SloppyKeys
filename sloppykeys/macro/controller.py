@@ -916,10 +916,11 @@ class MacroController:
             self._log("  Autoplay preset: could not find autoplay settings button")
             return False
 
+        fade_wait = min(0.3, getattr(self._nav, "panel_fade_wait", 0.3))
         cx, cy = hit.center_x, hit.center_y
         self._log(f"  Autoplay preset: opening settings for '{raw_preset}'...")
         self._ahk.run(nudge_click_script(cx, cy), wait=True, timeout=5.0)
-        time.sleep(self._nav.fade_wait)
+        time.sleep(fade_wait)
 
         # 2. OCR scan inside the Autoplay presets region
         ready, ocr_msg = self._ocr.available()
@@ -956,7 +957,7 @@ class MacroController:
             self._ahk.run(nudge_click_script(click_x, click_y), wait=True, timeout=5.0)
             self._equipped_autoplay_preset = raw_preset
             self._log(f"  Autoplay preset: selected '{raw_preset}' (matched '{target_block.text}')")
-            time.sleep(self._nav.fade_wait)
+            time.sleep(fade_wait)
         else:
             found_texts = [b.text for b in blocks]
             self._log(f"  Autoplay preset: '{raw_preset}' not found in OCR scan (read: {found_texts})")
@@ -970,6 +971,7 @@ class MacroController:
         from sloppykeys.content.nav_images import autoplay_close_image, close_panel_image
         from sloppykeys.macro.input_scripts import nudge_click_script
 
+        fade_wait = min(0.3, getattr(self._nav, "panel_fade_wait", 0.3))
         close_img = autoplay_close_image()
         hit = None
         if self._engine.template_exists(close_img):
@@ -981,11 +983,11 @@ class MacroController:
         if hit is not None:
             cx, cy = hit.center_x, hit.center_y
             self._ahk.run(nudge_click_script(cx, cy), wait=True, timeout=5.0)
-            time.sleep(self._nav.fade_wait)
+            time.sleep(fade_wait)
         else:
             from sloppykeys.macro.input_scripts import key_script
             self._ahk.run(key_script("Escape"), wait=True, timeout=2.0)
-            time.sleep(self._nav.fade_wait)
+            time.sleep(fade_wait)
 
     def run_camera(self) -> None:
         """Camera setup — pitch down, then zoom out. Public because the Image Manager runs
