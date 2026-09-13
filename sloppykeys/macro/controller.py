@@ -335,6 +335,7 @@ class MacroController:
             hwnd = rbx.find_roblox_window()
             if hwnd is not None:
                 self._log("Roblox reopened successfully.")
+                self._equipped_team = None
                 time.sleep(5.0)  # give it a moment to load
                 return True
             time.sleep(2.0)
