@@ -359,7 +359,7 @@ def close_panel_image() -> str:
     """The X that dismisses any panel in the gamemode UI, the challenge list included.
     Searched rather than clicked blind, so a panel can be left from a screen nothing
     confirmed."""
-    return os.path.join(IMAGES_DIR, LOBBY_DIR, CLOSE_PANEL_IMAGE)
+    return os.path.join(IMAGES_DIR, LOBBY_DIR, CLOSE_PANEL_IMAGE).replace("\\", "/")
 
 
 def back_lobby_image() -> str:
@@ -519,8 +519,8 @@ def teams_include_image() -> str:
 
 
 def teams_close_image() -> str:
-    """The close button ('X') on the Unit Teams modal."""
-    return os.path.join(IMAGES_DIR, TEAMS_DIR, TEAMS_CLOSE_IMAGE).replace("\\", "/")
+    """The close button ('X') on the Unit Teams modal — identical to lobby close.png."""
+    return close_panel_image().replace("\\", "/")
 
 
 def unit_teams_header_image() -> str:
@@ -529,14 +529,13 @@ def unit_teams_header_image() -> str:
 
 
 def teams_paths() -> list[str]:
-    """Every template a Team Loadout routine looks for."""
+    """Every template in the teams folder."""
     return [
         teams_units_icon_image(),
         teams_btn_image(),
         teams_load_btn_image(),
         teams_confirm_image(),
         teams_include_image(),
-        teams_close_image(),
         unit_teams_header_image(),
     ]
 

@@ -47,12 +47,16 @@ expected_team_templates = [
     teams_load_btn_image(),
     teams_confirm_image(),
     teams_include_image(),
-    teams_close_image(),
     unit_teams_header_image(),
 ]
 for p in expected_team_templates:
     assert "\\" not in p, f"Path has backslashes: {p}"
     assert p.startswith("assets/teams/"), f"Path not in assets/teams/: {p}"
+
+# teams_close_image() reuses the existing lobby close.png
+from sloppykeys.content.nav_images import close_panel_image
+assert teams_close_image() == close_panel_image()
+assert teams_close_image() == "assets/lobby/close.png"
 
 assert set(teams_paths()) == set(expected_team_templates)
 assert all(p in expected_paths() for p in expected_team_templates)
