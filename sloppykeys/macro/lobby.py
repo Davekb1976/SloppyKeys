@@ -1188,8 +1188,8 @@ class LobbyNavigator:
         if self._engine.template_exists(close_path):
             ok, msg = self._find_click(close_path, "Close Teams", timeout=self.search_timeout, fade_wait=0.2)
         else:
-            close_x = header_match.left + 610
-            close_y = header_match.top + 25
+            close_x = header_match.left + 620
+            close_y = header_match.top + 30
             self._ahk.run(nudge_click_script(close_x, close_y, park=self._park_point()), wait=True)
 
         time.sleep(self.click_settle)
