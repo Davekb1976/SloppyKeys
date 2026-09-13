@@ -140,6 +140,8 @@ class LobbyNavigator:
         # Readiness is polled up to this long rather than assumed.
         self.match_ready_timeout = 60.0
         self.match_ready_poll = 1.0
+        self.lobby_ready_timeout = 60.0
+        self.lobby_ready_poll = 1.0
         # Where to move the cursor before a search so no card is left hovered.
         # Client-space; top-left corner is usually empty of stage cards.
         self.park_client = (8, 8)
@@ -553,7 +555,10 @@ class LobbyNavigator:
         )
         if not confirm_ok:
             return (False, f"Back to Lobby clicked but {confirm_message}")
-        return (True, f"{message} \u2192 {confirm_message}")
+        ready, ready_msg = self.wait_for_lobby()
+        if not ready:
+            return (False, f"Back to Lobby clicked but {ready_msg}")
+        return (True, f"{message} \u2192 {confirm_message} \u2192 {ready_msg}")
 
     def open_challenges(self) -> tuple[bool, str]:
         """Lobby -> Play -> the Challenges card.
@@ -580,6 +585,9 @@ class LobbyNavigator:
         return (card_ok, f"Play {message} \u2192 {card_message}")
 
     def click_play(self) -> tuple[bool, str]:
+        ready, ready_msg = self.wait_for_lobby()
+        if not ready:
+            return (False, f"Play: {ready_msg}")
         return self._find_click(play_image(), "Play", timeout=self.search_timeout)
 
     def open_gamemode(self, gamemode: str) -> tuple[bool, str]:
@@ -1070,6 +1078,56 @@ class LobbyNavigator:
                 time.sleep(min(self.search_poll, self.match_ready_poll - waited))
                 waited += self.search_poll
 
+    def wait_for_lobby(self, timeout: float | None = None) -> tuple[bool, str]:
+        """Block until the lobby is loaded and interactive (Play or Units icon appears).
+
+        Like `wait_for_match_ready` waits for `start_game.png` when entering a stage,
+        this waits for the lobby when returning from a stage via Back to Lobby or
+        teleporting. A teleport/loading screen back to the lobby typically takes 10-20s;
+        acting before the lobby arrives causes searches for Units icon or Play to fail
+        and skip the task.
+        """
+        play_path = play_image()
+        units_path = teams_units_icon_image()
+        play_exists = self._engine.template_exists(play_path)
+        units_exists = self._engine.template_exists(units_path)
+
+        if not play_exists and not units_exists:
+            return (True, "lobby templates not captured — skipping lobby wait")
+
+        budget = self.lobby_ready_timeout if timeout is None else float(timeout)
+        deadline = time.monotonic() + max(0.0, budget)
+        checks = 0
+
+        while True:
+            if self._should_stop():
+                return (False, f"stopped by user after {checks} checks")
+            checks += 1
+
+            if play_exists:
+                match = self._find(play_path, timeout=0.0)
+                if match is not None:
+                    return (True, f"lobby loaded ({match.score:.2f}) after {checks} checks")
+
+            if units_exists:
+                match = self._find(units_path, timeout=0.0)
+                if match is not None:
+                    return (True, f"lobby loaded ({match.score:.2f}) after {checks} checks")
+
+            if time.monotonic() >= deadline:
+                return (
+                    False,
+                    f"Lobby (Play/Units icon) not found within {budget:.1f}s ({checks} checks) — "
+                    "still loading, or templates need updating",
+                )
+
+            waited = 0.0
+            while waited < self.lobby_ready_poll:
+                if self._should_stop():
+                    break
+                time.sleep(min(self.search_poll, self.lobby_ready_poll - waited))
+                waited += self.search_poll
+
     def run_and_start(
         self,
         gamemode: str,
@@ -1121,6 +1179,12 @@ class LobbyNavigator:
         units_icon = teams_units_icon_image()
         if not self._engine.template_exists(units_icon):
             return (False, f"template {units_icon} missing — capture Units icon in Image Manager > Teams")
+
+        if not in_match:
+            ready, rmsg = self.wait_for_lobby()
+            if not ready:
+                return (False, f"Units icon: {rmsg}")
+
         ok, msg = self._find_click(units_icon, "Units Icon", timeout=self.search_timeout, fade_wait=btn_fade_wait)
         if not ok:
             return (False, f"Units icon: {msg}")
