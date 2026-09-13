@@ -1150,7 +1150,7 @@ class LobbyNavigator:
         team_num_re = re.compile(r"\bteam\s*#?\s*([1-8])\b", re.IGNORECASE)
 
         target_btn_click: tuple[int, int] | None = None
-        max_scan_attempts = 10
+        max_scan_attempts = 16
 
         for _attempt in range(max_scan_attempts):
             if self._should_stop():
@@ -1181,19 +1181,8 @@ class LobbyNavigator:
             if target_block is not None:
                 target_top_screen = rect[1] + target_block.y
                 modal_bottom = header_match.top + 370
-                if target_top_screen + 85 > modal_bottom:
-                    # Cut off at bottom of dialog, scroll down to reveal
-                    self._scroll_at(scroll_client, notches=3)
-                    time.sleep(self.scroll_settle)
-                    continue
 
-                if target_top_screen < header_match.top + 40:
-                    # Cut off at top of dialog, scroll up to reveal
-                    self._scroll_at(scroll_client, notches=-3)
-                    time.sleep(self.scroll_settle)
-                    continue
-
-                # Target team row is comfortably on screen; find its Load Team button
+                # Search for Load Team button in this team's row
                 load_profile = ImageProfile(
                     name="load_team",
                     image_path=self._engine.to_absolute_path(load_path),
@@ -1201,32 +1190,47 @@ class LobbyNavigator:
                 )
                 matches = self._engine.find_instances(load_profile, rect, limit=6)
 
-                # Filter for the match whose center_y falls within this team's row
+                # Filter for matches whose center_y falls within this team's row and inside visible modal
                 row_matches = [
                     m for m in matches
                     if target_top_screen + 25 <= m.center_y <= target_top_screen + 130
+                    and m.center_y <= modal_bottom - 5
                 ]
 
                 if row_matches:
                     target_btn_click = (row_matches[0].center_x, row_matches[0].center_y)
-                else:
-                    # Calibrated fallback relative to header and target_block
-                    fallback_x = header_match.left + 569
-                    fallback_y = target_top_screen + 75
-                    target_btn_click = (fallback_x, fallback_y)
+                    break
+
+                # If button is not cleanly visible, check if row is clipped and nudge by 1 notch
+                if target_top_screen + 85 > modal_bottom:
+                    # Cut off at bottom of dialog, nudge down 1 notch to reveal
+                    self._scroll_at(scroll_client, notches=1)
+                    time.sleep(self.scroll_settle)
+                    continue
+
+                if target_top_screen < header_match.top + 40:
+                    # Cut off at top of dialog, nudge up 1 notch to reveal
+                    self._scroll_at(scroll_client, notches=-1)
+                    time.sleep(self.scroll_settle)
+                    continue
+
+                # Calibrated fallback relative to header and target_block
+                fallback_x = header_match.left + 569
+                fallback_y = target_top_screen + 75
+                target_btn_click = (fallback_x, fallback_y)
                 break
 
-            # Target team not visible yet -> decide scroll direction
+            # Target team not visible yet -> scroll 1 notch in the right direction
             if visible_teams:
                 team_numbers = [num for num, _ in visible_teams]
                 if all(n < team_num for n in team_numbers):
-                    notches = 4
+                    notches = 1
                 elif all(n > team_num for n in team_numbers):
-                    notches = -4
+                    notches = -1
                 else:
-                    notches = 4 if (sum(team_numbers) / len(team_numbers)) < team_num else -4
+                    notches = 1 if (sum(team_numbers) / len(team_numbers)) < team_num else -1
             else:
-                notches = 4 if team_num > 2 else -4
+                notches = 1 if team_num > 2 else -1
 
             self._scroll_at(scroll_client, notches=notches)
             time.sleep(self.scroll_settle)
