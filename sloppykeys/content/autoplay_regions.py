@@ -9,8 +9,8 @@ Read through `autoplay_presets_region()`, never the default directly.
 from __future__ import annotations
 
 # Default region for the Autoplay presets area on 1152x756 viewport:
-# (x, y, w, h) in client space. Centered area ~430x320.
-AUTOPLAY_PRESETS_DEFAULT_REGION = (360, 220, 430, 320)
+# (x, y, w, h) in client space. Presets list in modal (777, 470, 372, 179).
+AUTOPLAY_PRESETS_DEFAULT_REGION = (777, 470, 372, 179)
 
 _OVERRIDES: dict[str, tuple[int, int, int, int]] = {}
 
