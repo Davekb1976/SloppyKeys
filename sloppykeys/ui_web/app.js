@@ -2321,6 +2321,71 @@
     if (r.ok) { loadSettings(); window.renderHotkeyPills(); window.addLog("Hotkeys reset to defaults."); }
   });
 
+  const btnTestWebhook = document.getElementById("btn-test-webhook");
+  const webhookTestStatus = document.getElementById("webhook-test-status");
+
+  if (btnTestWebhook) {
+    btnTestWebhook.addEventListener("click", async () => {
+      if (!window.pywebview || !pywebview.api || !pywebview.api.test_webhook) return;
+      const urlInput = document.getElementById("s-webhook");
+      const userIdInput = document.getElementById("s-discord-user-id");
+      const url = urlInput ? urlInput.value.trim() : "";
+      const userId = userIdInput ? userIdInput.value.trim() : "";
+
+      if (!url) {
+        if (webhookTestStatus) {
+          webhookTestStatus.textContent = "Enter a webhook URL first";
+          webhookTestStatus.style.color = "var(--rose)";
+        }
+        if (window.addLog) window.addLog("[Webhook] Test failed: No webhook URL configured.");
+        return;
+      }
+
+      btnTestWebhook.disabled = true;
+      if (webhookTestStatus) {
+        webhookTestStatus.textContent = "Sending...";
+        webhookTestStatus.style.color = "var(--text-faint)";
+      }
+
+      try {
+        const res = await pywebview.api.test_webhook(url, userId);
+        if (res && !res.ok) {
+          btnTestWebhook.disabled = false;
+          if (webhookTestStatus) {
+            webhookTestStatus.textContent = res.error || "Failed";
+            webhookTestStatus.style.color = "var(--rose)";
+          }
+        }
+      } catch (e) {
+        btnTestWebhook.disabled = false;
+        if (webhookTestStatus) {
+          webhookTestStatus.textContent = "Error calling test";
+          webhookTestStatus.style.color = "var(--rose)";
+        }
+      }
+    });
+  }
+
+  window.onWebhookTestResult = function (result) {
+    const btnTest = document.getElementById("btn-test-webhook");
+    const statusEl = document.getElementById("webhook-test-status");
+    if (btnTest) btnTest.disabled = false;
+    if (statusEl) {
+      if (result && result.ok) {
+        statusEl.textContent = "Sent successfully!";
+        statusEl.style.color = "var(--teal)";
+      } else {
+        statusEl.textContent = (result && result.message) || "Failed to send";
+        statusEl.style.color = "var(--rose)";
+      }
+      setTimeout(() => {
+        if (statusEl && statusEl.textContent === "Sent successfully!") {
+          statusEl.textContent = "";
+        }
+      }, 5000);
+    }
+  };
+
   // Game keybinds: load + capture
   async function loadGameKeybinds() {
     if (!window.pywebview || !pywebview.api) return;

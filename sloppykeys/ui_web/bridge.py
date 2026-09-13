@@ -698,6 +698,65 @@ class Api:
         ok = UnifiedSettings(self._app_root).set(key, value)
         return {"ok": ok}
 
+    def test_webhook(self, url: str = "", user_id: str = "") -> dict:
+        """Send a test notification to the configured Discord webhook URL in a background thread."""
+        if not self._app_root:
+            return {"ok": False, "error": "No app root"}
+
+        from sloppykeys.core.webhook import (
+            DiscordWebhook,
+            COLOR_START,
+            validate_webhook_url,
+            validate_user_id,
+        )
+
+        unified = UnifiedSettings(self._app_root)
+        clean_url = (url or "").strip() or unified.get("discord_webhook", "")
+        clean_uid = (user_id or "").strip() if user_id is not None else unified.get("discord_user_id", "")
+
+        target_url, err = validate_webhook_url(clean_url)
+        if err:
+            return {"ok": False, "error": err}
+        if not target_url:
+            return {"ok": False, "error": "No webhook URL configured"}
+
+        if clean_uid:
+            _, id_err = validate_user_id(clean_uid)
+            if id_err:
+                return {"ok": False, "error": id_err}
+
+        unified.set("discord_webhook", target_url)
+        unified.set("discord_user_id", clean_uid)
+
+        def _worker() -> None:
+            hook = DiscordWebhook(
+                url_provider=lambda: target_url,
+                log=self._log_to_ui,
+                user_id_provider=lambda: clean_uid,
+            )
+            fields = [
+                ("Status", "Connected"),
+                ("Source", "Settings > Webhook Test"),
+            ]
+            ok, message = hook.send(
+                title="Webhook Test",
+                fields=fields,
+                color=COLOR_START,
+                footer="SloppyKeys Notification Test",
+                blocking=True,
+            )
+            self._push_js(
+                "window.onWebhookTestResult",
+                {"ok": ok, "message": message},
+            )
+            if ok:
+                self._log_to_ui("  [Webhook] Test notification sent successfully.")
+            else:
+                self._log_to_ui(f"  [Webhook] Test failed: {message}")
+
+        threading.Thread(target=_worker, daemon=True).start()
+        return {"ok": True}
+
     def get_hotkeys(self) -> dict:
         """Current hotkey bindings with display names."""
         if not self._app_root:
