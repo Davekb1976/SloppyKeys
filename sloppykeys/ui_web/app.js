@@ -445,6 +445,7 @@
   const tbMacro = document.getElementById("tb-macro");
   const tbSearch = document.getElementById("tb-search");
   const tbSearchRow = document.getElementById("tb-search-row");
+  const tbAutoplayPreset = document.getElementById("tb-autoplay-preset");
   // What the current mode's rows are, from `get_mode_fields`. Kept as state rather than
   // read back out of the DOM, so `saveCurrentTask` knows which fields mean anything without
   // inspecting `style.display`.
@@ -502,6 +503,7 @@
           bits.push("leave @ w" + t.leave_at_wave);
         }
         if (t.team) bits.push("Team " + t.team);
+        if (t.autoplay_preset) bits.push("Preset: " + t.autoplay_preset);
         if (t.macro) bits.push(t.macro);
       }
       // Challenge is taken by availability, not by position, so the number on the left is
@@ -691,6 +693,7 @@
       tbExtract.value = task.extract_after || 1;
       tbLeaveWave.value = task.leave_at_wave || 0;
       tbSearch.value = task.search || "";
+      if (tbAutoplayPreset) tbAutoplayPreset.value = task.autoplay_preset || "";
       applyModeFields(task.mode);
       tbMacro.value = task.macro || "";
       updateLeaveWaveVisibility(task.mode, task.stage);
@@ -823,6 +826,7 @@
     changes.difficulty = isStoryEvent ? "" : (tbModeFields.difficulty ? tbDifficulty.value : "");
     changes.extract_after = tbModeFields.extract ? Math.max(1, parseInt(tbExtract.value) || 1) : 0;
     changes.search = tbModeFields.search_label ? tbSearch.value.trim() : "";
+    changes.autoplay_preset = tbAutoplayPreset ? tbAutoplayPreset.value.trim() : "";
     changes.leave_at_wave = (tbMode.value === "Story" && tbStage.value === "Infinite")
       ? Math.max(0, parseInt(tbLeaveWave.value) || 0)
       : 0;
@@ -901,10 +905,11 @@
   // `change` fires on blur for a text input, which is the same contract every other row
   // here has — no keystroke-by-keystroke writes to settings.json.
   tbSearch.addEventListener("change", saveCurrentTask);
+  if (tbAutoplayPreset) tbAutoplayPreset.addEventListener("change", saveCurrentTask);
 
   document.getElementById("btn-add-task").addEventListener("click", () => {
     if (!window.pywebview || !pywebview.api) return;
-    const newTask = { mode: "Story", map: "", stage: "", difficulty: "Normal", repeat: 1, macro: "", team: "" };
+    const newTask = { mode: "Story", map: "", stage: "", difficulty: "Normal", repeat: 1, macro: "", team: "", autoplay_preset: "" };
     pywebview.api.add_task(newTask).then((r) => {
       if (r.ok) {
         newTask.id = r.id;

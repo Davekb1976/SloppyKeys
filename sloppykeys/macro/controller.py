@@ -166,6 +166,7 @@ class MacroController:
         self._kept_position = False
         self._left_early = False
         self._equipped_team: int | None = None
+        self._equipped_autoplay_preset: str | None = None
         self._cycle = 0
         self._last_reopen_time = 0.0
         self._golden_hour_played_interval = None
@@ -226,6 +227,7 @@ class MacroController:
         self._kept_position = False
         self._left_early = False
         self._equipped_team = None
+        self._equipped_autoplay_preset = None
         self._cycle = 0
         self._golden_hour_played_interval = None
         self._golden_hour_attempted_interval = None
@@ -337,6 +339,7 @@ class MacroController:
             if hwnd is not None:
                 self._log("Roblox reopened successfully.")
                 self._equipped_team = None
+                self._equipped_autoplay_preset = None
                 time.sleep(5.0)  # give it a moment to load
                 return True
             time.sleep(2.0)
@@ -480,6 +483,11 @@ class MacroController:
                     # it sets this again there — leaving it up would suppress the walk for the
                     # rest of the queue.
                     self._kept_position = False
+                    if self._checkpoint():
+                        return (True, f"stopped after {self._cycle} cycles")
+
+                    # Autoplay preset (if configured)
+                    self._ensure_autoplay_preset(task)
                     if self._checkpoint():
                         return (True, f"stopped after {self._cycle} cycles")
 
@@ -849,6 +857,7 @@ class MacroController:
         ok, msg = self._nav.back_to_lobby()
         if ok:
             self._camera_set = False
+            self._equipped_autoplay_preset = None
         return (ok, msg)
 
     def _ensure_team_equipped(self, task: dict | None = None) -> bool:
@@ -875,6 +884,108 @@ class MacroController:
             return True
         self._log(f"  Failed to equip Team #{team_num}: {msg}")
         return False
+
+    def _ensure_autoplay_preset(self, task: dict | None = None) -> bool:
+        """Select the in-match Autoplay preset if specified in task and not already active."""
+        t = task or getattr(self, "_current_task", None) or {}
+        raw_preset = str(t.get("autoplay_preset") or "").strip()
+        if not raw_preset:
+            return True
+
+        if getattr(self, "_equipped_autoplay_preset", None) == raw_preset:
+            self._log(f"  Autoplay preset: '{raw_preset}' already active — carried over.")
+            return True
+
+        from sloppykeys.content.nav_images import autoplay_settings_image
+        from sloppykeys.content.autoplay_regions import autoplay_presets_region
+        from sloppykeys.macro.input_scripts import nudge_click_script
+
+        settings_path = autoplay_settings_image()
+        if not self._engine.template_exists(settings_path):
+            self._log(f"  Autoplay preset: template {settings_path} not captured — skipping.")
+            return True
+
+        rect = self._rect()
+        if rect is None:
+            self._log("  Autoplay preset: skipped (Roblox not found)")
+            return False
+
+        # 1. Click the Autoplay Settings button
+        hit = self._engine.find(settings_path, timeout=3.0)
+        if hit is None:
+            self._log("  Autoplay preset: could not find autoplay settings button")
+            return False
+
+        cx, cy = hit.center
+        self._log(f"  Autoplay preset: opening settings for '{raw_preset}'...")
+        self._ahk.run(nudge_click_script(cx, cy), wait=True, timeout=5.0)
+        time.sleep(self._nav.fade_wait)
+
+        # 2. OCR scan inside the Autoplay presets region
+        ready, ocr_msg = self._ocr.available()
+        if not ready:
+            self._log(f"  Autoplay preset: OCR unavailable: {ocr_msg}")
+            self._close_autoplay_settings()
+            return False
+
+        px, py, pw, ph = autoplay_presets_region()
+        rect = self._rect()
+        if rect is None:
+            return False
+        rx, ry, _rw, _rh = rect
+        panel_screen = (rx + px, ry + py, pw, ph)
+
+        frame = self._engine.capture_bgr(panel_screen)
+        if frame is None:
+            self._log("  Autoplay preset: failed to capture preset region")
+            self._close_autoplay_settings()
+            return False
+
+        blocks = self._ocr.read_all(frame)
+        target_block = None
+        wanted_clean = raw_preset.lower()
+        for b in blocks:
+            text_clean = b.text.lower()
+            if wanted_clean in text_clean or text_clean in wanted_clean:
+                target_block = b
+                break
+
+        if target_block is not None:
+            click_x = rx + px + target_block.x + target_block.w // 2
+            click_y = ry + py + target_block.y + target_block.h // 2
+            self._ahk.run(nudge_click_script(click_x, click_y), wait=True, timeout=5.0)
+            self._equipped_autoplay_preset = raw_preset
+            self._log(f"  Autoplay preset: selected '{raw_preset}' (matched '{target_block.text}')")
+            time.sleep(self._nav.fade_wait)
+        else:
+            found_texts = [b.text for b in blocks]
+            self._log(f"  Autoplay preset: '{raw_preset}' not found in OCR scan (read: {found_texts})")
+
+        # 3. Dismiss panel
+        self._close_autoplay_settings()
+        return target_block is not None
+
+    def _close_autoplay_settings(self) -> None:
+        """Dismiss the Auto Play Settings panel via close_gray.png or close.png."""
+        from sloppykeys.content.nav_images import autoplay_close_image, close_panel_image
+        from sloppykeys.macro.input_scripts import nudge_click_script
+
+        close_img = autoplay_close_image()
+        hit = None
+        if self._engine.template_exists(close_img):
+            hit = self._engine.find(close_img, timeout=1.5)
+        if hit is None:
+            fallback = close_panel_image()
+            if self._engine.template_exists(fallback):
+                hit = self._engine.find(fallback, timeout=1.5)
+        if hit is not None:
+            cx, cy = hit.center
+            self._ahk.run(nudge_click_script(cx, cy), wait=True, timeout=5.0)
+            time.sleep(self._nav.fade_wait)
+        else:
+            from sloppykeys.macro.input_scripts import key_script
+            self._ahk.run(key_script("Escape"), wait=True, timeout=2.0)
+            time.sleep(self._nav.fade_wait)
 
     def run_camera(self) -> None:
         """Camera setup — pitch down, then zoom out. Public because the Image Manager runs
@@ -2433,6 +2544,10 @@ class MacroController:
             if self._checkpoint():
                 return
 
+            self._ensure_autoplay_preset(task)
+            if self._checkpoint():
+                return
+
             # Start Game
             self._placer.park()
             ok, msg = self._nav.click_start_game()
@@ -2678,6 +2793,10 @@ class MacroController:
         if self._checkpoint():
             return True
 
+        self._ensure_autoplay_preset(gh_task)
+        if self._checkpoint():
+            return True
+
         # Start Game
         self._placer.park()
         ok, msg = self._nav.click_start_game()
@@ -2845,6 +2964,10 @@ class MacroController:
         # Pre Start (walk)
         self._run_phase_linear(phases.get("pre_start", []))
         self._kept_position = False
+        if self._checkpoint():
+            return True
+
+        self._ensure_autoplay_preset(ec_task)
         if self._checkpoint():
             return True
 

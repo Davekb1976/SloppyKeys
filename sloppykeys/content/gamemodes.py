@@ -290,6 +290,8 @@ def sanitize_task(task: dict) -> dict:
         task["repeat"] = 1
     raw_team = str(task.get("team") or "").strip()
     task["team"] = raw_team if raw_team in {"1", "2", "3", "4", "5", "6", "7", "8"} else ""
+    raw_preset = str(task.get("autoplay_preset") or "").strip()
+    task["autoplay_preset"] = raw_preset[:40]
     return task
 
 

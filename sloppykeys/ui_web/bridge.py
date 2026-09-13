@@ -903,16 +903,23 @@ class Api:
     _REGION_GROUPS = (
         ("challenge", "Challenge Panel", "the Challenge panel must be open"),
         ("teams", "Unit Teams", "the Unit Teams dialog must be open"),
+        ("autoplay", "Autoplay Settings", "the Auto Play Settings panel must be open"),
         ("match", "In Match", "a stage must be running"),
     )
 
     @staticmethod
     def _region_tables():
+        from sloppykeys.content import autoplay_regions as _autoplay
         from sloppykeys.content import challenge as _challenge
         from sloppykeys.content import match_regions as _match
         from sloppykeys.content import teams_regions as _teams
 
-        return {"challenge": _challenge, "match": _match, "teams": _teams}
+        return {
+            "challenge": _challenge,
+            "match": _match,
+            "teams": _teams,
+            "autoplay": _autoplay,
+        }
 
     def get_vision_region_specs(self) -> list:
         """Every editable OCR box, tagged with the group whose screen it belongs to."""

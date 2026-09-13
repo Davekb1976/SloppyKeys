@@ -177,6 +177,8 @@ EXP_UPGRADE_CARD_IMAGE = "exp_upgrade_card.png"
 # instant it finds the off state and place nothing all match.
 AUTOPLAY_IMAGE = "autoplay.png"
 AUTOPLAY_ACTIVE_IMAGE = "autoplay_active.png"
+AUTOPLAY_SETTINGS_IMAGE = "autoplay_settings.png"
+AUTOPLAY_CLOSE_IMAGE = "close_gray.png"
 
 # Fishing: icon to equip the rod, and rank badge as proof it is equipped.
 FISHING_ICON_IMAGE = "fishing_icon.png"
@@ -438,6 +440,16 @@ def autoplay_active_image() -> str:
     return os.path.join(IMAGES_DIR, MATCH_DIR, AUTOPLAY_ACTIVE_IMAGE)
 
 
+def autoplay_settings_image() -> str:
+    """The Auto Play Settings icon button on the in-match HUD."""
+    return os.path.join(IMAGES_DIR, MATCH_DIR, AUTOPLAY_SETTINGS_IMAGE)
+
+
+def autoplay_close_image() -> str:
+    """The gray close button that dismisses the Auto Play Settings modal."""
+    return os.path.join(IMAGES_DIR, MATCH_DIR, AUTOPLAY_CLOSE_IMAGE)
+
+
 def fishing_icon_image() -> str:
     """The Fishing Icon button clicked to equip the fishing rod."""
     return os.path.join(IMAGES_DIR, FISHING_DIR, FISHING_ICON_IMAGE)
@@ -607,6 +619,8 @@ def expected_paths() -> list[str]:
         # card. `sighted` returns False for a missing file, which leaves the block inert.
         autoplay_image(),
         autoplay_active_image(),
+        autoplay_settings_image(),
+        autoplay_close_image(),
         # The fishing block searches for these to equip and confirm the rod
         fishing_icon_image(),
         fishing_rank_image(),
