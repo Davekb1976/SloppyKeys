@@ -119,9 +119,12 @@ class MacroController:
         self._settings = AppSettings(app_root)
         self._engine = ImageSearchEngine(app_root, log=self._log)
         self._ahk = AhkBridge()
+        from sloppykeys.core.ocr import OcrReader
+        self._ocr = OcrReader()
         self._nav = LobbyNavigator(
             self._engine, self._ahk, self._rect, log=self._log,
             should_stop=lambda: self._stop_requested,
+            ocr=self._ocr,
         )
         self._game_keys = GameKeyStore(app_root).all()
         self._placer = UnitPlacer(
@@ -163,8 +166,6 @@ class MacroController:
         self._kept_position = False
         self._left_early = False
         self._equipped_team: int | None = None
-        from sloppykeys.core.ocr import OcrReader
-        self._ocr = OcrReader()
         self._cycle = 0
         self._last_reopen_time = 0.0
         self._golden_hour_played_interval = None
@@ -852,7 +853,7 @@ class MacroController:
 
     def _ensure_team_equipped(self, task: dict | None = None) -> bool:
         """Equip the team specified in task if different from currently equipped team."""
-        t = task or self._current_task or {}
+        t = task or getattr(self, "_current_task", None) or {}
         raw_team = t.get("team")
         if not raw_team:
             return True
@@ -862,7 +863,7 @@ class MacroController:
             return True
         if team_num < 1 or team_num > 8:
             return True
-        if self._equipped_team == team_num:
+        if getattr(self, "_equipped_team", None) == team_num:
             return True
 
         in_match = self._nav.in_match()

@@ -17,8 +17,12 @@ than reporting that navigation didn't work.
 from __future__ import annotations
 
 import os
+import re
 import time
-from typing import Callable
+from typing import TYPE_CHECKING, Any, Callable
+
+if TYPE_CHECKING:
+    from sloppykeys.core.ocr import OcrReader
 
 from sloppykeys.content.acts import act_coord, golden_hour_act_coord
 from sloppykeys.content.challenge import (
@@ -77,6 +81,7 @@ from sloppykeys.content.nav_route import (
 from sloppykeys.core.image_search import (
     DEFAULT_CONFIDENCE,
     ImageMatch,
+    ImageProfile,
     ImageSearchEngine,
     confidence_for,
     best_score,
@@ -100,6 +105,7 @@ class LobbyNavigator:
         roblox_rect: RectProvider,
         log: Callable[[str], None] | None = None,
         should_stop: Callable[[], bool] | None = None,
+        ocr: OcrReader | None = None,
     ) -> None:
         self._engine = engine
         self._ahk = ahk
@@ -109,6 +115,7 @@ class LobbyNavigator:
         # Only waits are abandoned — never an AHK script, which could be holding a key or a
         # mouse button and would leave the input stuck if killed mid-press.
         self._should_stop = should_stop or (lambda: False)
+        self._ocr = ocr
         # A click triggers a transition (loading screen, slide/fade-in), so a
         # search that follows one polls until a deadline instead of looking once.
         # Attempt counts were the old approach and they coupled the wait to the
@@ -142,6 +149,12 @@ class LobbyNavigator:
         # matched wrong screens — and there is no auto calibrate. A template that can't clear
         # the default is usually still the wrong crop.
 
+
+    def ocr(self) -> OcrReader:
+        if self._ocr is None:
+            from sloppykeys.core.ocr import OcrReader
+            self._ocr = OcrReader()
+        return self._ocr
 
     def apply_delays(self, delays: dict[str, float]) -> None:
         """Live-update tunable timings (from Settings > Delays).
@@ -1124,43 +1137,110 @@ class LobbyNavigator:
         if header_match is None:
             return (False, self._miss(header_path, "Unit Teams Dialog"))
 
-        # 4. Scroll to target team if needed (Teams 3-8)
+        # 4. Locate target team via OCR and click its Load Team button
         load_path = teams_load_btn_image()
         if not self._engine.template_exists(load_path):
             return (False, f"template {load_path} missing — capture Load Team button in Image Manager > Teams")
 
-        if team_num >= 3:
-            scroll_client = (header_match.center_x - rect[0], header_match.center_y - rect[1] + 150)
-            scroll_steps = team_num - 2
-            for _ in range(scroll_steps):
-                self._scroll_at(scroll_client, notches=4)
-                time.sleep(self.scroll_settle)
+        ready, ocr_msg = self.ocr().available()
+        if not ready:
+            return (False, f"OCR unavailable for team scanning: {ocr_msg}")
 
-        rect = self._rect()
-        if rect is None:
-            return (False, "Roblox not found")
+        scroll_client = (header_match.center_x - rect[0], header_match.center_y - rect[1] + 150)
+        team_num_re = re.compile(r"\bteam\s*#?\s*([1-8])\b", re.IGNORECASE)
 
-        matches = self._engine.find_instances(rect, load_path, limit=4)
-        if not matches:
-            # Fallback: estimate button position relative to header
-            rel_y = 141 if team_num == 1 else 266
-            target_x = header_match.left + 586
-            target_y = header_match.top + rel_y
-            ok, click_msg = self._ahk.run(
-                nudge_click_script(target_x, target_y, park=self._park_point()),
-                wait=True,
-                timeout=8,
-            )
-            if not ok:
-                return (False, f"Load Team click failed: {click_msg}")
-        else:
-            matches.sort(key=lambda m: m.top)
-            idx = 0 if team_num == 1 else min(1, len(matches) - 1)
-            target_button = matches[idx]
-            ok, click_msg = self._click(target_button)
-            if not ok:
-                return (False, f"Load Team click failed: {click_msg}")
+        target_btn_click: tuple[int, int] | None = None
+        max_scan_attempts = 10
 
+        for _attempt in range(max_scan_attempts):
+            if self._should_stop():
+                return (False, "stopped by user")
+
+            rect = self._rect()
+            if rect is None:
+                return (False, "Roblox not found")
+
+            # Capture client area for OCR and template search
+            frame = self._engine.capture_bgr(rect)
+            if frame is None:
+                time.sleep(self.search_poll)
+                continue
+
+            blocks = self.ocr().read_all(frame)
+
+            target_block = None
+            visible_teams: list[tuple[int, Any]] = []
+            for b in blocks:
+                m = team_num_re.search(b.text)
+                if m:
+                    t_num = int(m.group(1))
+                    visible_teams.append((t_num, b))
+                    if t_num == team_num and target_block is None:
+                        target_block = b
+
+            if target_block is not None:
+                target_top_screen = rect[1] + target_block.y
+                modal_bottom = header_match.top + 370
+                if target_top_screen + 85 > modal_bottom:
+                    # Cut off at bottom of dialog, scroll down to reveal
+                    self._scroll_at(scroll_client, notches=3)
+                    time.sleep(self.scroll_settle)
+                    continue
+
+                if target_top_screen < header_match.top + 40:
+                    # Cut off at top of dialog, scroll up to reveal
+                    self._scroll_at(scroll_client, notches=-3)
+                    time.sleep(self.scroll_settle)
+                    continue
+
+                # Target team row is comfortably on screen; find its Load Team button
+                load_profile = ImageProfile(
+                    name="load_team",
+                    image_path=self._engine.to_absolute_path(load_path),
+                    confidence=confidence_for(load_path),
+                )
+                matches = self._engine.find_instances(load_profile, rect, limit=6)
+
+                # Filter for the match whose center_y falls within this team's row
+                row_matches = [
+                    m for m in matches
+                    if target_top_screen + 25 <= m.center_y <= target_top_screen + 130
+                ]
+
+                if row_matches:
+                    target_btn_click = (row_matches[0].center_x, row_matches[0].center_y)
+                else:
+                    # Calibrated fallback relative to header and target_block
+                    fallback_x = header_match.left + 569
+                    fallback_y = target_top_screen + 75
+                    target_btn_click = (fallback_x, fallback_y)
+                break
+
+            # Target team not visible yet -> decide scroll direction
+            if visible_teams:
+                team_numbers = [num for num, _ in visible_teams]
+                if all(n < team_num for n in team_numbers):
+                    notches = 4
+                elif all(n > team_num for n in team_numbers):
+                    notches = -4
+                else:
+                    notches = 4 if (sum(team_numbers) / len(team_numbers)) < team_num else -4
+            else:
+                notches = 4 if team_num > 2 else -4
+
+            self._scroll_at(scroll_client, notches=notches)
+            time.sleep(self.scroll_settle)
+
+        if target_btn_click is None:
+            return (False, f"Team #{team_num} not found in Unit Teams dialog after scrolling")
+
+        ok, click_msg = self._ahk.run(
+            nudge_click_script(target_btn_click[0], target_btn_click[1], park=self._park_point()),
+            wait=True,
+            timeout=8,
+        )
+        if not ok:
+            return (False, f"Load Team click failed: {click_msg}")
         time.sleep(self.click_settle)
 
         # 5. Confirm Popup
@@ -1187,6 +1267,8 @@ class LobbyNavigator:
         close_path = teams_close_image()
         if self._engine.template_exists(close_path):
             ok, msg = self._find_click(close_path, "Close Teams", timeout=self.search_timeout, fade_wait=0.2)
+            if not ok:
+                return (False, f"Close Teams: {msg}")
         else:
             close_x = header_match.left + 620
             close_y = header_match.top + 30

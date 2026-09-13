@@ -151,4 +151,110 @@ stub._equipped_team = None
 assert stub._ensure_team_equipped({"mode": "Story", "team": "3"}) is True
 assert len(stub._nav.equipped_calls) == 3
 
+# 5. Test team number regex matching
+import re
+from sloppykeys.core.ocr import TextBlock
+from sloppykeys.core.image_search import ImageMatch
+
+team_num_re = re.compile(r"\bteam\s*#?\s*([1-8])\b", re.IGNORECASE)
+assert team_num_re.search("Team #1").group(1) == "1"
+assert team_num_re.search("Team 8").group(1) == "8"
+assert team_num_re.search("Team#3").group(1) == "3"
+assert team_num_re.search("Team # 5").group(1) == "5"
+assert team_num_re.search("Team DPS") is None
+assert team_num_re.search("Save Team") is None
+assert team_num_re.search("Load Team") is None
+assert team_num_re.search("Team #10") is None
+
+# 6. Test LobbyNavigator.equip_team with OCR row matching
+import numpy as np
+
+class MockOcr:
+    def __init__(self, block_sequence):
+        self.seq = list(block_sequence)
+        self.call_count = 0
+    def available(self):
+        return (True, "ok")
+    def read_all(self, frame):
+        idx = min(self.call_count, len(self.seq) - 1)
+        self.call_count += 1
+        return self.seq[idx]
+
+class MockScanEngine:
+    def __init__(self, matches):
+        self.matches = matches
+    def template_exists(self, p):
+        return True
+    def to_absolute_path(self, p):
+        return p
+    def capture_bgr(self, rect):
+        return np.zeros((10, 10, 3), dtype=np.uint8)
+    def find_instances(self, profile, rect, limit=6):
+        return self.matches
+
+class RecordingAhk:
+    def __init__(self):
+        self.scripts = []
+    def available(self):
+        return True
+    def run(self, script, wait=True, timeout=8):
+        self.scripts.append(script)
+        return (True, "ok")
+
+blocks_f1 = [
+    TextBlock(text="Unit Teams", score=0.96, x=56, y=35, width=97, height=23),
+    TextBlock(text="Team #1", score=0.92, x=83, y=92, width=51, height=15),
+    TextBlock(text="Team #2", score=0.95, x=83, y=217, width=54, height=15),
+]
+load_matches = [
+    ImageMatch(profile_name="load_team", score=0.99, center_x=630, center_y=167, left=597, top=159, width=67, height=16),
+    ImageMatch(profile_name="load_team", score=0.95, center_x=630, center_y=292, left=597, top=284, width=67, height=16),
+]
+
+mock_ocr = MockOcr([blocks_f1])
+mock_engine = MockScanEngine(load_matches)
+mock_ahk = RecordingAhk()
+
+test_nav = LobbyNavigator(
+    engine=mock_engine,
+    ahk=mock_ahk,
+    roblox_rect=lambda: (0, 0, 1152, 756),
+    ocr=mock_ocr,
+)
+test_nav.scroll_settle = 0.001
+test_nav.click_settle = 0.001
+test_nav._find_click = lambda path, label, **kw: (True, "ok")
+test_nav._find = lambda path, **kw: ImageMatch(profile_name="header", score=0.99, center_x=95, center_y=39, left=61, top=21, width=69, height=36)
+
+ok, msg = test_nav.equip_team(2)
+assert ok is True, f"Expected success, got: {msg}"
+assert "Team #2 equipped" in msg
+# Load Team click must be for Team 2 (y=292), not Team 1 (y=167)
+assert "292" in mock_ahk.scripts[0]
+assert "630" in mock_ahk.scripts[0]
+
+# 7. Test scroll-down then equip
+blocks_f2 = [
+    TextBlock(text="Team #4", score=0.94, x=83, y=92, width=51, height=15),
+    TextBlock(text="Team #5", score=0.97, x=83, y=217, width=54, height=15),
+]
+mock_ocr_scroll = MockOcr([blocks_f1, blocks_f2])
+mock_ahk_scroll = RecordingAhk()
+scroll_nav = LobbyNavigator(
+    engine=mock_engine,
+    ahk=mock_ahk_scroll,
+    roblox_rect=lambda: (0, 0, 1152, 756),
+    ocr=mock_ocr_scroll,
+)
+scroll_nav.scroll_settle = 0.001
+scroll_nav.click_settle = 0.001
+scroll_nav._find_click = lambda path, label, **kw: (True, "ok")
+scroll_nav._find = lambda path, **kw: ImageMatch(profile_name="header", score=0.99, center_x=95, center_y=39, left=61, top=21, width=69, height=36)
+
+ok, msg = scroll_nav.equip_team(5)
+assert ok is True, f"Expected success, got: {msg}"
+assert "Team #5 equipped" in msg
+assert "WheelDown" in mock_ahk_scroll.scripts[0]
+assert "292" in mock_ahk_scroll.scripts[1]
+
 print("team loadout tests: OK")
