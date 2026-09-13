@@ -84,7 +84,8 @@ def test_controller_lifecycle() -> None:
 
     # 2. Mocking engine & OCR for preset selection
     class DummyHit:
-        center = (500, 500)
+        center_x = 500
+        center_y = 500
 
     class DummyBlock:
         text = "Raid 2"
@@ -92,7 +93,6 @@ def test_controller_lifecycle() -> None:
 
     class DummyEngine:
         def template_exists(self, path): return True
-        def find(self, path, timeout=0.0): return DummyHit()
         def capture_bgr(self, box): return "frame"
 
     class DummyOcr:
@@ -101,6 +101,7 @@ def test_controller_lifecycle() -> None:
 
     class DummyNav:
         fade_wait = 0.01
+        def _find(self, path, timeout=0.0): return DummyHit()
 
     class DummyAhk:
         def __init__(self): self.runs = []

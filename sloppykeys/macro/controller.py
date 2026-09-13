@@ -911,12 +911,12 @@ class MacroController:
             return False
 
         # 1. Click the Autoplay Settings button
-        hit = self._engine.find(settings_path, timeout=3.0)
+        hit = self._nav._find(settings_path, timeout=3.0)
         if hit is None:
             self._log("  Autoplay preset: could not find autoplay settings button")
             return False
 
-        cx, cy = hit.center
+        cx, cy = hit.center_x, hit.center_y
         self._log(f"  Autoplay preset: opening settings for '{raw_preset}'...")
         self._ahk.run(nudge_click_script(cx, cy), wait=True, timeout=5.0)
         time.sleep(self._nav.fade_wait)
@@ -973,13 +973,13 @@ class MacroController:
         close_img = autoplay_close_image()
         hit = None
         if self._engine.template_exists(close_img):
-            hit = self._engine.find(close_img, timeout=1.5)
+            hit = self._nav._find(close_img, timeout=1.5)
         if hit is None:
             fallback = close_panel_image()
             if self._engine.template_exists(fallback):
-                hit = self._engine.find(fallback, timeout=1.5)
+                hit = self._nav._find(fallback, timeout=1.5)
         if hit is not None:
-            cx, cy = hit.center
+            cx, cy = hit.center_x, hit.center_y
             self._ahk.run(nudge_click_script(cx, cy), wait=True, timeout=5.0)
             time.sleep(self._nav.fade_wait)
         else:
