@@ -897,7 +897,10 @@ class MacroController:
             return True
 
         from sloppykeys.content.nav_images import autoplay_settings_image
-        from sloppykeys.content.autoplay_regions import autoplay_presets_region
+        from sloppykeys.content.autoplay_regions import (
+            autoplay_presets_region,
+            match_autoplay_preset,
+        )
         from sloppykeys.macro.input_scripts import nudge_click_script
 
         settings_path = autoplay_settings_image()
@@ -943,20 +946,16 @@ class MacroController:
             return False
 
         blocks = self._ocr.read_all(frame)
-        target_block = None
-        wanted_clean = raw_preset.lower()
-        for b in blocks:
-            text_clean = b.text.lower()
-            if wanted_clean in text_clean or text_clean in wanted_clean:
-                target_block = b
-                break
+        target_block, match_desc = match_autoplay_preset(raw_preset, blocks)
 
         if target_block is not None:
-            click_x = rx + px + target_block.x + target_block.w // 2
-            click_y = ry + py + target_block.y + target_block.h // 2
+            bw = getattr(target_block, "width", getattr(target_block, "w", 0))
+            bh = getattr(target_block, "height", getattr(target_block, "h", 0))
+            click_x = rx + px + target_block.x + bw // 2
+            click_y = ry + py + target_block.y + bh // 2
             self._ahk.run(nudge_click_script(click_x, click_y), wait=True, timeout=5.0)
             self._equipped_autoplay_preset = raw_preset
-            self._log(f"  Autoplay preset: selected '{raw_preset}' (matched '{target_block.text}')")
+            self._log(f"  Autoplay preset: selected '{raw_preset}' ({match_desc})")
             time.sleep(fade_wait)
         else:
             found_texts = [b.text for b in blocks]

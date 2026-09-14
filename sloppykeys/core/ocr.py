@@ -68,6 +68,14 @@ class TextBlock:
     width: int
     height: int
 
+    @property
+    def w(self) -> int:
+        return self.width
+
+    @property
+    def h(self) -> int:
+        return self.height
+
     def region(self) -> tuple[int, int, int, int]:
         """As the project's `(x, y, w, h)` region tuple, ready to paste into a table."""
         return (self.x, self.y, self.width, self.height)

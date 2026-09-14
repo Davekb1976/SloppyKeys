@@ -23,10 +23,12 @@ from sloppykeys.content.autoplay_regions import (
     AUTOPLAY_PRESETS_DEFAULT_REGION,
     autoplay_presets_region,
     apply_region_overrides,
+    match_autoplay_preset,
     region_key,
     region_specs,
 )
 from sloppykeys.content.gamemodes import sanitize_task
+from sloppykeys.core.ocr import TextBlock
 from sloppykeys.macro.controller import MacroController
 
 
@@ -146,9 +148,66 @@ def test_controller_lifecycle() -> None:
     print("OK: controller autoplay preset lifecycle and repeat carryover")
 
 
+def test_matching() -> None:
+    # 1. TextBlock .w and .h properties
+    tb = TextBlock(text="Preset5", score=0.99, x=10, y=20, width=55, height=18)
+    assert tb.w == 55
+    assert tb.h == 18
+
+    # Game scan blocks
+    raw_texts = [
+        "Presets", "AH", "Portals", "Preset2", "Preset3",
+        "Preset4", "Preset5", "Preset6", "Preset7", "Preset8", "Preset9",
+    ]
+    blocks = [TextBlock(text=t, score=0.98, x=10, y=10, width=50, height=20) for t in raw_texts]
+
+    # 2. "Preset 5" (with space) matches "Preset5" (without space)
+    hit, desc = match_autoplay_preset("Preset 5", blocks)
+    assert hit is not None
+    assert hit.text == "Preset5"
+    assert "exact" in desc
+
+    # Case variations and punctuation
+    for query in ["Preset 5", "Preset5", "preset 5", "preset-5", "preset_5"]:
+        hit, _ = match_autoplay_preset(query, blocks)
+        assert hit is not None and hit.text == "Preset5"
+
+    # Other presets
+    hit2, _ = match_autoplay_preset("Preset 2", blocks)
+    assert hit2 is not None and hit2.text == "Preset2"
+
+    hit_ah, _ = match_autoplay_preset("AH", blocks)
+    assert hit_ah is not None and hit_ah.text == "AH"
+
+    hit_portals, _ = match_autoplay_preset("Portals", blocks)
+    assert hit_portals is not None and hit_portals.text == "Portals"
+
+    # Strict digits: "Preset 5" must never match "Preset2" or "Presets"
+    hit_fail, _ = match_autoplay_preset("Preset 1", blocks)
+    assert hit_fail is None
+
+    # 3. Custom renamed preset "test"
+    blocks_test = [
+        TextBlock(text=t, score=0.95, x=10, y=10, width=50, height=20)
+        for t in ["Presets", "AH", "Portals", "Preset2", "test", "Preset6"]
+    ]
+    for test_query in ["test", "Test", "TEST", "test ", " test"]:
+        hit_t, desc_t = match_autoplay_preset(test_query, blocks_test)
+        assert hit_t is not None
+        assert hit_t.text == "test"
+
+    # Fuzzy match on minor typo / OCR glitch
+    hit_fuzzy, desc_f = match_autoplay_preset("tst", blocks_test)
+    assert hit_fuzzy is not None and hit_fuzzy.text == "test"
+    assert "fuzzy" in desc_f
+
+    print("OK: match_autoplay_preset robust matching tests")
+
+
 if __name__ == "__main__":
     test_templates()
     test_regions()
     test_sanitize()
     test_controller_lifecycle()
+    test_matching()
     print("ALL AUTOPLAY PRESET TESTS PASSED")
