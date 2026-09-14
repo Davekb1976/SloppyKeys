@@ -204,9 +204,11 @@ which established several of the capabilities built here: the task queue, the wa
 recorder, the block-based match plan, and Discord match reporting. That prior work is
 acknowledged with thanks.
 
-The implementation is independent. Input is delivered through AutoHotkey v2 rather than
-`SendInput`; the Roblox window is placed in the topmost band with its frame removed rather
-than reparented as a child window; text is read with RapidOCR rather than Tesseract.
+The implementation is independent: input is delegated to an external AutoHotkey v2
+process rather than direct in-process Win32 calls; the Roblox window rides in the
+topmost band with its frame removed rather than being reparented as a child window;
+and text recognition runs offline via a self-contained RapidOCR (ONNX) engine without
+requiring external Tesseract or Windows SDK installers.
 
 Bundled attribution: the `ponytail` steering guide is MIT, from
 [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail).
