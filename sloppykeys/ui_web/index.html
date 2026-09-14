@@ -407,13 +407,6 @@
                     <div class="setting-info"><span class="setting-label">Repeat</span></div>
                     <input type="number" class="setting-input" id="tb-repeat" min="1" max="999" value="1" style="width:70px;">
                   </div>
-                  <div class="setting-row" id="tb-autoplay-preset-row">
-                    <div class="setting-info">
-                      <span class="setting-label">Autoplay Preset</span>
-                      <span class="setting-desc">Preset selected via OCR before Start Game</span>
-                    </div>
-                    <input type="text" class="setting-input" id="tb-autoplay-preset" maxlength="40" placeholder="Preset name (optional)" style="width:140px;">
-                  </div>
                   <!-- Expedition only: the run ends when the macro takes an Extract offer,
                        so which offer to take is how long the run is. -->
                   <div class="setting-row" id="tb-extract-row" style="display:none;">
@@ -431,19 +424,26 @@
                     </div>
                     <input type="number" class="setting-input" id="tb-leave-wave" min="0" max="999" value="0" style="width:70px;">
                   </div>
-                  <div class="setting-row" style="grid-column:1/3;">
-                    <div class="setting-info">
-                      <div style="display:flex; align-items:center; gap:6px;">
-                        <span class="setting-label">Macro Operation</span>
-                        <span class="tb-no-macro-tag" id="tb-no-macro-tag" style="display:none;">No Macro</span>
-                      </div>
-                      <span class="setting-desc">The block-based routine to run (Macro Manager tab)</span>
-                      <div class="tb-macro-warn" id="tb-macro-warn" style="display:none;">
-                        No macro assigned — character won't walk and units won't be placed.
-                      </div>
-                    </div>
-                    <select class="setting-select" id="tb-macro"><option value="">No Macro</option></select>
+                </div>
+                <div class="setting-row" id="tb-autoplay-preset-row">
+                  <div class="setting-info">
+                    <span class="setting-label">Autoplay Preset</span>
+                    <span class="setting-desc">Preset selected via OCR before Start Game</span>
                   </div>
+                  <input type="text" class="setting-input" id="tb-autoplay-preset" maxlength="40" placeholder="Preset name (optional)" style="width:140px;">
+                </div>
+                <div class="setting-row" id="tb-macro-row" style="grid-column:1/3;">
+                  <div class="setting-info">
+                    <div style="display:flex; align-items:center; gap:6px;">
+                      <span class="setting-label">Macro Operation</span>
+                      <span class="tb-no-macro-tag" id="tb-no-macro-tag" style="display:none;">No Macro</span>
+                    </div>
+                    <span class="setting-desc">The block-based routine to run (Macro Manager tab)</span>
+                    <div class="tb-macro-warn" id="tb-macro-warn" style="display:none;">
+                      No macro assigned — character won't walk and units won't be placed.
+                    </div>
+                  </div>
+                  <select class="setting-select" id="tb-macro"><option value="">No Macro</option></select>
                 </div>
                 <!-- Challenge-specific fields -->
                 <div id="tb-challenge-fields" style="display:none; grid-column:1/3;">

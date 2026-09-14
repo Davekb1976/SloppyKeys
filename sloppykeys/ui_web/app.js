@@ -489,11 +489,13 @@
           .filter(Boolean);
         bits.push(on.length ? "slots " + on.join(" ") : "every slot off");
         if (t.team) bits.push("Team " + t.team);
+        if (t.autoplay_preset) bits.push("Preset: " + t.autoplay_preset);
         const assigned = Object.keys(t.challenge_macros || {}).filter((m) => t.challenge_macros[m]);
         bits.push(assigned.length ? assigned.length + " map macro" + (assigned.length === 1 ? "" : "s") : "no macros assigned");
       } else if (isStoryEvent) {
         bits.push("Auto-Detect map");
         if (t.team) bits.push("Team " + t.team);
+        if (t.autoplay_preset) bits.push("Preset: " + t.autoplay_preset);
         bits.push(t.macro || "no macro assigned");
       } else {
         if (fields.difficulty && t.difficulty) bits.push(t.difficulty);
@@ -678,9 +680,12 @@
     // Populate fields
     tbMode.value = task.mode || "";
     tbTeam.value = task.team || "";
+    if (tbAutoplayPreset) tbAutoplayPreset.value = task.autoplay_preset || "";
     // Toggle Challenge vs Standard fields based on mode
     const isChallenge = tbMode.value === "Challenge";
     document.getElementById("tb-standard-fields").style.display = isChallenge ? "none" : "contents";
+    const tbMacroRow = document.getElementById("tb-macro-row");
+    if (tbMacroRow) tbMacroRow.style.display = isChallenge ? "none" : "";
     document.getElementById("tb-challenge-fields").style.display = isChallenge ? "block" : "none";
     if (isChallenge) {
       renderChallengeMapGrid();
@@ -693,7 +698,6 @@
       tbExtract.value = task.extract_after || 1;
       tbLeaveWave.value = task.leave_at_wave || 0;
       tbSearch.value = task.search || "";
-      if (tbAutoplayPreset) tbAutoplayPreset.value = task.autoplay_preset || "";
       applyModeFields(task.mode);
       tbMacro.value = task.macro || "";
       updateLeaveWaveVisibility(task.mode, task.stage);
@@ -863,6 +867,8 @@
   tbMode.addEventListener("change", () => {
     const isChallenge = tbMode.value === "Challenge";
     document.getElementById("tb-standard-fields").style.display = isChallenge ? "none" : "contents";
+    const tbMacroRow = document.getElementById("tb-macro-row");
+    if (tbMacroRow) tbMacroRow.style.display = isChallenge ? "none" : "";
     document.getElementById("tb-challenge-fields").style.display = isChallenge ? "block" : "none";
     updateMacroWarning();
     if (isChallenge) {

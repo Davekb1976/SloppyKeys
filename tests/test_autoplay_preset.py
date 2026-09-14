@@ -69,6 +69,9 @@ def test_sanitize() -> None:
     sanitized = sanitize_task(task)
     assert sanitized["autoplay_preset"] == "Raid 2"
 
+    task_chal = {"mode": "Challenge", "autoplay_preset": "Preset 5"}
+    assert sanitize_task(task_chal)["autoplay_preset"] == "Preset 5"
+
     task_empty = {"mode": "Story"}
     assert sanitize_task(task_empty)["autoplay_preset"] == ""
     print("OK: sanitize_task preserves autoplay_preset")
