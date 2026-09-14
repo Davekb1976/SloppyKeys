@@ -201,7 +201,27 @@ def test_matching() -> None:
     assert hit_fuzzy is not None and hit_fuzzy.text == "test"
     assert "fuzzy" in desc_f
 
-    print("OK: match_autoplay_preset robust matching tests")
+    # 4. Multi-line wrapped preset names (e.g. 'copyofporta' + 'ls' inside the button card)
+    blocks_multiline = [
+        TextBlock(text="Portals", score=1.0, x=29, y=19, width=47, height=16),
+        TextBlock(text="Preset2", score=1.0, x=147, y=20, width=52, height=14),
+        TextBlock(text="copyofporta", score=1.0, x=15, y=135, width=76, height=19),
+        TextBlock(text="Ls", score=0.63, x=44, y=149, width=17, height=15),
+    ]
+    # Searching for "copy of portals" or "copyofportals" MUST match the wrapped card, NEVER "Portals"
+    for q in ["copy of portals", "copyofportals", "Copy Of Portals"]:
+        hit_copy, desc_c = match_autoplay_preset(q, blocks_multiline)
+        assert hit_copy is not None, f"Expected match for {q}"
+        assert hit_copy.text == "copyofporta Ls", f"Matched wrong block: {hit_copy.text}"
+        assert hit_copy.x == 15 and hit_copy.y == 135
+        assert hit_copy.width == 76 and hit_copy.height == 29
+        assert "exact" in desc_c
+
+    # Searching for "Portals" matches "Portals", not "copyofporta Ls"
+    hit_p, _ = match_autoplay_preset("Portals", blocks_multiline)
+    assert hit_p is not None and hit_p.text == "Portals"
+
+    print("OK: match_autoplay_preset robust matching tests (including multiline and copy-of-portals isolation)")
 
 
 if __name__ == "__main__":
