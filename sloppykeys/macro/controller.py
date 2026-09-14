@@ -901,7 +901,7 @@ class MacroController:
             autoplay_presets_region,
             match_autoplay_preset,
         )
-        from sloppykeys.macro.input_scripts import nudge_click_script
+        from sloppykeys.macro.input_scripts import nudge_click_script, SPREAD_TIGHT
 
         settings_path = autoplay_settings_image()
         if not self._engine.template_exists(settings_path):
@@ -922,7 +922,7 @@ class MacroController:
         fade_wait = min(0.3, getattr(self._nav, "panel_fade_wait", 0.3))
         cx, cy = hit.center_x, hit.center_y
         self._log(f"  Autoplay preset: opening settings for '{raw_preset}'...")
-        self._ahk.run(nudge_click_script(cx, cy), wait=True, timeout=5.0)
+        self._ahk.run(nudge_click_script(cx, cy, spread=SPREAD_TIGHT), wait=True, timeout=5.0)
         time.sleep(fade_wait)
 
         # 2. OCR scan inside the Autoplay presets region
@@ -953,7 +953,7 @@ class MacroController:
             bh = getattr(target_block, "height", getattr(target_block, "h", 0))
             click_x = rx + px + target_block.x + bw // 2
             click_y = ry + py + target_block.y + bh // 2
-            self._ahk.run(nudge_click_script(click_x, click_y), wait=True, timeout=5.0)
+            self._ahk.run(nudge_click_script(click_x, click_y, spread=SPREAD_TIGHT), wait=True, timeout=5.0)
             self._equipped_autoplay_preset = raw_preset
             self._log(f"  Autoplay preset: selected '{raw_preset}' ({match_desc})")
             time.sleep(fade_wait)
@@ -968,7 +968,7 @@ class MacroController:
     def _close_autoplay_settings(self) -> None:
         """Dismiss the Auto Play Settings panel via close_gray.png or close.png."""
         from sloppykeys.content.nav_images import autoplay_close_image, close_panel_image
-        from sloppykeys.macro.input_scripts import nudge_click_script
+        from sloppykeys.macro.input_scripts import nudge_click_script, SPREAD_TIGHT
 
         fade_wait = min(0.3, getattr(self._nav, "panel_fade_wait", 0.3))
         close_img = autoplay_close_image()
@@ -981,7 +981,7 @@ class MacroController:
                 hit = self._nav._find(fallback, timeout=1.5)
         if hit is not None:
             cx, cy = hit.center_x, hit.center_y
-            self._ahk.run(nudge_click_script(cx, cy), wait=True, timeout=5.0)
+            self._ahk.run(nudge_click_script(cx, cy, spread=SPREAD_TIGHT), wait=True, timeout=5.0)
             time.sleep(fade_wait)
         else:
             from sloppykeys.macro.input_scripts import key_script
@@ -2099,13 +2099,13 @@ class MacroController:
             if not (x and y):
                 self._log("    [block] click: no coordinate set — skipping")
                 return
-            from sloppykeys.macro.input_scripts import nudge_click_script
+            from sloppykeys.macro.input_scripts import nudge_click_script, SPREAD_TIGHT
             screen_pos = self._client_to_screen(x, y)
             if screen_pos is None:
                 self._log("    [block] click: can't resolve screen position")
                 return
             self._ahk.run(
-                nudge_click_script(screen_pos[0], screen_pos[1]), wait=True, timeout=5.0
+                nudge_click_script(screen_pos[0], screen_pos[1], spread=SPREAD_TIGHT), wait=True, timeout=5.0
             )
 
         elif btype == "send_key":

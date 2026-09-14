@@ -16,6 +16,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sloppykeys.macro import input_scripts  # noqa: E402
+from sloppykeys.macro.controller import MacroController  # noqa: E402
 from sloppykeys.macro.input_scripts import (  # noqa: E402
     SPREAD_TIGHT,
     SPREAD_WIDE,
@@ -88,5 +89,22 @@ try:
     assert plain == [TARGET], plain
 finally:
     input_scripts.USE_NUDGE = True
+
+# # The Click block in MacroController must use SPREAD_TIGHT (not SPREAD_WIDE)
+ctrl = MacroController.__new__(MacroController)
+scripts_run: list[str] = []
+ctrl._ahk = type("Ahk", (), {"run": lambda self, s, wait=True, timeout=5.0: scripts_run.append(s) or (True, "ok")})()
+ctrl._log = lambda _m: None
+ctrl._client_to_screen = lambda x, y: (x + 100, y + 200)
+
+target_client = (300, 400)
+target_screen = (400, 600)
+ctrl._execute_block({"type": "click", "params": {"x": target_client[0], "y": target_client[1]}})
+
+assert len(scripts_run) == 1, scripts_run
+click_moves = moves(scripts_run[0])
+assert click_moves[-1] == target_screen, click_moves
+assert all(p[1] == target_screen[1] for p in click_moves), f"click block moved vertically: {click_moves}"
+assert max(abs(p[0] - target_screen[0]) for p in click_moves) <= SPREAD_TIGHT, click_moves
 
 print("nudge script: OK")
