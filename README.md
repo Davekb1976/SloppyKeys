@@ -23,21 +23,18 @@ Queue up Story, Challenge, Expedition, Raid and Events runs, place your units, a
 
 ## Table of Contents
 
-- [Features](#features)
-- [Requirements](#requirements)
-- [Download & Install](#download--install)
-- [Updates](#updates)
-- [Your data](#your-data)
-- [Usage](#usage)
-- [How it works, and what it will not do](#how-it-works-and-what-it-will-not-do)
-- [Running from source](#running-from-source)
-- [Project layout](#project-layout)
-- [Bugs and requests](#bugs-and-requests)
-- [Licence](#licence)
-- [Credits](#credits)
-- [Disclaimer](#disclaimer)
+- [Features & Overview](#features--overview)
+- [Getting Started](#getting-started)
+- [Usage & Controls](#usage--controls)
+- [Development & Source](#development--source)
+- [Credits & Tooling](#credits--tooling)
+- [License & Disclaimer](#license--disclaimer)
 
-## Features
+---
+
+## Features & Overview
+
+### Features
 
 - **Every mode.** Story, Challenge, Expedition, Raid and Events, with hard mode and
   Expedition difficulty as toggles.
@@ -45,6 +42,8 @@ Queue up Story, Challenge, Expedition, Raid and Events runs, place your units, a
   is met, without stopping between matches.
 - **Unit plans you place yourself.** Pick the coordinates on the live window, set the slot
   and the upgrade level, save it per gamemode/map/act.
+- **Autoplay preset selector.** Select in-game autoplay presets per task before match start
+  using OCR matching.
 - **Reads the challenge panel**, including the daily limit, and waits out the 8PM refill
   rather than burning runs.
 - **Events routes you author** — click, find, expect, scroll, wait — for the modes whose
@@ -55,7 +54,26 @@ Queue up Story, Challenge, Expedition, Raid and Events runs, place your units, a
   rest down.
 - **In-app updates** from the GitHub release, checksum-verified.
 
-## Requirements
+### How it works, and what it will not do
+
+Everything the macro knows comes from **pixels on screen**. Everything it does goes out as
+**ordinary Windows input**. That boundary is the whole design:
+
+- It captures the screen with [mss](https://github.com/BoboTiG/python-mss) and matches
+  templates with OpenCV. Two strings no template can cover (the challenge daily limit and
+  the map name) go through offline OCR via RapidOCR.
+- It sends input by generating an AutoHotkey v2 script and running it. Python decides
+  *what* to do; AHK does it.
+- Roblox is never reparented, injected into, hooked, or read from memory. Nothing is
+  written to a Roblox file. No fast flags, no anti-cheat interaction of any kind.
+
+If a feature would need more than pixels in and OS input out, it doesn't get built.
+
+---
+
+## Getting Started
+
+### Requirements
 
 - **Windows 10/11, x64 only.** The whole thing is ctypes to Win32; there is no other path.
 - **[AutoHotkey v2](https://www.autohotkey.com/)** — every click and keypress goes through
@@ -63,7 +81,7 @@ Queue up Story, Challenge, Expedition, Raid and Events runs, place your units, a
 - **Display scaling at 100%.** At 125% a template cropped at 100% scores as a different
   image (measured 0.80x) and matching fails.
 
-## Download & Install
+### Download & Install
 
 Grab the latest [release](../../releases):
 
@@ -79,30 +97,20 @@ lists SHA-256 hashes if you want to check what you downloaded.
 Then install AutoHotkey v2 if you haven't. The installer says so too, rather than letting
 you find out by every click doing nothing.
 
-## Updates
+### Updates & Your Data
 
-**Settings > Main > Updates.** It asks GitHub once per launch whether there's a newer
-release and stays quiet unless there is. Nothing downloads until you click.
+- **Updates (Settings > Main > Updates):** It asks GitHub once per launch whether there's a newer
+  release and stays quiet unless there is. Nothing downloads until you click. Installer copies
+  update in place with SHA-256 verification against `SHA256SUMS.txt`.
+- **Your Data:** `assets\`, `operations\`, `paths\`, `presets\`, `routes.json` and `settings.json` live
+  **beside the exe** — the app writes to all of them, so captured templates and plans survive
+  restarts and upgrades.
+- `settings.json` holds your private-server link and your Discord webhook URL. It stays on
+  your machine; nothing is uploaded anywhere except the webhook you configured.
 
-If you used the installer, it can update in place: it fetches the new setup, checks it
-against the `SHA256SUMS.txt` published with the release, refuses anything that doesn't
-match, and won't touch an update while the macro is running. Portable and from-source
-copies get the release page instead — running the installer from a portable folder would
-just leave a second copy elsewhere.
+---
 
-Turn the whole thing off with the toggle and nothing contacts GitHub.
-
-## Your data
-
-`assets\`, `operations\`, `paths\`, `presets\`, `routes.json` and `settings.json` live
-**beside the exe** — the app
-writes to all of them, so a captured template has to survive a restart. An upgrade never
-overwrites them, and an uninstall asks before removing them.
-
-`settings.json` holds your private-server link and your Discord webhook URL. It stays on
-your machine; nothing is uploaded anywhere except the webhook you configured.
-
-## Usage
+## Usage & Controls
 
 | Key | Does |
 |---|---|
@@ -120,22 +128,11 @@ Start and stop are separate keys on purpose: with one toggle, pressing it to sta
 you thought had stopped stops it instead, and there's no way to be sure which state you're
 in before you press.
 
-## How it works, and what it will not do
+---
 
-Everything the macro knows comes from **pixels on screen**. Everything it does goes out as
-**ordinary Windows input**. That boundary is the whole design:
+## Development & Source
 
-- It captures the screen with [mss](https://github.com/BoboTiG/python-mss) and matches
-  templates with OpenCV. Two strings no template can cover (the challenge daily limit and
-  the map name) go through offline OCR.
-- It sends input by generating an AutoHotkey v2 script and running it. Python decides
-  *what* to do; AHK does it.
-- Roblox is never reparented, injected into, hooked, or read from memory. Nothing is
-  written to a Roblox file. No fast flags, no anti-cheat interaction of any kind.
-
-If a feature would need more than pixels in and OS input out, it doesn't get built.
-
-## Running from source
+### Running from source
 
 ```powershell
 py -3.14 -m venv .venv
@@ -154,7 +151,7 @@ Framework-free assert scripts, run one at a time:
 .venv\Scripts\python.exe tests\test_placement_plan.py
 ```
 
-### Building
+### Building & Releasing
 
 ```powershell
 .venv\Scripts\python.exe -m pip install pyinstaller
@@ -162,31 +159,23 @@ Framework-free assert scripts, run one at a time:
 ```
 
 Onedir, not onefile: a onefile build unpacks ~400MB to a temp folder on every launch. Lands
-in `..\..\SLOPPYKEYS` unless you pass `--dest`. `--console` keeps a console so tracebacks
-from the worker threads are visible. Close the app first — a running exe can't be overwritten.
+in `..\..\SLOPPYKEYS` unless you pass `--dest`.
 
-The installer needs [Inno Setup 6](https://jrsoftware.org/isdl.php), and takes the version
-on the command line rather than defaulting to a stale one:
+The installer needs [Inno Setup 6](https://jrsoftware.org/isdl.php), taking the version
+on the command line:
 
 ```powershell
 $v = .venv\Scripts\python.exe -c "from sloppykeys.version import VERSION; print(VERSION)"
 "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe" /DAppVersion=$v installer.iss
 ```
 
-### Releasing
+To bump version and tag:
 
 ```powershell
 .venv\Scripts\python.exe bump_version.py
 ```
 
-That bumps `sloppykeys/version.py`, commits `Release <version>` with the changes since the
-last tag, and pushes the tag. `.github/workflows/release.yml` builds the installer and the
-portable zip on a clean runner and publishes them.
-
-Versions are `MAJOR.MINOR.PATCH` with a **single-digit patch**: `0.1.9` is followed by
-`0.2.0`, not `0.1.10`.
-
-## Project layout
+### Project layout
 
 ```
 sloppykeys/
@@ -203,23 +192,11 @@ tests/       assert scripts, no framework
 
 Content and timing are **tables, not branches**: adding a map or a delay is a row.
 
-## Bugs and requests
+---
 
-[Open an issue](../../issues/new/choose) — bring `log.txt`, a screenshot, and your display
-scaling. Pull requests aren't accepted; fork it instead. Details in
-[CONTRIBUTING.md](CONTRIBUTING.md).
+## Credits & Tooling
 
-## Licence
-
-[MIT](LICENSE). Use it, change it, ship it.
-
-It carries no paywall, licence key or telemetry, and it never will — but that's a promise
-about this build, not a restriction on yours.
-
-Bundled attribution: the `ponytail` steering guide is MIT, from
-[DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail).
-
-## Credits
+### Acknowledgements
 
 This project follows
 [Cweamy/Anime-Expeditions-Creams-Macro](https://github.com/Cweamy/Anime-Expeditions-Creams-Macro),
@@ -231,11 +208,34 @@ The implementation is independent. Input is delivered through AutoHotkey v2 rath
 `SendInput`; the Roblox window is placed in the topmost band with its frame removed rather
 than reparented as a child window; text is read with RapidOCR rather than Tesseract.
 
-That project is MIT licensed. No portion of its source is included here, so it places no
-notice requirement on this repository. Were any of it reused, its copyright and licence
-notice would ship alongside it.
+Bundled attribution: the `ponytail` steering guide is MIT, from
+[DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail).
 
-## Disclaimer
+### AI Assistance & IDEs
+
+This project was built with the assistance of frontier AI models across specialized agentic IDEs:
+
+- **AI Models:** Claude Opus 5, Claude Sonnet 5, Opus 4.8, Claude Opus 4.6 (Thinking), and Gemini 4.8 Flash.
+- **IDEs:** Developed using **Antigravity IDE** (for Gemini 4.8 Flash and Claude Opus 4.6 Thinking) and **Kiro IDE** (for Claude Opus 5, Claude Sonnet 5, and Opus 4.8).
+
+---
+
+## License & Disclaimer
+
+### Licence
+
+[MIT](LICENSE). Use it, change it, ship it.
+
+It carries no paywall, licence key or telemetry, and it never will — but that's a promise
+about this build, not a restriction on yours.
+
+### Bugs and requests
+
+[Open an issue](../../issues/new/choose) — bring `log.txt`, a screenshot, and your display
+scaling. Pull requests aren't accepted; fork it instead. Details in
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
+### Disclaimer
 
 Automating a game may breach its terms of service, and using this can get your account
 actioned. That risk is yours. Not affiliated with, endorsed by, or connected to Roblox or
