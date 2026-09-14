@@ -9,6 +9,7 @@
   included. One file, not one per panel.
 - `close_gamemode.png` — the intermission menu's own **Back** control, which puts the
   **lobby proper** back on screen. See below.
+- `reconnect.png` — the Roblox **Reconnect** button that appears when disconnected from the server.
 
 Capture all of these from the **Image Manager** (F6): it grabs the exact pixels the matcher
 reads, at the pinned client size, and writes them to the right filename. Cropping from

@@ -54,6 +54,7 @@ from sloppykeys.content.nav_images import (
     portal_bag_image,
     portal_select_portal_image,
     portals_tab_image,
+    reconnect_image,
     repeat_image,
     return_lobby_confirm_image,
     select_stage_image,
@@ -949,6 +950,17 @@ class LobbyNavigator:
         """
         return self._find(start_game_image()) is not None
 
+    def is_disconnected(self) -> bool:
+        """One look for the Reconnect button: has Roblox disconnected?
+
+        Deliberately a single look with no wait: this answers "are we disconnected right now".
+        Returns False when the template is missing so an uncaptured template is a safe no-op.
+        """
+        path = reconnect_image()
+        if not self._engine.template_exists(path):
+            return False
+        return self._find(path, timeout=0.0) is not None
+
     def click_start_game(self, timeout: float | None = None) -> tuple[bool, str]:
         """Find and click the in-match Start Game button, which begins the wave.
 
@@ -1059,6 +1071,8 @@ class LobbyNavigator:
         while True:
             if self._should_stop():
                 return (False, f"stopped by user after {checks} checks")
+            if self.is_disconnected():
+                return (False, "disconnected (Reconnect button detected)")
             checks += 1
             match = self._find(path)
             if match is not None:
@@ -1102,6 +1116,8 @@ class LobbyNavigator:
         while True:
             if self._should_stop():
                 return (False, f"stopped by user after {checks} checks")
+            if self.is_disconnected():
+                return (False, "disconnected (Reconnect button detected)")
             checks += 1
 
             if play_exists:

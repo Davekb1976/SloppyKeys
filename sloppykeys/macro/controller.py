@@ -281,16 +281,29 @@ class MacroController:
             time.sleep(0.15)
         return self._stop_requested
 
-    def _try_reopen_roblox(self) -> bool:
-        """If auto-reopen is enabled and Roblox isn't running, relaunch via deep link.
+    def _check_disconnected(self) -> bool:
+        """Check if Roblox is showing the reconnect dialog."""
+        nav = getattr(self, "_nav", None)
+        if nav is None or not hasattr(nav, "is_disconnected"):
+            return False
+        return bool(nav.is_disconnected())
 
-        Throttled to one attempt per REOPEN_COOLDOWN seconds. Returns True if
-        Roblox is (or became) available, False if we couldn't recover.
-        """
-        hwnd = rbx.find_roblox_window()
-        if hwnd is not None:
-            return True
+    def _handle_disconnect(self) -> bool:
+        """Handle detected disconnection: close old Roblox process and rejoin private server."""
+        unified = UnifiedSettings(self._app_root)
+        if not unified.get("auto_reopen_roblox", True):
+            self._log("  Roblox disconnected, but Auto-reopen is disabled.")
+            return False
+        self._log("  Roblox disconnected (Reconnect button detected) — closing and rejoining private server...")
+        rbx.close_roblox_process()
+        time.sleep(1.5)
+        self._equipped_team = None
+        self._equipped_autoplay_preset = None
+        self._camera_set = False
+        self._kept_position = False
+        return self._relaunch_private_server(reason="Roblox disconnected")
 
+    def _relaunch_private_server(self, reason: str = "Roblox closed mid-run") -> bool:
         unified = UnifiedSettings(self._app_root)
         if not unified.get("auto_reopen_roblox", True):
             return False
@@ -302,14 +315,9 @@ class MacroController:
         self._last_reopen_time = now
         link = unified.get("private_server_link", "")
         if not link or link == "empty":
-            self._log("Roblox closed but no private server link — can't reopen.")
+            self._log(f"{reason} but no private server link — can't reopen.")
             return False
 
-        # Through the parser, not raw. `parse_private_server_link` turns a share URL into the
-        # `roblox://` deep link that starts the client; handing the stored URL to the shell
-        # opens a browser tab with a Join button instead, so the reopen never completed on
-        # its own and the 60s wait below always timed out. The parser existed for this and
-        # had no caller.
         from sloppykeys.config.settings import parse_private_server_link
 
         uri, error = parse_private_server_link(link)
@@ -317,7 +325,7 @@ class MacroController:
             self._log(f"Can't reopen Roblox: {error or 'the private server link is unusable'}")
             return False
 
-        self._log("Roblox closed mid-run. Relaunching via deep link...")
+        self._log(f"{reason}. Relaunching via deep link...")
         try:
             import os as _os
             _os.startfile(uri)
@@ -325,11 +333,6 @@ class MacroController:
             self._log(f"Failed to launch Roblox: {exc}")
             return False
 
-        # Wait for the window to appear. `lobby_rejoin_wait` is read here, which is the reader
-        # it never had: it sat in `DELAY_SPEC` doing nothing while this used a hardcoded 60s —
-        # and 60s is exactly the case its docstring calls out as too short, since a cold start
-        # is Roblox launching, updating, loading the place and spawning in. A deadline on a
-        # poll, so a generous value costs nothing when the join is quick.
         budget = max(1.0, float(self._delays.get("lobby_rejoin_wait", 150.0)))
         deadline = time.time() + budget
         while time.time() < deadline:
@@ -340,12 +343,29 @@ class MacroController:
                 self._log("Roblox reopened successfully.")
                 self._equipped_team = None
                 self._equipped_autoplay_preset = None
+                self._camera_set = False
+                self._kept_position = False
                 time.sleep(5.0)  # give it a moment to load
                 return True
             time.sleep(2.0)
 
         self._log(f"Roblox didn't appear within {budget:.0f}s.")
         return False
+
+    def _try_reopen_roblox(self) -> bool:
+        """If auto-reopen is enabled and Roblox isn't running or is disconnected, relaunch.
+
+        Throttled to one attempt per REOPEN_COOLDOWN seconds. Returns True if
+        Roblox is (or became) available, False if we couldn't recover.
+        """
+        if self._check_disconnected():
+            return self._handle_disconnect()
+
+        hwnd = rbx.find_roblox_window()
+        if hwnd is not None:
+            return True
+
+        return self._relaunch_private_server(reason="Roblox closed mid-run")
 
     def _run(self) -> tuple[bool, str]:
         loop_pass = 0
@@ -601,6 +621,10 @@ class MacroController:
 
     def _navigate_lobby(self, mode: str, map_name: str, stage: str) -> bool:
         """Run the lobby chain for a task. Returns True on success."""
+        if self._check_disconnected():
+            self._handle_disconnect()
+            return False
+
         # Check if already in match
         if self._nav.in_match():
             self._log("  Already in a match — skipping lobby.")
@@ -1075,6 +1099,7 @@ class MacroController:
             except (ValueError, TypeError):
                 leave_at_wave = 0
         next_wave_check = 0.0
+        next_disconnect_check = 0.0
 
         is_eclipse = self._is_eclipse_active()
         self._next_eclipse_card_check = 0.0
@@ -1088,6 +1113,15 @@ class MacroController:
                 # this one — a plausible wrong number on the history card and in Discord.
                 self._stats.abandon_stage()
                 return
+
+            now = time.time()
+            if now >= next_disconnect_check:
+                next_disconnect_check = now + 2.0
+                if self._check_disconnected():
+                    self._stats.abandon_stage()
+                    self._handle_disconnect()
+                    self._left_early = True
+                    return
 
             if time.monotonic() >= match_deadline:
                 self._log(

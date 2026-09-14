@@ -240,3 +240,21 @@ def recover_frame(hwnd: int, client_w: int, client_h: int) -> bool:
 
 def is_minimized(hwnd: int) -> bool:
     return bool(user32.IsIconic(hwnd))
+
+
+def close_roblox_process() -> None:
+    """Terminate running Roblox player processes.
+
+    Used when Roblox is disconnected or hung so a fresh launch can succeed.
+    """
+    import subprocess
+
+    for proc in ("RobloxPlayerBeta.exe", "RobloxPlayerLauncher.exe"):
+        try:
+            subprocess.run(
+                ["taskkill", "/F", "/IM", proc],
+                capture_output=True,
+                check=False,
+            )
+        except Exception:
+            pass

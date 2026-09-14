@@ -93,6 +93,7 @@ CLOSE_PANEL_IMAGE = "close.png"
 # No fallback coordinate: nobody has measured one, and a blind click on the lobby is how a
 # stray click reaches the world. A miss reports and the caller carries on.
 CLOSE_GAMEMODE_IMAGE = "close_gamemode.png"
+RECONNECT_IMAGE = "reconnect.png"
 # Only exists once a stage is loaded and the player has control, so finding it is
 # how the macro tells "in the match" from "still on the loading screen". It comes
 # back after a win, which is also how the next match is started.
@@ -364,6 +365,11 @@ def close_panel_image() -> str:
     return os.path.join(IMAGES_DIR, LOBBY_DIR, CLOSE_PANEL_IMAGE).replace("\\", "/")
 
 
+def reconnect_image() -> str:
+    """The Roblox disconnect modal's Reconnect button."""
+    return os.path.join(IMAGES_DIR, LOBBY_DIR, RECONNECT_IMAGE)
+
+
 def back_lobby_image() -> str:
     """In-match Back to Lobby — opens `return_lobby_confirm_image`, doesn't leave."""
     return os.path.join(IMAGES_DIR, MATCH_DIR, BACK_LOBBY_IMAGE)
@@ -629,6 +635,7 @@ def expected_paths() -> list[str]:
         # the *next* task: an unclosed panel covers whatever that task's chain starts from.
         close_panel_image(),
         close_gamemode_image(),
+        reconnect_image(),
     ]
     paths += expedition_match_paths()
     paths += teams_paths()

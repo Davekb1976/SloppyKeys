@@ -199,7 +199,7 @@ class MockScanEngine:
     def __init__(self, matches):
         self.matches = matches
     def template_exists(self, p):
-        return True
+        return "reconnect" not in str(p)
     def to_absolute_path(self, p):
         return p
     def capture_bgr(self, rect):
