@@ -242,12 +242,14 @@ def is_minimized(hwnd: int) -> bool:
     return bool(user32.IsIconic(hwnd))
 
 
-def close_roblox_process() -> None:
+def close_roblox_process(timeout: float = 5.0) -> bool:
     """Terminate running Roblox player processes.
 
     Used when Roblox is disconnected or hung so a fresh launch can succeed.
+    Waits up to timeout seconds for the game window to disappear.
     """
     import subprocess
+    import time
 
     for proc in ("RobloxPlayerBeta.exe", "RobloxPlayerLauncher.exe"):
         try:
@@ -258,3 +260,10 @@ def close_roblox_process() -> None:
             )
         except Exception:
             pass
+
+    deadline = time.time() + max(0.0, timeout)
+    while time.time() < deadline:
+        if find_roblox_window() is None:
+            return True
+        time.sleep(0.2)
+    return find_roblox_window() is None

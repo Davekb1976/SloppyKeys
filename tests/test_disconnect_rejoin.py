@@ -92,7 +92,7 @@ with tempfile.TemporaryDirectory() as tmpdir:
     assert ctrl._check_disconnected() is True
     
     relaunch_called = []
-    ctrl._relaunch_private_server = lambda reason="": relaunch_called.append(reason) or True
+    ctrl._relaunch_private_server = lambda reason="", *a, **kw: relaunch_called.append(reason) or True
     
     handled = ctrl._handle_disconnect()
     assert handled is True

@@ -301,15 +301,15 @@ class MacroController:
         self._equipped_autoplay_preset = None
         self._camera_set = False
         self._kept_position = False
-        return self._relaunch_private_server(reason="Roblox disconnected")
+        return self._relaunch_private_server(reason="Roblox disconnected", force=True)
 
-    def _relaunch_private_server(self, reason: str = "Roblox closed mid-run") -> bool:
+    def _relaunch_private_server(self, reason: str = "Roblox closed mid-run", force: bool = False) -> bool:
         unified = UnifiedSettings(self._app_root)
         if not unified.get("auto_reopen_roblox", True):
             return False
 
         now = time.time()
-        if now - self._last_reopen_time < REOPEN_COOLDOWN:
+        if not force and (now - self._last_reopen_time < REOPEN_COOLDOWN):
             return False
 
         self._last_reopen_time = now
