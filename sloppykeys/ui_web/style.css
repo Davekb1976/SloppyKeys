@@ -1717,17 +1717,28 @@ button.vp-chip { cursor: pointer; }
 }
 
 .ec-card-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--text-faint);
-  font-size: 13px;
-  letter-spacing: -2px;
-  padding: 2px;
-  line-height: 1;
+  width: 14px;
+  height: 20px;
   flex-shrink: 0;
   cursor: grab;
+  transition: color 0.12s;
 }
 .ec-card-handle:hover {
   color: var(--text);
 }
+.ec-card-handle svg {
+  display: block;
+  opacity: 0.75;
+  transition: opacity 0.12s;
+}
+.ec-card-handle:hover svg {
+  opacity: 1;
+}
+
 
 .ec-card-rank {
   display: inline-flex;

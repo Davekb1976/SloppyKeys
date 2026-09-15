@@ -2847,7 +2847,7 @@
 
       return `
         <div class="ec-card-row${isOff ? " disabled" : ""}" data-idx="${idx}" draggable="true">
-          <span class="ec-card-handle" title="Drag to reorder">⋮⋮</span>
+          <span class="ec-card-handle" title="Drag to reorder"><svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor"><circle cx="2.5" cy="2.5" r="1.25"/><circle cx="7.5" cy="2.5" r="1.25"/><circle cx="2.5" cy="7" r="1.25"/><circle cx="7.5" cy="7" r="1.25"/><circle cx="2.5" cy="11.5" r="1.25"/><circle cx="7.5" cy="11.5" r="1.25"/></svg></span>
           <span class="ec-card-rank">#${rank}</span>
           <div class="ec-card-thumb-wrap" title="${c.missing ? "Template not captured yet" : c.name}">
             ${thumbHtml}
