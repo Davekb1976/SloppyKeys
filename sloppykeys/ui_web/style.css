@@ -1228,7 +1228,7 @@ button.vp-chip { cursor: pointer; }
 .settings-layout { display: flex; flex: 1; min-height: 0; }
 .settings-nav {
   display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-3) var(--space-2);
-  width: 140px; flex-shrink: 0; border-right: 1px solid var(--border);
+  width: 145px; flex-shrink: 0; border-right: 1px solid var(--border);
 }
 .settings-search {
   width: 100%; height: 28px; margin-bottom: 8px; font-size: 11px;
@@ -1238,13 +1238,23 @@ button.vp-chip { cursor: pointer; }
 .settings-search:focus { border-color: var(--accent); }
 /* Settings nav tabs — chunky plate style with opacity hierarchy */
 .settings-nav-btn {
-  display: flex; align-items: center; height: var(--control-md);
-  padding: 0 var(--space-3); border-radius: 0;
+  display: flex; align-items: center; gap: 8px; height: var(--control-md);
+  padding: 0 10px; border-radius: 0;
   font-size: 12px; font-weight: 600; color: var(--text-muted);
   background: var(--surface-raised); border: 1px solid var(--border);
   box-shadow: var(--bevel-strong);
   opacity: 0.6;
   transition: box-shadow 0.15s, transform 0.12s, opacity 0.15s, background 0.15s, border-color 0.15s;
+}
+.settings-nav-icon {
+  width: 14px; height: 14px; flex-shrink: 0; pointer-events: none;
+  opacity: 0.75; transition: opacity 0.15s;
+}
+.settings-nav-btn:hover .settings-nav-icon {
+  opacity: 0.95;
+}
+.settings-nav-btn.active .settings-nav-icon {
+  opacity: 1;
 }
 .settings-nav-btn:hover {
   box-shadow: none; opacity: 0.9;
