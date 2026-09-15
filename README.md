@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="sloppykeys/ui_web/logo.png" alt="SloppyKeys Logo" width="128" height="128">
+
 # SloppyKeys
 
 **A macro that plays *Anime Expedition* by looking at it.**<br>
