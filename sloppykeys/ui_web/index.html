@@ -791,6 +791,29 @@
                 </div>
               </div>
             </div>
+
+            <div class="card-gamemode-section" style="margin-top:16px;">
+              <div class="card-section-header" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span class="card-section-tag tag-settings-debug">Console</span>
+                  <span class="card-section-label">Terminal &amp; Diagnostic Output</span>
+                  <span class="card-section-desc">Live console stream (stdout/stderr, RapidOCR, errors &amp; tracebacks)</span>
+                </div>
+                <div class="terminal-actions">
+                  <span class="terminal-counter" id="terminal-counter">0 lines</span>
+                  <button class="btn btn--sm" id="btn-terminal-copy" data-tip="Copy all terminal lines to clipboard">Copy Terminal</button>
+                  <button class="btn btn--sm" id="btn-terminal-copy-errors" data-tip="Copy only error and traceback lines">Copy Errors</button>
+                  <button class="btn btn--sm btn--subtle" id="btn-terminal-clear" data-tip="Clear terminal buffer">Clear</button>
+                </div>
+              </div>
+              <div class="card-section-body" style="padding:10px 12px;">
+                <div class="terminal-window" id="terminal-window">
+                  <div class="terminal-body" id="terminal-body">
+                    <div class="terminal-empty">No console output recorded yet. Output from Python, RapidOCR, and the macro will appear here.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- OCR Regions -->

@@ -8,11 +8,23 @@
   const navButtons = document.querySelectorAll(".nav-btn[data-screen]");
   const screens = document.querySelectorAll(".screen");
 
+  let startTerminalPolling = () => {};
+  let stopTerminalPolling = () => {};
+
   function switchScreen(name) {
     screens.forEach((s) => s.classList.toggle("active", s.id === "screen-" + name));
     navButtons.forEach((b) => b.classList.toggle("active", b.dataset.screen === name));
     // Only the dashboard needs the game visible.
     setGameVisible(name === "dashboard");
+    if (name !== "settings") {
+      stopTerminalPolling();
+    } else {
+      const activeCatBtn = document.querySelector(".settings-nav-btn.active");
+      const activeCat = activeCatBtn ? activeCatBtn.dataset.cat : "all";
+      if (activeCat === "debug" || activeCat === "all") {
+        startTerminalPolling();
+      }
+    }
   }
 
   // One funnel for every show/hide, so the guards live in one place. A covered game leaves
@@ -1603,6 +1615,141 @@
     });
   }
 
+  // ---- Terminal & Diagnostic Console ----
+  const terminalBody = document.getElementById("terminal-body");
+  const terminalCounter = document.getElementById("terminal-counter");
+  const btnTerminalCopy = document.getElementById("btn-terminal-copy");
+  const btnTerminalCopyErrors = document.getElementById("btn-terminal-copy-errors");
+  const btnTerminalClear = document.getElementById("btn-terminal-clear");
+
+  let terminalLatestId = 0;
+  let terminalPollTimer = null;
+  let terminalAutoScroll = true;
+
+  function appendTerminalLines(lines, total) {
+    if (!terminalBody) return;
+    const empty = terminalBody.querySelector(".terminal-empty");
+    if (empty && lines.length > 0) empty.remove();
+
+    const frag = document.createDocumentFragment();
+    for (const l of lines) {
+      const row = document.createElement("div");
+      row.className = "terminal-line" + (l.is_err ? " terminal-line--err" : "");
+
+      const ts = document.createElement("span");
+      ts.className = "terminal-ts";
+      ts.textContent = l.ts || "";
+
+      const badge = document.createElement("span");
+      badge.className = "terminal-stream-badge";
+      badge.textContent = l.stream || "stdout";
+
+      const text = document.createElement("span");
+      text.className = "terminal-text";
+      text.textContent = l.text || "";
+
+      row.appendChild(ts);
+      row.appendChild(badge);
+      row.appendChild(text);
+      frag.appendChild(row);
+    }
+    terminalBody.appendChild(frag);
+
+    while (terminalBody.childElementCount > 1000) {
+      terminalBody.removeChild(terminalBody.firstElementChild);
+    }
+
+    const count = total !== undefined ? total : terminalBody.childElementCount;
+    if (terminalCounter) terminalCounter.textContent = `${count} line${count === 1 ? "" : "s"}`;
+
+    if (terminalAutoScroll) {
+      terminalBody.scrollTop = terminalBody.scrollHeight;
+    }
+  }
+
+  async function pollTerminalLogs() {
+    if (!window.pywebview || !pywebview.api || !pywebview.api.get_terminal_logs) return;
+    try {
+      const res = await pywebview.api.get_terminal_logs(terminalLatestId);
+      if (!res || !res.ok) return;
+      if (res.latest_id !== undefined) terminalLatestId = res.latest_id;
+      if (res.lines && res.lines.length > 0) {
+        appendTerminalLines(res.lines, res.total);
+      } else if (res.total !== undefined && terminalCounter) {
+        terminalCounter.textContent = `${res.total} line${res.total === 1 ? "" : "s"}`;
+      }
+    } catch (_) {}
+  }
+
+  startTerminalPolling = function () {
+    if (terminalPollTimer) return;
+    pollTerminalLogs();
+    terminalPollTimer = setInterval(pollTerminalLogs, 1500);
+  };
+
+  stopTerminalPolling = function () {
+    if (terminalPollTimer) {
+      clearInterval(terminalPollTimer);
+      terminalPollTimer = null;
+    }
+  };
+
+  if (terminalBody) {
+    terminalBody.addEventListener("scroll", () => {
+      const threshold = 20;
+      const atBottom = (terminalBody.scrollHeight - terminalBody.scrollTop - terminalBody.clientHeight) <= threshold;
+      terminalAutoScroll = atBottom;
+    });
+  }
+
+  if (btnTerminalCopy) {
+    btnTerminalCopy.addEventListener("click", async () => {
+      if (!window.pywebview || !pywebview.api || !pywebview.api.copy_terminal_logs) return;
+      try {
+        const res = await pywebview.api.copy_terminal_logs(false);
+        if (res && res.text) {
+          await navigator.clipboard.writeText(res.text);
+          const oldText = btnTerminalCopy.textContent;
+          btnTerminalCopy.textContent = "Copied!";
+          setTimeout(() => { btnTerminalCopy.textContent = oldText; }, 1500);
+        }
+      } catch (_) {}
+    });
+  }
+
+  if (btnTerminalCopyErrors) {
+    btnTerminalCopyErrors.addEventListener("click", async () => {
+      if (!window.pywebview || !pywebview.api || !pywebview.api.copy_terminal_logs) return;
+      try {
+        const res = await pywebview.api.copy_terminal_logs(true);
+        if (res && res.text) {
+          await navigator.clipboard.writeText(res.text);
+          const oldText = btnTerminalCopyErrors.textContent;
+          btnTerminalCopyErrors.textContent = "Copied!";
+          setTimeout(() => { btnTerminalCopyErrors.textContent = oldText; }, 1500);
+        } else {
+          const oldText = btnTerminalCopyErrors.textContent;
+          btnTerminalCopyErrors.textContent = "No Errors";
+          setTimeout(() => { btnTerminalCopyErrors.textContent = oldText; }, 1500);
+        }
+      } catch (_) {}
+    });
+  }
+
+  if (btnTerminalClear) {
+    btnTerminalClear.addEventListener("click", async () => {
+      if (!window.pywebview || !pywebview.api || !pywebview.api.clear_terminal_logs) return;
+      try {
+        await pywebview.api.clear_terminal_logs();
+        terminalLatestId = 0;
+        if (terminalBody) {
+          terminalBody.innerHTML = '<div class="terminal-empty">Console cleared. New output will appear here.</div>';
+        }
+        if (terminalCounter) terminalCounter.textContent = "0 lines";
+      } catch (_) {}
+    });
+  }
+
   // Testing is per section now — each group's boxes only exist on its own screen, so a
   // single "test everything" button could only ever have half its rows read real text.
 
@@ -1641,6 +1788,7 @@
     loadChallengeMaps();
     window.renderHotkeyPills();
     refreshWalkDefaults();
+    pollTerminalLogs();
   };
 
   // ---- Macro Manager ----
@@ -2348,6 +2496,9 @@
     if (cat === "debug" || cat === "all") {
       loadVisionRegions();
       loadVisionPoints();
+      startTerminalPolling();
+    } else {
+      stopTerminalPolling();
     }
   }
 

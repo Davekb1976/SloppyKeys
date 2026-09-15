@@ -80,6 +80,9 @@ from sloppykeys.core.updates import (
     update_dir,
 )
 from sloppykeys.macro.controller import MacroController
+from sloppykeys.core.terminal import get_terminal_buffer, install_terminal_stream
+
+install_terminal_stream()
 
 WINDOW_TITLE = "SloppyKeys"
 
@@ -902,6 +905,21 @@ class Api:
             return {"ok": False}
         UnifiedSettings(self._app_root).set_eclipse_card_fallback(fallback)
         return {"ok": True, "fallback": UnifiedSettings(self._app_root).get_eclipse_card_fallback()}
+
+    # ---- Terminal & Diagnostic Output ----
+
+    def get_terminal_logs(self, after_id: int = 0) -> dict:
+        """Fetch buffered terminal/console lines recorded after `after_id`."""
+        return get_terminal_buffer().get_lines(after_id=after_id)
+
+    def copy_terminal_logs(self, errors_only: bool = False) -> dict:
+        """Return formatted text of the terminal buffer for clipboard copy."""
+        return {"ok": True, "text": get_terminal_buffer().get_text(errors_only=errors_only)}
+
+    def clear_terminal_logs(self) -> dict:
+        """Clear the in-memory terminal buffer."""
+        get_terminal_buffer().clear()
+        return {"ok": True}
 
     # ---- Game Keybinds (in-game keys the macro presses) ----
 
@@ -2407,6 +2425,7 @@ class Api:
         before the page is up, or after it has gone, is exactly the kind worth having.
         """
         self._write_log(msg)
+        get_terminal_buffer().append(msg, stream="macro")
         if self._window is None:
             return
         safe = msg.replace("\\", "\\\\").replace('"', '\\"').replace("\n", " ")
