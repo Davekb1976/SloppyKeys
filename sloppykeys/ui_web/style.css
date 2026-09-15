@@ -2142,7 +2142,7 @@ button.vp-chip { cursor: pointer; }
 }
 
 .terminal-window {
-  background: var(--surface-sunken);
+  background: #0b0a0e;
   border: 1px solid var(--border);
   border-radius: 4px;
   display: flex;
