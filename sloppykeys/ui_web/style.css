@@ -447,8 +447,9 @@ input:focus, select:focus {
 .vr-card-top {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 6px;
-  min-width: 0;
+  width: 100%;
 }
 .vr-card-name {
   font-size: 12px;
@@ -458,11 +459,14 @@ input:focus, select:focus {
   overflow: hidden;
   text-overflow: ellipsis;
   letter-spacing: 0.01em;
+  flex: 1;
+  min-width: 0;
 }
 .vr-flag {
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
+  margin-left: auto;
 }
 .vr-badge--default {
   background: var(--surface-sunken);
@@ -507,22 +511,24 @@ input:focus, select:focus {
   color: var(--text-faint);
 }
 
-/* Coordinate inputs bar */
+/* Coordinate inputs bar: 4-column equal grid for strict alignment across cards */
 .vr-coords-bar {
-  display: flex;
-  align-items: center;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: 4px;
-  flex-wrap: wrap;
+  width: 100%;
+  box-sizing: border-box;
 }
 .vr-coord-item {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 2px;
+  justify-content: space-between;
   background: var(--surface-sunken);
   border: 1px solid var(--border);
   padding: 1px 4px;
   transition: border-color 0.12s;
   cursor: text;
+  box-sizing: border-box;
 }
 .vr-coord-lbl {
   font-size: 9px;
@@ -530,9 +536,11 @@ input:focus, select:focus {
   color: var(--text-faint);
   font-family: var(--font-mono);
   user-select: none;
+  flex-shrink: 0;
 }
 .vr-coord-item input {
-  width: 36px;
+  width: 100%;
+  max-width: 36px;
   height: 18px;
   font-size: 10px;
   font-family: var(--font-mono);
