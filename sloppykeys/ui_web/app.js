@@ -667,6 +667,7 @@
           else if (f.stage && !first.stage) firstIssue = `No ${f.target_label || "act"}`;
           else if (f.search_label && !first.search) firstIssue = "No portal name";
           else if (!first.macro) firstIssue = "No macro";
+          else if (first.mode === "Expedition" && autoplayOperations.has(first.macro)) firstIssue = "Expedition has no Auto Play";
         }
 
         if (firstIssue) {
@@ -717,6 +718,7 @@
       tbMacro.value = task.macro || "";
       updateLeaveWaveVisibility(task.mode, task.stage);
       updateStoryEventVisibility(task.mode, task.map || task.stage);
+      updateAutoplayPresetVisibility(task.mode);
       updateMacroWarning();
     }
   }
@@ -740,6 +742,14 @@
     if (diffRow) diffRow.style.display = isEvent ? "none" : (tbModeFields.difficulty ? "" : "none");
     if (repeatRow) repeatRow.style.display = isGoldenHour ? "none" : "";
     if (leaveWaveRow && isEvent) leaveWaveRow.style.display = "none";
+  }
+
+  function updateAutoplayPresetVisibility(mode) {
+    const currentMode = mode !== undefined ? mode : tbMode.value;
+    const apPresetRow = document.getElementById("tb-autoplay-preset-row");
+    if (apPresetRow) {
+      apPresetRow.style.display = currentMode === "Expedition" ? "none" : "";
+    }
   }
 
   // Show only the rows this gamemode can actually use. Every answer comes from `content/`
@@ -766,11 +776,13 @@
     tbSearchRow.style.display = f.search_label ? "" : "none";
     if (f.search_label) document.getElementById("tb-search-label").textContent = f.search_label;
     updateStoryEventVisibility(mode, map !== undefined ? map : tbMap.value);
+    updateAutoplayPresetVisibility(mode);
   }
 
   function showBuilderEmpty() {
     taskBuilder.style.display = "none";
     taskBuilderEmpty.style.display = "";
+    updateAutoplayPresetVisibility();
     updateMacroWarning();
   }
 
@@ -948,6 +960,11 @@
 
   if (expAutoplayClose) expAutoplayClose.addEventListener("click", closeExpeditionAutoplayModal);
   if (expAutoplayOk) expAutoplayOk.addEventListener("click", closeExpeditionAutoplayModal);
+  if (expAutoplayModal) {
+    expAutoplayModal.addEventListener("click", (e) => {
+      if (e.target === expAutoplayModal) closeExpeditionAutoplayModal();
+    });
+  }
 
   function checkExpeditionAutoplayPopup(macroName) {
     if (tbMode.value === "Expedition" && macroName && autoplayOperations.has(macroName)) {
@@ -2287,6 +2304,7 @@
       ecMacro.innerHTML = '<option value="">Default (Current Task Macro)</option>' + names.map((n) => `<option value="${n}">${n}</option>`).join("");
       if (cur) ecMacro.value = cur;
     }
+    renderTaskList();
   }
 
   document.getElementById("btn-op-save").addEventListener("click", async () => {
