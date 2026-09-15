@@ -285,19 +285,15 @@ class Api:
         return FARM_GAMEMODE_NAMES + ["Challenge"]
 
     def get_maps(self, gamemode: str) -> list[str]:
-        """Maps for a gamemode. Events reads from the route store."""
-        from sloppykeys.content.gamemodes import is_custom, maps_for
+        """Maps for a gamemode. Events reads from the route store, prepended with built-in events."""
+        from sloppykeys.content.gamemodes import EVENT_NAMES, is_custom, maps_for
 
         if is_custom(gamemode) and self._app_root:
             from sloppykeys.config.nav_routes import RouteStore
 
-            return RouteStore(self._app_root).maps()
-        maps = maps_for(gamemode)
-        if gamemode == "Story":
-            from sloppykeys.content.gamemodes import STORY_EVENT_NAMES
-
-            return list(STORY_EVENT_NAMES) + maps
-        return maps
+            route_maps = [m for m in RouteStore(self._app_root).maps() if m not in EVENT_NAMES]
+            return list(EVENT_NAMES) + route_maps
+        return maps_for(gamemode)
 
     def get_difficulty_options(self, gamemode: str) -> list[str]:
         """What the task builder's Difficulty control offers for a gamemode: 1-3 where the
@@ -309,8 +305,10 @@ class Api:
 
     def get_targets(self, gamemode: str, map_name: str) -> list[str]:
         """Acts/targets for a gamemode+map combo."""
-        from sloppykeys.content.gamemodes import is_custom, targets_for
+        from sloppykeys.content.gamemodes import EVENT_NAMES, is_custom, targets_for
 
+        if gamemode == "Events" and map_name in EVENT_NAMES:
+            return []
         if is_custom(gamemode) and self._app_root:
             from sloppykeys.config.nav_routes import RouteStore
 

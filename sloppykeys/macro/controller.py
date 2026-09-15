@@ -417,9 +417,9 @@ class MacroController:
                         return (True, f"stopped after {self._cycle} cycles")
                     continue
 
-                # Story Event tasks (Eclipse, Golden Hour) are standing priority detours.
-                is_story_event = mode == "Story" and (map_name in ("Eclipse", "Golden Hour") or stage in ("Eclipse", "Golden Hour"))
-                if is_story_event:
+                # Event tasks (Eclipse, Golden Hour) are standing priority detours.
+                is_event_task = mode in ("Events", "Story") and (map_name in ("Eclipse", "Golden Hour") or stage in ("Eclipse", "Golden Hour"))
+                if is_event_task:
                     event_name = map_name if map_name in ("Eclipse", "Golden Hour") else stage
                     if event_name == "Eclipse" and self._eclipse_wants_in(tasks=tasks):
                         self._run_eclipse_detour()
@@ -604,12 +604,12 @@ class MacroController:
                     if self._checkpoint():
                         return (True, f"stopped after {self._cycle} cycles")
 
-            # If the queue has only priority/standing tasks (Challenge or Story Events)
+            # If the queue has only priority/standing tasks (Challenge or Events)
             # and none are due right now, rest briefly so we don't spin in a busy loop.
             has_linear = any(
                 t.get("mode") != "Challenge"
                 and not (
-                    t.get("mode") == "Story"
+                    t.get("mode") in ("Events", "Story")
                     and (t.get("map") in ("Eclipse", "Golden Hour") or t.get("stage") in ("Eclipse", "Golden Hour"))
                 )
                 for t in tasks
@@ -685,8 +685,12 @@ class MacroController:
                 from_gamemode_panel = True
                 time.sleep(self._nav.click_settle)
 
-        # Events use route navigation
+        # Events use route navigation, unless it's a built-in event (Eclipse, Golden Hour)
         if is_custom(mode):
+            if map_name == "Eclipse":
+                return self._run_eclipse_detour()
+            if map_name == "Golden Hour":
+                return self._run_golden_hour_detour()
             return self._navigate_route(map_name, stage)
 
         # Standard lobby chain
@@ -1418,8 +1422,10 @@ class MacroController:
         if getattr(self, "_is_eclipse_match", False):
             return True
         task = self._current_task or {}
-        return task.get("mode") == "Story" and (
-            task.get("stage") == "Eclipse" or task.get("target") == "Eclipse"
+        return task.get("mode") in ("Events", "Story") and (
+            task.get("map") == "Eclipse"
+            or task.get("stage") == "Eclipse"
+            or task.get("target") == "Eclipse"
         )
 
     def _tick_eclipse_cards(self) -> bool:
@@ -2304,7 +2310,7 @@ class MacroController:
         return None
 
     def _eclipse_task(self, tasks: list | None = None) -> dict | None:
-        """The queued Story Eclipse task, or None."""
+        """The queued Events/Story Eclipse task, or None."""
         task_list = tasks if tasks is not None else getattr(self, "_tasks", None)
         if task_list is None and hasattr(self, "_app_root"):
             from sloppykeys.config.unified import UnifiedSettings
@@ -2315,14 +2321,14 @@ class MacroController:
         for task in task_list:
             if (
                 isinstance(task, dict)
-                and task.get("mode") == "Story"
+                and task.get("mode") in ("Events", "Story")
                 and (task.get("map") == "Eclipse" or task.get("stage") == "Eclipse")
             ):
                 return task
         return None
 
     def _golden_hour_task(self, tasks: list | None = None) -> dict | None:
-        """The queued Story Golden Hour task, or None."""
+        """The queued Events/Story Golden Hour task, or None."""
         task_list = tasks if tasks is not None else getattr(self, "_tasks", None)
         if task_list is None and hasattr(self, "_app_root"):
             from sloppykeys.config.unified import UnifiedSettings
@@ -2333,7 +2339,7 @@ class MacroController:
         for task in task_list:
             if (
                 isinstance(task, dict)
-                and task.get("mode") == "Story"
+                and task.get("mode") in ("Events", "Story")
                 and (task.get("map") == "Golden Hour" or task.get("stage") == "Golden Hour")
             ):
                 return task

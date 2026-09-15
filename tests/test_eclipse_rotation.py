@@ -36,7 +36,7 @@ finally:
     os.path.isfile = orig_isfile
 
 # 2. Queued, but templates missing on disk
-ctrl._tasks = [{"mode": "Story", "map": "Eclipse"}]
+ctrl._tasks = [{"mode": "Events", "map": "Eclipse"}]
 os.path.isfile = lambda p: False if ("eclipse" in p or "golden_hour" in p) else orig_isfile(p)
 try:
     assert ctrl._eclipse_wants_in(t_10_05) is False, "Must not want in when template is missing"
@@ -78,9 +78,13 @@ try:
     # 4. Queue-based task check
     ctrl._eclipse_played_interval = None
     ctrl._eclipse_attempted_interval = None
-    ctrl._tasks = [{"mode": "Story", "map": "Eclipse", "macro": "ec_op"}]
-    assert ctrl._eclipse_wants_in(t_11_00) is True, "Must want in when Story Eclipse task is queued by map"
+    ctrl._tasks = [{"mode": "Events", "map": "Eclipse", "macro": "ec_op"}]
+    assert ctrl._eclipse_wants_in(t_11_00) is True, "Must want in when Events Eclipse task is queued by map"
     assert ctrl._eclipse_task()["macro"] == "ec_op"
+    # Backwards compatibility when stored as Story
+    ctrl._tasks = [{"mode": "Story", "map": "Eclipse", "macro": "ec_op_story"}]
+    assert ctrl._eclipse_wants_in(t_11_00) is True, "Must want in when legacy Story Eclipse task is queued by map"
+    assert ctrl._eclipse_task()["macro"] == "ec_op_story"
     # Backwards compatibility when stored by stage
     ctrl._tasks = [{"mode": "Story", "stage": "Eclipse", "macro": "ec_op_stage"}]
     assert ctrl._eclipse_wants_in(t_11_00) is True, "Must want in when Story Eclipse task is queued by stage"

@@ -87,6 +87,14 @@ fields = api.get_mode_fields("Events")
 assert fields["stage"] is True and fields["difficulty"] is False
 assert fields["map_label"] == "Event", fields
 
+# Events exposes built-in events (Eclipse, Golden Hour) plus custom routes; Story contains neither
+events_maps = api.get_maps("Events")
+assert "Eclipse" in events_maps and "Golden Hour" in events_maps, events_maps
+story_maps = api.get_maps("Story")
+assert "Eclipse" not in story_maps and "Golden Hour" not in story_maps, story_maps
+assert api.get_targets("Events", "Eclipse") == []
+assert api.get_targets("Events", "Golden Hour") == []
+
 # An unknown mode must answer with something the page can render, not blow up.
 fields = api.get_mode_fields("NoSuchMode")
 assert fields["stage"] is False and fields["difficulty"] is False and fields["search_label"] == ""

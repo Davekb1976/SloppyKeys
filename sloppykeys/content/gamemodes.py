@@ -21,7 +21,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-STORY_EVENT_NAMES = ("Eclipse", "Golden Hour")
+EVENT_NAMES = ("Eclipse", "Golden Hour")
+STORY_EVENT_NAMES = EVENT_NAMES  # backwards compatibility
 STORY_EVENT_MAPS = STORY_EVENT_NAMES
 STORY_EVENT_ACTS = STORY_EVENT_NAMES  # backwards compatibility
 # In in-game order.
@@ -96,7 +97,7 @@ class Gamemode:
     search_label: str = ""
 
     def targets_for_map(self, _map_name: str) -> list[str]:
-        if self.name == "Story" and _map_name in STORY_EVENT_NAMES:
+        if _map_name in EVENT_NAMES:
             return []
         # Every map in a gamemode currently exposes the same target set.
         return list(self.targets)
@@ -133,13 +134,13 @@ GAMEMODES: dict[str, Gamemode] = {
         ],
         targets=EXPEDITION_TARGETS,
     ),
-    # Events rotate with every update, so its maps (the events themselves) and
-    # acts are built by the user in Run > Route and read from routes.json.
+    # Events includes built-in rotational events (Eclipse, Golden Hour) which scan Story
+    # stages in the lobby, plus user-authored routes in routes.json.
     "Events": Gamemode(
         name="Events",
         map_label="Event",
         target_label="Act",
-        maps=[],
+        maps=list(EVENT_NAMES),
         targets=[],
         custom=True,
     ),
@@ -237,7 +238,7 @@ def selection_complete(gamemode: str, map_name: str, target: str) -> bool:
     is complete at Map, so callers must not demand all three."""
     if not gamemode or not map_name:
         return False
-    if gamemode == "Story" and map_name in STORY_EVENT_NAMES:
+    if gamemode in ("Events", "Story") and map_name in EVENT_NAMES:
         return True
     return bool(target) or not has_targets(gamemode)
 
@@ -282,9 +283,10 @@ def sanitize_task(task: dict) -> dict:
         task["search"] = ""
     if not (mode == "Story" and task.get("stage") == "Infinite"):
         task["leave_at_wave"] = 0
-    if mode == "Story" and (task.get("map") in STORY_EVENT_NAMES or task.get("stage") in STORY_EVENT_NAMES):
-        if task.get("map") not in STORY_EVENT_NAMES:
+    if (mode in ("Events", "Story")) and (task.get("map") in EVENT_NAMES or task.get("stage") in EVENT_NAMES):
+        if task.get("map") not in EVENT_NAMES:
             task["map"] = task.get("stage") or "Eclipse"
+        task["mode"] = "Events"
         task["stage"] = ""
         task["difficulty"] = ""
         task["repeat"] = 1
@@ -316,18 +318,18 @@ def validate_task(task: dict, app_root: Path | str | None = None) -> str | None:
             return "all challenge slots are disabled"
         return None
 
-    # Story event tasks (Eclipse, Golden Hour) rotate maps dynamically every 30 mins
+    # Event tasks (Eclipse, Golden Hour) rotate maps dynamically every 30 mins
     map_name = str(task.get("map") or "").strip()
     stage = str(task.get("stage") or "").strip()
-    is_story_event = mode == "Story" and (map_name in STORY_EVENT_NAMES or stage in STORY_EVENT_NAMES)
+    is_event = (mode in ("Events", "Story")) and (map_name in EVENT_NAMES or stage in EVENT_NAMES)
 
     # Farm gamemodes require a map
-    if not map_name and not is_story_event:
+    if not map_name and not is_event:
         map_lbl, _ = labels_for(mode)
         return f"{map_lbl.lower()} is required"
 
-    # Gamemodes with acts/targets require an act/stage (except Story events where map is Eclipse/Golden Hour)
-    if has_targets(mode) and not is_story_event:
+    # Gamemodes with acts/targets require an act/stage (except events where map is Eclipse/Golden Hour)
+    if has_targets(mode) and not is_event:
         if not stage:
             _, target_lbl = labels_for(mode)
             return f"{target_lbl.lower()} is required"
@@ -361,18 +363,18 @@ def validate_task_queue(tasks: list[dict], app_root: Path | str | None = None) -
 
     has_eclipse = any(
         isinstance(t, dict)
-        and t.get("mode") == "Story"
+        and t.get("mode") in ("Events", "Story")
         and (t.get("map") == "Eclipse" or t.get("stage") == "Eclipse")
         for t in tasks
     )
     has_gh = any(
         isinstance(t, dict)
-        and t.get("mode") == "Story"
+        and t.get("mode") in ("Events", "Story")
         and (t.get("map") == "Golden Hour" or t.get("stage") == "Golden Hour")
         for t in tasks
     )
     if has_eclipse and has_gh:
-        return "only one Story Event (Eclipse or Golden Hour) can be prioritized at a time"
+        return "only one Event (Eclipse or Golden Hour) can be prioritized at a time"
 
     for i, t in enumerate(tasks, 1):
         err = validate_task(t, app_root=app_root)

@@ -129,8 +129,9 @@ def test_events_schema() -> None:
     assert is_custom("Events") and not is_custom("Story")
     # Must stay True or the unit config path collapses to configs/Events/<Map>.json.
     assert has_targets("Events")
-    # The static table knows no Events maps; the route store supplies them.
-    assert maps_for("Events") == []
+    # The static table holds built-in events; the route store supplies custom maps.
+    from sloppykeys.content.gamemodes import EVENT_NAMES
+    assert maps_for("Events") == list(EVENT_NAMES)
 
 
 if __name__ == "__main__":

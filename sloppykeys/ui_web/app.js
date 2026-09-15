@@ -470,14 +470,14 @@
     taskList.innerHTML = tasks.map((t, i) => {
       const fields = modeFields[t.mode] || {};
       const isChallenge = t.mode === "Challenge";
-      const isStoryEvent = t.mode === "Story" && (t.map === "Eclipse" || t.map === "Golden Hour" || t.stage === "Eclipse" || t.stage === "Golden Hour");
+      const isEventTask = (t.mode === "Events" || t.mode === "Story") && (t.map === "Eclipse" || t.map === "Golden Hour" || t.stage === "Eclipse" || t.stage === "Golden Hour");
       const eventName = (t.map === "Eclipse" || t.map === "Golden Hour") ? t.map : t.stage;
       // A Challenge card names no map or stage: it plays whichever of the three rows the
       // panel offers. A task saved before that was enforced still holds a stale one.
       const title = isChallenge
         ? "Challenge"
-        : isStoryEvent
-        ? `Story · ${eventName}`
+        : isEventTask
+        ? `Events · ${eventName}`
         : [t.mode, t.map, t.stage].filter(Boolean).join(" · ") || "Unconfigured";
       // Only what this mode actually uses. Every card read "<difficulty> · ×<repeat>", which
       // for Challenge named a difficulty it has no control for and a repeat the runner
@@ -492,7 +492,7 @@
         if (t.autoplay_preset) bits.push("Preset: " + t.autoplay_preset);
         const assigned = Object.keys(t.challenge_macros || {}).filter((m) => t.challenge_macros[m]);
         bits.push(assigned.length ? assigned.length + " map macro" + (assigned.length === 1 ? "" : "s") : "no macros assigned");
-      } else if (isStoryEvent) {
+      } else if (isEventTask) {
         bits.push("Auto-Detect map");
         if (t.team) bits.push("Team " + t.team);
         if (t.autoplay_preset) bits.push("Preset: " + t.autoplay_preset);
@@ -571,9 +571,9 @@
         const t = tasks[i];
         const fields = modeFields[t.mode] || {};
         const isChal = t.mode === "Challenge";
-        const isStoryEvent = t.mode === "Story" && (t.map === "Eclipse" || t.map === "Golden Hour" || t.stage === "Eclipse" || t.stage === "Golden Hour");
-        if (t.mode === "Story" && (t.map === "Eclipse" || t.stage === "Eclipse")) hasEclipse = true;
-        if (t.mode === "Story" && (t.map === "Golden Hour" || t.stage === "Golden Hour")) hasGH = true;
+        const isEventTask = (t.mode === "Events" || t.mode === "Story") && (t.map === "Eclipse" || t.map === "Golden Hour" || t.stage === "Eclipse" || t.stage === "Golden Hour");
+        if ((t.mode === "Events" || t.mode === "Story") && (t.map === "Eclipse" || t.stage === "Eclipse")) hasEclipse = true;
+        if ((t.mode === "Events" || t.mode === "Story") && (t.map === "Golden Hour" || t.stage === "Golden Hour")) hasGH = true;
 
         if (isChal) {
           const slots = t.challenge_slots || [true, true, true];
@@ -581,7 +581,7 @@
             queueIssue = `Task ${i + 1}: All slots off`;
             break;
           }
-        } else if (isStoryEvent) {
+        } else if (isEventTask) {
           if (!t.macro) {
             queueIssue = `Task ${i + 1}: No macro`;
             break;
@@ -641,7 +641,7 @@
         const first = tasks[0];
         const f = modeFields[first.mode] || {};
         let firstIssue = null;
-        const firstIsEvent = first.mode === "Story" && (first.map === "Eclipse" || first.map === "Golden Hour" || first.stage === "Eclipse" || first.stage === "Golden Hour");
+        const firstIsEvent = (first.mode === "Events" || first.mode === "Story") && (first.map === "Eclipse" || first.map === "Golden Hour" || first.stage === "Eclipse" || first.stage === "Golden Hour");
         if (first.mode === "Challenge") {
           const slots = first.challenge_slots || [true, true, true];
           if (!slots.some(Boolean)) firstIssue = "All slots off";
@@ -661,7 +661,7 @@
           const title = first.mode === "Challenge"
             ? "Challenge"
             : firstIsEvent
-            ? `${first.mode} · ${first.stage}`
+            ? `Events · ${(first.map === "Eclipse" || first.map === "Golden Hour") ? first.map : first.stage}`
             : [first.mode, first.map, first.stage].filter(Boolean).join(" · ");
           statGamemode.textContent = title || "Ready";
           statGamemode.className = "status-value";
@@ -715,7 +715,7 @@
   function updateStoryEventVisibility(mode, map) {
     const currentMode = mode !== undefined ? mode : tbMode.value;
     const currentMap = map !== undefined ? map : tbMap.value;
-    const isEvent = currentMode === "Story" && (currentMap === "Eclipse" || currentMap === "Golden Hour" || tbStage.value === "Eclipse" || tbStage.value === "Golden Hour");
+    const isEvent = (currentMode === "Events" || currentMode === "Story") && (currentMap === "Eclipse" || currentMap === "Golden Hour" || tbStage.value === "Eclipse" || tbStage.value === "Golden Hour");
     const stageRow = document.getElementById("tb-stage-row");
     const diffRow = document.getElementById("tb-difficulty-row");
     const repeatRow = document.getElementById("tb-repeat-row");
@@ -779,7 +779,7 @@
   }
 
   async function loadStages(mode, map, selected) {
-    const isEvent = mode === "Story" && (map === "Eclipse" || map === "Golden Hour");
+    const isEvent = (mode === "Events" || mode === "Story") && (map === "Eclipse" || map === "Golden Hour");
     if (isEvent || !window.pywebview || !pywebview.api || !mode || !map) {
       tbStage.innerHTML = '<option value="">—</option>';
       updateLeaveWaveVisibility(mode, "");
@@ -814,11 +814,11 @@
 
   async function saveCurrentTask() {
     if (!selectedTaskId || !window.pywebview || !pywebview.api) return;
-    const isStoryEvent = tbMode.value === "Story" && (tbMap.value === "Eclipse" || tbMap.value === "Golden Hour" || tbStage.value === "Eclipse" || tbStage.value === "Golden Hour");
+    const isEvent = (tbMode.value === "Events" || tbMode.value === "Story") && (tbMap.value === "Eclipse" || tbMap.value === "Golden Hour" || tbStage.value === "Eclipse" || tbStage.value === "Golden Hour");
     const changes = {
       mode: tbMode.value,
       team: tbTeam.value || "",
-      repeat: isStoryEvent ? 1 : Math.max(1, parseInt(tbRepeat.value) || 1),
+      repeat: isEvent ? 1 : Math.max(1, parseInt(tbRepeat.value) || 1),
       macro: tbMacro.value,
     };
     // Only the fields this mode has a control for, so a task can't carry a stage or a
@@ -826,8 +826,8 @@
     // empty stage, Raid tasks store an Easy/Hard nothing clicked, and switching to Portals
     // leave a stale Infinite stage.
     changes.map = (tbModeFields.map !== false) ? tbMap.value : "";
-    changes.stage = isStoryEvent ? "" : (tbModeFields.stage ? tbStage.value : "");
-    changes.difficulty = isStoryEvent ? "" : (tbModeFields.difficulty ? tbDifficulty.value : "");
+    changes.stage = isEvent ? "" : (tbModeFields.stage ? tbStage.value : "");
+    changes.difficulty = isEvent ? "" : (tbModeFields.difficulty ? tbDifficulty.value : "");
     changes.extract_after = tbModeFields.extract ? Math.max(1, parseInt(tbExtract.value) || 1) : 0;
     changes.search = tbModeFields.search_label ? tbSearch.value.trim() : "";
     changes.autoplay_preset = tbAutoplayPreset ? tbAutoplayPreset.value.trim() : "";
@@ -844,16 +844,16 @@
         document.getElementById("tb-chal-slot3")?.classList.contains("on") !== false,
       ];
     }
-    // Mutual exclusivity: only one Story Event prioritized in the queue at a time
-    if (isStoryEvent) {
+    // Mutual exclusivity: only one Event prioritized in the queue at a time
+    if (isEvent) {
       const currentEvent = (tbMap.value === "Eclipse" || tbMap.value === "Golden Hour") ? tbMap.value : tbStage.value;
       const otherEvent = currentEvent === "Eclipse" ? "Golden Hour" : "Eclipse";
-      const otherTask = tasks.find(x => x.id !== selectedTaskId && x.mode === "Story" && (x.map === otherEvent || x.stage === otherEvent));
+      const otherTask = tasks.find(x => x.id !== selectedTaskId && (x.mode === "Events" || x.mode === "Story") && (x.map === otherEvent || x.stage === otherEvent));
       if (otherTask) {
         await pywebview.api.delete_task(otherTask.id);
         const idx = tasks.findIndex(x => x.id === otherTask.id);
         if (idx !== -1) tasks.splice(idx, 1);
-        if (window.addLog) window.addLog(`[Queue] Replaced ${otherEvent} with ${currentEvent} (only one Story Event can be prioritized).`);
+        if (window.addLog) window.addLog(`[Queue] Replaced ${otherEvent} with ${currentEvent} (only one Event can be prioritized).`);
       }
     }
     pywebview.api.update_task(selectedTaskId, changes).then(() => {
