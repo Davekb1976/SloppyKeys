@@ -1267,7 +1267,14 @@ button.vp-chip { cursor: pointer; }
 .settings-category {
   margin-bottom: 16px; border: 1px solid var(--border); background: var(--surface-panel); padding: 14px 16px;
 }
-.settings-category .page-header { margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.settings-category .page-header {
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.settings-category .page-header:not(:first-child) {
+  margin-top: 28px;
+}
 
 .hotkey-btn {
   font-size: 12px; font-weight: 600; color: var(--text-muted);
