@@ -34,6 +34,21 @@ function stub() {
   });
 }
 
+const apiStub = new Proxy({}, {
+  get(_t, k) {
+    if (k === "get_tasks") return async () => [
+      { id: "1", mode: "Story", map: "", stage: "", macro: "" },
+      { id: "2", mode: "Challenge", challenge_slots: [true, false, true] },
+      { id: "3", mode: "Events", map: "Eclipse", stage: "", macro: "auto play" },
+    ];
+    if (k === "get_gamemodes") return async () => ["Story", "Challenge", "Events"];
+    if (k === "get_mode_fields") return async () => ({ stage: true, difficulty: true });
+    if (k === "list_operations" || k === "get_challenge_maps" || k === "list_task_presets" || k === "get_walk_defaults") return async () => [];
+    if (k === "get_hotkeys") return async () => ({ start: "F1", pause: "F2", stop: "F3" });
+    return async () => [];
+  },
+});
+
 const sandbox = {
   console,
   setTimeout,
@@ -50,15 +65,21 @@ const sandbox = {
     addEventListener: () => {},
     body: stub(),
   },
+  pywebview: { api: apiStub },
 };
 sandbox.window = sandbox;
 
 const appJs = path.join(__dirname, "..", "sloppykeys", "ui_web", "app.js");
 try {
   vm.runInNewContext(fs.readFileSync(appJs, "utf8"), sandbox, { filename: "app.js" });
+  if (typeof sandbox.window.onBackendReady === "function") {
+    sandbox.window.onBackendReady();
+  }
 } catch (e) {
   console.error(`app.js threw at load: ${e.name}: ${e.message}`);
   console.error((e.stack || "").split("\n").slice(1, 3).join("\n"));
   process.exit(1);
 }
-console.log("OK: app.js ran to the end");
+setTimeout(() => {
+  console.log("OK: app.js ran to the end");
+}, 100);

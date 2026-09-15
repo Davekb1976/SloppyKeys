@@ -518,11 +518,11 @@
         } else {
           badge = `<span class="task-card-badge" data-tip="Runs before the other tasks whenever a challenge&#10;is available, wherever it sits in this queue.&#10;The maps re-roll every :00 and :30.">Priority</span>`;
         }
-      } else if (isStoryEvent) {
+      } else if (isEventTask) {
         if (!t.macro) {
           badge = `<span class="task-card-badge task-card-badge--warn" data-tip="No macro operation assigned.&#10;Character will not walk and units will not be placed.">No Macro</span>`;
         } else {
-          badge = `<span class="task-card-badge" data-tip="Runs before other tasks every 30 minutes (:00 and :30)&#10;whenever ${eventName} is active in Story stages.">Priority</span>`;
+          badge = `<span class="task-card-badge" data-tip="Runs before other tasks every 30 minutes (:00 and :30)&#10;whenever ${eventName} is active.">Priority</span>`;
         }
       } else {
         const missingMap = !t.map;
