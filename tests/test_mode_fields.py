@@ -137,4 +137,11 @@ assert cleaned_chal["map"] == "", cleaned_chal
 assert cleaned_chal["stage"] == "", cleaned_chal
 assert cleaned_chal["difficulty"] == "", cleaned_chal
 
+# Event task repeat: Golden Hour is non-repeatable (repeat=1), Eclipse is repeatable
+eclipse_task = {"mode": "Events", "map": "Eclipse", "repeat": 5}
+assert sanitize_task(dict(eclipse_task))["repeat"] == 5, "Eclipse must preserve repeat count"
+
+golden_task = {"mode": "Events", "map": "Golden Hour", "repeat": 5}
+assert sanitize_task(dict(golden_task))["repeat"] == 1, "Golden Hour must force repeat=1"
+
 print("mode fields: OK")

@@ -493,6 +493,9 @@
         const assigned = Object.keys(t.challenge_macros || {}).filter((m) => t.challenge_macros[m]);
         bits.push(assigned.length ? assigned.length + " map macro" + (assigned.length === 1 ? "" : "s") : "no macros assigned");
       } else if (isEventTask) {
+        if (eventName === "Eclipse") {
+          bits.push("×" + (t.repeat || 1));
+        }
         bits.push("Auto-Detect map");
         if (t.team) bits.push("Team " + t.team);
         if (t.autoplay_preset) bits.push("Preset: " + t.autoplay_preset);
@@ -716,13 +719,14 @@
     const currentMode = mode !== undefined ? mode : tbMode.value;
     const currentMap = map !== undefined ? map : tbMap.value;
     const isEvent = (currentMode === "Events" || currentMode === "Story") && (currentMap === "Eclipse" || currentMap === "Golden Hour" || tbStage.value === "Eclipse" || tbStage.value === "Golden Hour");
+    const isGoldenHour = (currentMode === "Events" || currentMode === "Story") && (currentMap === "Golden Hour" || tbStage.value === "Golden Hour");
     const stageRow = document.getElementById("tb-stage-row");
     const diffRow = document.getElementById("tb-difficulty-row");
     const repeatRow = document.getElementById("tb-repeat-row");
     const leaveWaveRow = document.getElementById("tb-leave-wave-row");
     if (stageRow) stageRow.style.display = isEvent ? "none" : (tbModeFields.stage ? "" : "none");
     if (diffRow) diffRow.style.display = isEvent ? "none" : (tbModeFields.difficulty ? "" : "none");
-    if (repeatRow) repeatRow.style.display = isEvent ? "none" : "";
+    if (repeatRow) repeatRow.style.display = isGoldenHour ? "none" : "";
     if (leaveWaveRow && isEvent) leaveWaveRow.style.display = "none";
   }
 
@@ -815,10 +819,11 @@
   async function saveCurrentTask() {
     if (!selectedTaskId || !window.pywebview || !pywebview.api) return;
     const isEvent = (tbMode.value === "Events" || tbMode.value === "Story") && (tbMap.value === "Eclipse" || tbMap.value === "Golden Hour" || tbStage.value === "Eclipse" || tbStage.value === "Golden Hour");
+    const isGoldenHour = (tbMode.value === "Events" || tbMode.value === "Story") && (tbMap.value === "Golden Hour" || tbStage.value === "Golden Hour");
     const changes = {
       mode: tbMode.value,
       team: tbTeam.value || "",
-      repeat: isEvent ? 1 : Math.max(1, parseInt(tbRepeat.value) || 1),
+      repeat: isGoldenHour ? 1 : Math.max(1, parseInt(tbRepeat.value) || 1),
       macro: tbMacro.value,
     };
     // Only the fields this mode has a control for, so a task can't carry a stage or a

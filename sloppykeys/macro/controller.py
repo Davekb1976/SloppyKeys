@@ -2871,8 +2871,8 @@ class MacroController:
         """Should Eclipse run before the next match or queue pass?
 
         Eclipse re-rolls every 30 minutes on :00 and :30 boundaries.
-        It is non-repeatable: once played or attempted without finding a badge
-        in the current rotation, it rests until the clock crosses the next boundary.
+        It runs up to its configured repeat count per 30-min window,
+        then rests until the clock crosses the next boundary.
         """
         ec_task = self._eclipse_task(tasks)
         if ec_task is None:
@@ -2900,7 +2900,8 @@ class MacroController:
           1. Enters that stage's act selection screen.
           2. Clicks the Eclipse act via `select_act("Story", "Eclipse", prefer_eclipse=True)`.
           3. Starts the stage and waits for the match to be ready.
-          4. Executes the configured Eclipse macro (or fallback).
+          4. Executes the configured Eclipse macro for its configured repeat count,
+             chaining subsequent matches via Repeat Stage.
           5. Returns to the lobby via `_back_to_lobby()`.
 
         Returns True if an Eclipse run was executed, False otherwise.
@@ -2983,8 +2984,6 @@ class MacroController:
             self._log(f"  Eclipse: match ready wait failed: {msg}")
             return False
 
-        self._ensure_camera()
-
         # Load operation
         ec_task = self._eclipse_task()
         macro_name = (
@@ -2993,50 +2992,81 @@ class MacroController:
             or ((self._current_task or {}).get("macro", ""))
             or "auto play"
         )
+        try:
+            repeat = max(1, int((ec_task or {}).get("repeat", 1) or 1))
+        except (ValueError, TypeError):
+            repeat = 1
+
         op = load_operation(self._app_root, macro_name)
         phases = op.get("phases", {})
         self._phases = phases
-
-        if self._checkpoint():
-            return True
-
-        self._log(f"  Eclipse: running match with macro '{macro_name}'...")
-
-        # Pre Start (walk)
-        self._run_phase_linear(phases.get("pre_start", []))
-        self._kept_position = False
-        if self._checkpoint():
-            return True
-
-        self._ensure_autoplay_preset(ec_task)
-        if self._checkpoint():
-            return True
-
-        # Start Game
-        self._placer.park()
-        ok, msg = self._nav.click_start_game()
-        if ok:
-            self._stats.start_stage()
-            self._log(f"  Start Game: {msg or 'ok'}")
-        else:
-            self._log(f"  Start Game failed: {msg}")
-
-        if self._checkpoint():
-            return True
-
-        # Battle + Loops
         battle_blocks = phases.get("battle", [])
         loop_a = phases.get("loop_a", [])
         loop_b = phases.get("loop_b", [])
-        self._run_match(battle_blocks, loop_a, loop_b)
 
-        if self._checkpoint():
-            return True
+        for rep in range(repeat):
+            if self._checkpoint():
+                return True
 
-        self._cycle += 1
-        self._eclipse_played_interval = interval_key()
+            self._ensure_camera()
 
-        self._log("  Eclipse: match finished — returning to lobby.")
+            if repeat > 1:
+                self._log(f"  Eclipse: running match {rep + 1}/{repeat} with macro '{macro_name}'...")
+            else:
+                self._log(f"  Eclipse: running match with macro '{macro_name}'...")
+
+            # Pre Start (walk)
+            self._run_phase_linear(phases.get("pre_start", []))
+            self._kept_position = False
+            if self._checkpoint():
+                return True
+
+            self._ensure_autoplay_preset(ec_task)
+            if self._checkpoint():
+                return True
+
+            # Start Game
+            self._placer.park()
+            ok, msg = self._nav.click_start_game()
+            if ok:
+                self._stats.start_stage()
+                self._log(f"  Start Game: {msg or 'ok'}")
+            else:
+                self._log(f"  Start Game failed: {msg}")
+
+            if self._checkpoint():
+                return True
+
+            # Battle + Loops
+            self._run_match(battle_blocks, loop_a, loop_b)
+
+            if self._checkpoint():
+                return True
+
+            self._cycle += 1
+            self._eclipse_played_interval = interval_key()
+
+            more_reps = rep < repeat - 1
+            if self._left_early:
+                self._left_early = False
+                self._kept_position = False
+                self._camera_set = False
+                break
+            elif more_reps:
+                ok, msg = self._nav.click_repeat()
+                self._kept_position = bool(ok)
+                if ok:
+                    if hasattr(self._nav, "wait_for_match_ready"):
+                        ready, rmsg = self._nav.wait_for_match_ready()
+                        self._log(f"  Stage loaded: {rmsg}")
+                        if not ready:
+                            self._kept_position = False
+                            break
+                else:
+                    self._log(f"  Eclipse Repeat: {msg} — returning to lobby.")
+                    break
+
+        self._log("  Eclipse: finished — returning to lobby.")
         ok, msg = self._back_to_lobby()
         self._log(f"  Back to lobby: {msg}")
         return True
