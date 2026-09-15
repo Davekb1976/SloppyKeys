@@ -1287,12 +1287,27 @@ button.vp-chip { cursor: pointer; }
 }
 
 .hotkey-btn {
-  font-size: 12px; font-weight: 600; color: var(--text-muted);
-  padding: 5px 12px; border: 1px solid var(--border); background: var(--surface-sunken);
-  cursor: pointer; min-width: 80px; text-align: center; transition: border-color 0.12s;
+  font-family: var(--font-mono);
+  font-size: 11px; font-weight: 700; color: var(--text-muted);
+  padding: 4px 10px; border: 1px solid var(--border); background: var(--surface-sunken);
+  cursor: pointer; min-width: 72px; text-align: center;
+  transition: border-color 0.12s, color 0.12s, background 0.12s, box-shadow 0.12s;
+  letter-spacing: 0.03em;
+  box-sizing: border-box;
+  flex-shrink: 0;
 }
-.hotkey-btn:hover { border-color: var(--accent); color: var(--text); }
-.hotkey-btn.capturing { border-color: var(--accent); color: var(--accent); animation: pulse 0.8s infinite; }
+.hotkey-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface-sunken));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+.hotkey-btn.capturing {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, var(--surface-sunken));
+  animation: pulse 0.8s infinite;
+}
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
 /* Setting rows — two-column grid */
@@ -1968,5 +1983,147 @@ button.vp-chip { cursor: pointer; }
   background: var(--surface-raised);
   color: var(--text-muted);
   border: 1px solid var(--border-strong);
+}
+
+/* ---- Settings Screen Cards & Plates ---- */
+
+/* Tag badge variants for settings sections */
+.tag-settings-general {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: #c4b5fd;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.tag-settings-hotkeys {
+  background: rgba(59, 130, 246, 0.15);
+  color: #93c5fd;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+}
+
+.tag-settings-delays {
+  background: rgba(234, 179, 8, 0.15);
+  color: #fde047;
+  border: 1px solid rgba(234, 179, 8, 0.35);
+}
+
+.tag-settings-webhook {
+  background: rgba(168, 85, 247, 0.15);
+  color: #d8b4fe;
+  border: 1px solid rgba(168, 85, 247, 0.35);
+}
+
+.tag-settings-debug {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+/* 2-Column Responsive Grid for Settings cards */
+.setting-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Setting row transformed into an interactive plate inside card sections */
+.card-section-body .setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--surface-panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border-strong);
+  transition: border-color 0.12s, background 0.12s, transform 0.12s, box-shadow 0.12s;
+  box-sizing: border-box;
+  min-height: 52px;
+}
+
+.card-section-body .setting-row:hover {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+  background: var(--surface-raised);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.card-section-body .setting-row:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+  border-left-color: var(--accent);
+}
+
+.card-section-body .setting-row.full {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
+.card-section-body .setting-row.full .setting-input {
+  max-width: 440px;
+}
+
+.card-section-body .setting-row .setting-input {
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 0;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+
+.card-section-body .setting-row .setting-input:focus {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+/* Delay input box with mono unit */
+.setting-delay-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  box-sizing: border-box;
+  transition: border-color 0.12s, box-shadow 0.12s;
+  flex-shrink: 0;
+}
+
+.setting-delay-input-wrap:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.setting-delay-input-wrap input.setting-input--delay {
+  width: 54px;
+  height: 24px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  padding: 0 2px;
+  border: none;
+  background: transparent;
+  color: var(--teal);
+  text-align: right;
+  outline: none;
+  -moz-appearance: textfield;
+}
+
+.setting-delay-input-wrap input.setting-input--delay::-webkit-outer-spin-button,
+.setting-delay-input-wrap input.setting-input--delay::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.setting-delay-unit {
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-faint);
+  user-select: none;
+  margin-left: 2px;
 }
 

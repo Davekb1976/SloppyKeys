@@ -542,45 +542,59 @@
       <div class="settings-content" id="settings-content">
         <!-- General -->
         <div class="settings-category" data-cat="general">
-          <div class="page-header"><span class="page-title">General</span></div>
-          <div class="setting-group">
-            <div class="setting-row full">
-              <div class="setting-info">
-                <span class="setting-name">Private Server Link</span>
-                <span class="setting-desc">Deep link used to join your server</span>
-              </div>
-              <input type="text" class="setting-input" id="s-private-server" placeholder="https://www.roblox.com/share?code=..." data-key="private_server_link">
+          <div class="page-header">
+            <div>
+              <span class="page-title">General</span>
+              <span class="page-subtitle" style="margin-top:2px; font-size:11px; color:var(--text-faint);">Core macro configuration and automation preferences</span>
             </div>
-            <div class="setting-row">
-              <div class="setting-info">
-                <span class="setting-name">Check for updates on startup</span>
-                <span class="setting-desc">Asks GitHub once per launch. Never downloads on its own.</span>
-              </div>
-              <div style="display:flex; gap:6px; align-items:center;">
-                <button class="btn btn--sm tip-left" id="btn-check-update" data-tip="Ask GitHub now.">Check now</button>
-                <label class="check check--lg"><input type="checkbox" id="s-auto-update" data-key="auto_update"><span class="check-box"></span></label>
-              </div>
-            </div>
+          </div>
 
-            <div class="setting-row">
-              <div class="setting-info">
-                <span class="setting-name">Camera once per session</span>
-                <span class="setting-desc">Skip the camera setup on repeat matches</span>
+          <div class="cards-container">
+            <div class="card-gamemode-section">
+              <div class="card-section-header">
+                <span class="card-section-tag tag-settings-general">Setup</span>
+                <span class="card-section-label">General Preferences</span>
+                <span class="card-section-desc">Client connection and session behaviors</span>
               </div>
-              <label class="check check--lg"><input type="checkbox" id="s-camera-once" data-key="camera_once_per_session"><span class="check-box"></span></label>
-            </div>
-            <div class="setting-row">
-              <div class="setting-info">
-                <span class="setting-name">Auto-reopen Roblox</span>
-                <span class="setting-desc">Relaunch the game if it crashes mid-run</span>
+              <div class="card-section-body">
+                <div class="setting-row full">
+                  <div class="setting-info">
+                    <span class="setting-name">Private Server Link</span>
+                    <span class="setting-desc">Deep link used to join your server</span>
+                  </div>
+                  <input type="text" class="setting-input" id="s-private-server" placeholder="https://www.roblox.com/share?code=..." data-key="private_server_link">
+                </div>
+
+                <div class="setting-card-grid" style="margin-top:10px;">
+                  <div class="setting-row">
+                    <div class="setting-info">
+                      <span class="setting-name">Check for updates on startup</span>
+                      <span class="setting-desc">Asks GitHub once per launch. Never downloads on its own.</span>
+                    </div>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                      <button class="btn btn--sm tip-left" id="btn-check-update" data-tip="Ask GitHub now.">Check now</button>
+                      <label class="check check--lg"><input type="checkbox" id="s-auto-update" data-key="auto_update"><span class="check-box"></span></label>
+                    </div>
+                  </div>
+
+                  <div class="setting-row">
+                    <div class="setting-info">
+                      <span class="setting-name">Camera once per session</span>
+                      <span class="setting-desc">Skip the camera setup on repeat matches</span>
+                    </div>
+                    <label class="check check--lg"><input type="checkbox" id="s-camera-once" data-key="camera_once_per_session"><span class="check-box"></span></label>
+                  </div>
+
+                  <div class="setting-row">
+                    <div class="setting-info">
+                      <span class="setting-name">Auto-reopen Roblox</span>
+                      <span class="setting-desc">Relaunch the game if it crashes mid-run</span>
+                    </div>
+                    <label class="check check--lg"><input type="checkbox" id="s-auto-reopen" data-key="auto_reopen_roblox"><span class="check-box"></span></label>
+                  </div>
+                </div>
               </div>
-              <label class="check check--lg"><input type="checkbox" id="s-auto-reopen" data-key="auto_reopen_roblox"><span class="check-box"></span></label>
             </div>
-            <!-- There is no Action Delay row. It offered an "extra pause after every click"
-                 and nothing read `action_delay_ms` anywhere: the control saved a number that
-                 changed no timing, so a user slowing the macro down got no slower macro. The
-                 waits that are real are in Settings > Delays, each named for the step it
-                 governs — a blanket pause after every click is not one of them. -->
           </div>
         </div>
 
@@ -628,76 +642,154 @@
 
         <!-- Hotkeys -->
         <div class="settings-category" data-cat="hotkeys">
-          <div class="page-header" style="display:flex; align-items:center; justify-content:space-between;">
-            <span class="page-title">Hotkeys</span>
-            <button class="btn btn--sm" id="btn-reset-hotkeys">Reset to Defaults</button>
+          <div class="page-header" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+            <div>
+              <span class="page-title">Hotkeys</span>
+              <span class="page-subtitle" style="margin-top:2px; font-size:11px; color:var(--text-faint);">Global shortcuts and in-game key emulation</span>
+            </div>
+            <div>
+              <button class="btn btn--sm" id="btn-reset-hotkeys">Reset to Defaults</button>
+            </div>
           </div>
-          <div class="setting-group" id="hotkeys-list"></div>
 
-          <div class="page-header" style="margin-top:16px;"><span class="page-title">In-Game Keybinds</span><span class="page-subtitle" style="margin-left:8px; font-size:10px; color:var(--text-faint);">Keys the macro presses inside Roblox</span></div>
-          <div class="setting-group" id="game-keybinds-list">
-            <div class="setting-row">
-              <div class="setting-info"><span class="setting-name">Upgrade Unit</span><span class="setting-desc">Press to upgrade a selected unit</span></div>
-              <button class="hotkey-btn" data-game-key="upgrade">T</button>
+          <div class="cards-container">
+            <!-- Macro Shortcuts Card Section -->
+            <div class="card-gamemode-section">
+              <div class="card-section-header">
+                <span class="card-section-tag tag-settings-hotkeys">Shortcuts</span>
+                <span class="card-section-label">Global Macro Hotkeys</span>
+                <span class="card-section-desc">Active system-wide to control macro execution</span>
+              </div>
+              <div class="card-section-body">
+                <div class="card-section-hint">Click any hotkey badge to listen for a new key combination.</div>
+                <div class="setting-card-grid" id="hotkeys-list"></div>
+              </div>
             </div>
-            <div class="setting-row">
-              <div class="setting-info"><span class="setting-name">Sell Unit</span><span class="setting-desc">Press to sell a selected unit</span></div>
-              <button class="hotkey-btn" data-game-key="sell">X</button>
-            </div>
-            <div class="setting-row">
-              <div class="setting-info"><span class="setting-name">Target Priority</span><span class="setting-desc">Press to cycle unit target priority</span></div>
-              <button class="hotkey-btn" data-game-key="priority">R</button>
-            </div>
-            <div class="setting-row">
-              <div class="setting-info"><span class="setting-name">Autograde</span><span class="setting-desc">Press to toggle auto-upgrade on a unit</span></div>
-              <button class="hotkey-btn" data-game-key="autograde">V</button>
+
+            <!-- In-Game Keybinds Card Section -->
+            <div class="card-gamemode-section">
+              <div class="card-section-header">
+                <span class="card-section-tag tag-settings-hotkeys">Roblox</span>
+                <span class="card-section-label">In-Game Keybinds</span>
+                <span class="card-section-desc">Keys the macro presses through AutoHotkey inside Roblox</span>
+              </div>
+              <div class="card-section-body">
+                <div class="card-section-hint">Match these to your in-game Roblox key bindings.</div>
+                <div class="setting-card-grid" id="game-keybinds-list">
+                  <div class="setting-row">
+                    <div class="setting-info"><span class="setting-name">Upgrade Unit</span><span class="setting-desc">Press to upgrade a selected unit</span></div>
+                    <button class="hotkey-btn" data-game-key="upgrade">T</button>
+                  </div>
+                  <div class="setting-row">
+                    <div class="setting-info"><span class="setting-name">Sell Unit</span><span class="setting-desc">Press to sell a selected unit</span></div>
+                    <button class="hotkey-btn" data-game-key="sell">X</button>
+                  </div>
+                  <div class="setting-row">
+                    <div class="setting-info"><span class="setting-name">Target Priority</span><span class="setting-desc">Press to cycle unit target priority</span></div>
+                    <button class="hotkey-btn" data-game-key="priority">R</button>
+                  </div>
+                  <div class="setting-row">
+                    <div class="setting-info"><span class="setting-name">Autograde</span><span class="setting-desc">Press to toggle auto-upgrade on a unit</span></div>
+                    <button class="hotkey-btn" data-game-key="autograde">V</button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
         <!-- Delays -->
         <div class="settings-category" data-cat="delays">
-          <div class="page-header"><span class="page-title">Delays</span></div>
-          <div class="setting-group" id="delays-list"></div>
+          <div class="page-header">
+            <div>
+              <span class="page-title">Delays</span>
+              <span class="page-subtitle" style="margin-top:2px; font-size:11px; color:var(--text-faint);">Action settling times and transition deadlines in seconds</span>
+            </div>
+          </div>
+
+          <div class="cards-container">
+            <div class="card-gamemode-section">
+              <div class="card-section-header">
+                <span class="card-section-tag tag-settings-delays">Timing</span>
+                <span class="card-section-label">Tunable Timing Values</span>
+                <span class="card-section-desc">Applied live to navigation and placement routines</span>
+                <div class="card-section-header-controls">
+                  <span class="card-section-count" id="delays-count">6 configured</span>
+                </div>
+              </div>
+              <div class="card-section-body">
+                <div class="card-section-hint">Values are in seconds. Lower numbers make the macro faster; raise them if clicks miss or UI fades aren't finished.</div>
+                <div class="setting-card-grid" id="delays-list"></div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Webhook -->
         <div class="settings-category" data-cat="webhook">
           <div class="page-header" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
-            <span class="page-title">Webhook</span>
+            <div>
+              <span class="page-title">Webhook</span>
+              <span class="page-subtitle" style="margin-top:2px; font-size:11px; color:var(--text-faint);">Discord notifications for match results and status alerts</span>
+            </div>
             <div style="display:flex; align-items:center; gap:8px;">
               <span id="webhook-test-status" style="font-size:12px; color:var(--text-faint);"></span>
               <button class="btn btn--sm" id="btn-test-webhook">Test Webhook</button>
             </div>
           </div>
-          <div class="setting-group">
-            <div class="setting-row full">
-              <div class="setting-info">
-                <span class="setting-name">Discord Webhook URL</span>
-                <span class="setting-desc">Posts win/loss notifications to your channel</span>
+
+          <div class="cards-container">
+            <div class="card-gamemode-section">
+              <div class="card-section-header">
+                <span class="card-section-tag tag-settings-webhook">Notifications</span>
+                <span class="card-section-label">Discord Integration</span>
+                <span class="card-section-desc">Webhook configuration and mention ping targets</span>
               </div>
-              <input type="text" class="setting-input" id="s-webhook" placeholder="https://discord.com/api/webhooks/..." data-key="discord_webhook">
-            </div>
-            <div class="setting-row full">
-              <div class="setting-info">
-                <span class="setting-name">Ping your Discord user ID</span>
-                <span class="setting-desc">Optional. Mentions you on every notification. Leave empty for none. Discord &gt; Settings &gt; Advanced &gt; Developer Mode, then right-click yourself &gt; Copy User ID.</span>
+              <div class="card-section-body" style="display:flex; flex-direction:column; gap:10px;">
+                <div class="setting-row full">
+                  <div class="setting-info">
+                    <span class="setting-name">Discord Webhook URL</span>
+                    <span class="setting-desc">Posts win/loss notifications and run stats to your channel</span>
+                  </div>
+                  <input type="text" class="setting-input" id="s-webhook" placeholder="https://discord.com/api/webhooks/..." data-key="discord_webhook">
+                </div>
+                <div class="setting-row full">
+                  <div class="setting-info">
+                    <span class="setting-name">Ping your Discord user ID</span>
+                    <span class="setting-desc">Optional. Mentions you on every notification. Leave empty for none. Discord &gt; Settings &gt; Advanced &gt; Developer Mode, then right-click yourself &gt; Copy User ID.</span>
+                  </div>
+                  <input type="text" class="setting-input" id="s-discord-user-id" placeholder="e.g. 286825732000000000" data-key="discord_user_id">
+                </div>
               </div>
-              <input type="text" class="setting-input" id="s-discord-user-id" placeholder="e.g. 286825732000000000" data-key="discord_user_id">
             </div>
           </div>
         </div>
 
         <!-- Debug -->
         <div class="settings-category" data-cat="debug">
-          <div class="page-header"><span class="page-title">Debug</span></div>
-          <div class="setting-group">
-            <div class="setting-row">
-              <div class="setting-info">
-                <span class="setting-name">Debug Screenshots</span>
-                <span class="setting-desc">Save screenshots on each lobby step</span>
+          <div class="page-header">
+            <div>
+              <span class="page-title">Debug</span>
+              <span class="page-subtitle" style="margin-top:2px; font-size:11px; color:var(--text-faint);">Diagnostics, calibration points, and OCR coordinate tooling</span>
+            </div>
+          </div>
+
+          <div class="cards-container">
+            <div class="card-gamemode-section">
+              <div class="card-section-header">
+                <span class="card-section-tag tag-settings-debug">Diagnostics</span>
+                <span class="card-section-label">Lobby Diagnostics</span>
+                <span class="card-section-desc">Trace captured frames and step transitions</span>
               </div>
-              <label class="check check--lg"><input type="checkbox" id="s-debug-screenshots" data-key="debug_screenshots"><span class="check-box"></span></label>
+              <div class="card-section-body">
+                <div class="setting-row">
+                  <div class="setting-info">
+                    <span class="setting-name">Debug Screenshots</span>
+                    <span class="setting-desc">Save screenshots on each lobby step to disk</span>
+                  </div>
+                  <label class="check check--lg"><input type="checkbox" id="s-debug-screenshots" data-key="debug_screenshots"><span class="check-box"></span></label>
+                </div>
+              </div>
             </div>
           </div>
 

@@ -2435,12 +2435,25 @@
       const hk = await pywebview.api.get_hotkeys();
       const hkList = document.getElementById("hotkeys-list");
       if (hk && Object.keys(hk).length) {
-        hkList.innerHTML = Object.entries(hk).map(([action, display]) =>
-          `<div class="setting-row">
-            <div class="setting-info"><span class="setting-name">${action.replace(/_/g, " ")}</span></div>
+        const HOTKEY_DESCS = {
+          start: "Start macro run",
+          pause: "Pause or resume current run",
+          stop: "Emergency stop the macro",
+          reload: "Reload configs and operations",
+          image_manager: "Toggle Image Manager window",
+          compact_mode: "Toggle compact mini view",
+        };
+        hkList.innerHTML = Object.entries(hk).map(([action, display]) => {
+          const label = action.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+          const desc = HOTKEY_DESCS[action] || "Macro execution hotkey";
+          return `<div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-name">${label}</span>
+              <span class="setting-desc">${desc}</span>
+            </div>
             <button class="hotkey-btn" data-action="${action}">${display || "Unbound"}</button>
-          </div>`
-        ).join("");
+          </div>`;
+        }).join("");
         // Wire key capture
         hkList.querySelectorAll(".hotkey-btn").forEach((btn) => {
           btn.addEventListener("click", () => {
@@ -2475,9 +2488,51 @@
       const delays = await pywebview.api.get_delays();
       const dList = document.getElementById("delays-list");
       if (delays && Object.keys(delays).length) {
-        dList.innerHTML = Object.entries(delays).map(([key, val]) =>
-          `<div class="setting-row"><div class="setting-info"><span class="setting-name">${key.replace(/_/g, " ")}</span></div><input type="number" class="setting-input" value="${val}" step="0.1" style="width:80px;" data-delay-key="${key}"></div>`
-        ).join("");
+        const DELAY_META = {
+          image_search_cooldown: {
+            label: "Unverifiable Click Settle",
+            desc: "Pause after blind clicks that cannot be image-verified",
+          },
+          panel_fade_wait: {
+            label: "UI Fade-In Wait",
+            desc: "Time for menus and dialogs to finish animating",
+          },
+          camera_zoom: {
+            label: "Camera Zoom Hold",
+            desc: "Hold duration when zooming camera all the way out",
+          },
+          placement_settle: {
+            label: "Placement Settle",
+            desc: "Pause after each unit placement keypress and click",
+          },
+          result_screenshot_delay: {
+            label: "Result Screenshot Delay",
+            desc: "Wait for reward banners to render before capturing",
+          },
+          lobby_rejoin_wait: {
+            label: "Lobby Rejoin Wait",
+            desc: "Maximum timeout when waiting for Roblox to reopen and load",
+          },
+        };
+        const countEl = document.getElementById("delays-count");
+        if (countEl) countEl.textContent = `${Object.keys(delays).length} configured`;
+
+        dList.innerHTML = Object.entries(delays).map(([key, val]) => {
+          const meta = DELAY_META[key] || {
+            label: key.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()),
+            desc: "Timing delay in seconds",
+          };
+          return `<div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-name">${meta.label}</span>
+              <span class="setting-desc">${meta.desc}</span>
+            </div>
+            <div class="setting-delay-input-wrap">
+              <input type="number" class="setting-input--delay" value="${val}" step="0.1" data-delay-key="${key}">
+              <span class="setting-delay-unit">s</span>
+            </div>
+          </div>`;
+        }).join("");
         dList.querySelectorAll("[data-delay-key]").forEach((inp) => {
           inp.addEventListener("change", () => {
             if (!window.pywebview || !pywebview.api) return;
