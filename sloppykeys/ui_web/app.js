@@ -1254,6 +1254,31 @@
     openRegionPicker(ocrRegionKey, ocrCachedSnapshot);
   });
 
+  // ---- OCR Region Preview Lightbox ----
+  function openOcrPreviewModal({ src, title, dims, info }) {
+    const modal = document.getElementById("ocr-preview-modal");
+    if (!modal) return;
+    const imgEl = document.getElementById("ocr-preview-img");
+    const titleEl = document.getElementById("ocr-preview-title");
+    const dimsEl = document.getElementById("ocr-preview-dims");
+    const infoEl = document.getElementById("ocr-preview-info");
+
+    if (imgEl) imgEl.src = src;
+    if (titleEl) titleEl.textContent = title;
+    if (dimsEl) dimsEl.textContent = dims;
+    if (infoEl) infoEl.textContent = info;
+    modal.style.display = "flex";
+  }
+
+  const ocrPrevModal = document.getElementById("ocr-preview-modal");
+  const ocrPrevClose = document.getElementById("ocr-preview-close");
+  if (ocrPrevClose && ocrPrevModal) {
+    ocrPrevClose.addEventListener("click", () => { ocrPrevModal.style.display = "none"; });
+    ocrPrevModal.addEventListener("click", (e) => {
+      if (e.target === ocrPrevModal) ocrPrevModal.style.display = "none";
+    });
+  }
+
   // ---- Vision regions ----
 
   // Previews come from assets/regions/, written whenever a capture already happened for
@@ -1341,7 +1366,7 @@
               const edited = !!overrides[s.key];
               return `
               <div class="vision-region-row ec-card-row" data-vr-row="${s.key}">
-                <div class="vr-thumb-cell" data-tip="Preview crop">
+                <div class="vr-thumb-cell" data-tip="Click to enlarge preview">
                   <img class="vr-thumb" data-vr-thumb="${s.key}" alt="" hidden>
                   <span class="vr-nopreview" data-vr-none="${s.key}">no preview</span>
                 </div>
@@ -1383,6 +1408,28 @@
       </div>`;
     }).join("");
     Object.entries(previews).forEach(([key, uri]) => setRegionThumb(key, uri));
+    list.querySelectorAll(".vr-thumb-cell").forEach(cell => {
+      cell.addEventListener("click", () => {
+        const row = cell.closest(".vision-region-row");
+        if (!row) return;
+        const img = cell.querySelector(".vr-thumb");
+        if (!img || img.hidden || !img.src) return;
+        const title = row.querySelector(".vr-card-name")?.textContent || "Region Preview";
+        const readText = row.querySelector(".vr-read")?.textContent || "";
+        const inputs = row.querySelectorAll("input");
+        const x = inputs[0]?.value || "";
+        const y = inputs[1]?.value || "";
+        const w = inputs[2]?.value || "";
+        const h = inputs[3]?.value || "";
+
+        openOcrPreviewModal({
+          src: img.src,
+          title,
+          dims: w && h ? `${w} × ${h} px` : "",
+          info: `Position: (${x}, ${y}) · Size: ${w}×${h} px${readText ? ` · Read: "${readText}"` : ""}`,
+        });
+      });
+    });
     list.querySelectorAll("[data-vr-preview-group]").forEach(btn => {
       btn.addEventListener("click", async () => {
         if (!window.pywebview || !pywebview.api) return;
@@ -1474,17 +1521,35 @@
     }
     list.innerHTML = pointGroups.map(g => {
       const setCount = g.points.filter(p => p.edited).length;
-      return `<div class="vr-group">
-        <div class="vr-group-head">
-          <span class="vr-group-title">${g.label}</span>
-          <span class="vr-group-note">${g.where}</span>
-          <span class="vr-default">${setCount}/${g.points.length} measured</span>
-          <button class="btn btn--sm" data-vp-group="${g.key}" data-tip="Grab the game and click each point on it.&#10;${g.where}">Set points</button>
-          <button class="btn btn--sm btn--danger tip-left" data-vp-reset="${g.key}" data-tip="Back to the shipped coordinates">Reset</button>
+      return `
+      <div class="card-gamemode-section vr-group" data-vp-section="${g.key}">
+        <div class="card-section-header">
+          <span class="card-section-tag tag-ocr-dialog">POINTS</span>
+          <span class="card-section-label">${g.label}</span>
+          <span class="card-section-desc">${g.where}</span>
+          <div class="card-section-header-controls">
+            <button class="btn btn--sm" data-vp-group="${g.key}" data-tip="Grab the game and click each point on it.&#10;${g.where}">Set Points</button>
+            <button class="btn btn--sm btn--danger tip-left" data-vp-reset="${g.key}" data-tip="Back to the shipped coordinates">Reset</button>
+            <span class="card-section-count">${setCount}/${g.points.length} measured</span>
+          </div>
         </div>
-        <div class="vp-row">
-          ${g.points.map(p => `<span class="vp-chip${p.edited ? " on" : ""}">${p.label}
-            <span class="vp-chip-xy">${p.x},${p.y}</span></span>`).join("")}
+        <div class="card-section-body">
+          <div class="card-section-hint">
+            The clicks fire blind — nothing verifies them. Put ${g.where}, then click Set Points to calibrate each position.
+          </div>
+          <div class="vp-card-grid">
+            ${g.points.map(p => `
+            <div class="vp-point-card${p.edited ? " on" : ""}">
+              <div class="vp-point-info">
+                <span class="vp-point-name" title="${p.label}">${p.label}</span>
+                <span class="ec-card-badge ${p.edited ? "ec-card-badge--ok" : "vr-badge--default"}">${p.edited ? "Measured" : "Default"}</span>
+              </div>
+              <div class="vp-point-coords" title="Screen coordinates (X, Y)">
+                <span class="vp-coord-axis">X:</span><span class="vp-coord-val">${p.x}</span>
+                <span class="vp-coord-axis">Y:</span><span class="vp-coord-val">${p.y}</span>
+              </div>
+            </div>`).join("")}
+          </div>
         </div>
       </div>`;
     }).join("");
@@ -2240,6 +2305,7 @@
     }
     if (cat === "debug" || cat === "all") {
       loadVisionRegions();
+      loadVisionPoints();
     }
   }
 
