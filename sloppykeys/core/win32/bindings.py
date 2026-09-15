@@ -113,6 +113,30 @@ _set_sig(
     ctypes.POINTER(wintypes.DWORD),
 )
 _set_sig(kernel32.CloseHandle, wintypes.BOOL, wintypes.HANDLE)
+_set_sig(
+    user32.LoadImageW,
+    wintypes.HANDLE,
+    wintypes.HINSTANCE,
+    wintypes.LPCWSTR,
+    wintypes.UINT,
+    ctypes.c_int,
+    ctypes.c_int,
+    wintypes.UINT,
+)
+_set_sig(
+    user32.SendMessageW,
+    wintypes.LPARAM,
+    wintypes.HWND,
+    wintypes.UINT,
+    wintypes.WPARAM,
+    wintypes.LPARAM,
+)
+
+IMAGE_ICON = 1
+LR_LOADFROMFILE = 0x00000010
+WM_SETICON = 0x0080
+ICON_SMALL = 0
+ICON_BIG = 1
 
 
 def is_key_down(virtual_key: int) -> bool:

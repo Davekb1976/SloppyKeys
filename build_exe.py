@@ -38,7 +38,7 @@ DEFAULT_DEST = os.path.join(os.path.dirname(os.path.dirname(HERE)), "SLOPPYKEYS"
 # exception — shipped walk paths the Auto mode looks up by name, shared game data rather
 # than anyone's recording, so without it Auto does nothing on a fresh install.
 DATA_DIRS = ("assets", os.path.join("paths", "defaults"))
-DATA_FILES = ("routes.json",)
+DATA_FILES = ("routes.json", "icon.ico")
 # `routes.json` again under a second name. The installer writes `routes.json` only if it is
 # missing (it is the user's own events once they have any) but always replaces this copy, so
 # it is the only way a route shipped with a new version reaches an existing install —
@@ -223,6 +223,9 @@ def build(dest: str, console: bool, onefile: bool) -> None:
         "--console" if console else "--windowed",
         "--onefile" if onefile else "--onedir",
     ]
+    icon_path = os.path.join(HERE, "icon.ico")
+    if os.path.isfile(icon_path):
+        command += ["--icon", icon_path]
     # The front end is data, not modules: PyInstaller's scan collects `bridge.py` and nothing
     # beside it, so `index.html`, `style.css`, `app.js` and `fonts/` have to be named. Without
     # this the exe starts, finds no `index.html` next to the frozen `bridge.py`, and shows a

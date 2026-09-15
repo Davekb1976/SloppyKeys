@@ -7,11 +7,16 @@ Window Manager paints around every top-level window on Windows 11.
 from __future__ import annotations
 
 import ctypes
+import os
 from ctypes import wintypes
 
 from .bindings import (
     HWND_NOTOPMOST,
     HWND_TOPMOST,
+    ICON_BIG,
+    ICON_SMALL,
+    IMAGE_ICON,
+    LR_LOADFROMFILE,
     SPI_GETWORKAREA,
     SW_MINIMIZE,
     SWP_FRAMECHANGED,
@@ -19,6 +24,7 @@ from .bindings import (
     SWP_NOMOVE,
     SWP_NOSIZE,
     SWP_NOZORDER,
+    WM_SETICON,
     user32,
 )
 
@@ -185,3 +191,17 @@ def move_to(hwnd: int, x: int, y: int) -> bool:
             hwnd, 0, int(x), int(y), 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE
         )
     )
+
+
+def set_window_icon(hwnd: int, icon_path: str) -> bool:
+    """Set the window's taskbar and title icon from an .ico file."""
+    if not os.path.isfile(icon_path):
+        return False
+    hicon_big = user32.LoadImageW(None, icon_path, IMAGE_ICON, 32, 32, LR_LOADFROMFILE)
+    hicon_small = user32.LoadImageW(None, icon_path, IMAGE_ICON, 16, 16, LR_LOADFROMFILE)
+    if hicon_big:
+        user32.SendMessageW(hwnd, WM_SETICON, ICON_BIG, hicon_big)
+    if hicon_small:
+        user32.SendMessageW(hwnd, WM_SETICON, ICON_SMALL, hicon_small)
+    return bool(hicon_big or hicon_small)
+

@@ -46,6 +46,7 @@ from sloppykeys.core.win32.frameless import (
     move_to,
     set_topmost,
     set_window_below,
+    set_window_icon,
 )
 from sloppykeys.core.win32.roblox_window import (
     activate_window,
@@ -2737,6 +2738,8 @@ def main() -> None:
 
         # Init the macro controller.
         api._app_root = resolve_app_root()
+        if hwnd:
+            set_window_icon(hwnd, os.path.join(api._app_root, "icon.ico"))
         # Before the first line is logged, so this session starts a clean file.
         api._rotate_log()
         api._write_log(f"SloppyKeys {api.get_version()} started.")

@@ -74,6 +74,7 @@ SolidCompression=yes
 WizardStyle=modern
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
+SetupIconFile=icon.ico
 UninstallDisplayIcon={app}\{#AppExe}
 ; Restart Manager may close the app to replace its exe, but it must not restart it: the
 ; [Run] entry below already does that for a silent update, and both firing would leave two
