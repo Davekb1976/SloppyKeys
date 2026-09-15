@@ -348,6 +348,11 @@ input:focus, select:focus {
   border: 1px solid var(--border); padding: 8px;
   background: var(--surface-sunken);
 }
+.vr-group.card-gamemode-section {
+  padding: 0;
+  gap: 0;
+  background: var(--surface-panel);
+}
 .vr-group-head { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
 .vr-group-title {
   font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
@@ -361,51 +366,223 @@ input:focus, select:focus {
   font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
   color: var(--text-faint); border: 1px solid var(--border); padding: 1px 4px; margin-left: 4px;
 }
-/* Every column is a fixed flex basis, because both of these have to be true in every row:
-   the inputs start at the same x, and so does everything after them.
-   - `.vr-label` was `min-width: 130px` — a floor, not a width. "Row 1 map name" plus its
-     DEFAULT badge overruns it, so those rows pushed their inputs right of every other row's.
-     Fixing that by pinning the label to 150px then **hid the badge**: the label clips with an
-     ellipsis, so on the longer names the pill was the part cut off. So the badge gets its own
-     column (`.vr-flag`), always reserved whether or not it is showing — an absent badge that
-     collapsed its cell would misalign every edited row against every default one.
-   - The thumb was a bare `<img hidden>`, and `hidden` is `display: none`, which drops it out
-     of the flex line entirely — so a row with a preview and a row without did not agree
-     either. `.vr-thumb-cell` keeps the space whether or not a crop exists.
-   Not a grid: each row is its own element, so `auto` and `minmax` columns resolve per row and
-   would not line up across rows — and eight fixed columns overflow the panel. */
-.vision-region-row { display: flex; align-items: center; gap: 6px; font-size: 11px; }
-.vision-region-row .vr-label {
-  flex: 0 0 150px; min-width: 0; color: var(--text-muted); font-weight: 600;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.vr-flag { flex: 0 0 52px; display: flex; align-items: center; min-width: 0; }
-/* No left margin in here: the cell's own gap does that job, and the shared rule's margin is
-   for the group header, where the badge really does follow text. */
-.vr-flag .vr-default { margin-left: 0; }
-/* Both states carry a badge, so the column is never blank. Showing one only for `default` read
-   as a broken panel once every row had been measured — which is the normal end state, and what
-   an install with all eleven boxes tuned actually looks like. */
 .vr-edited {
   color: var(--accent);
   border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
 }
-.vision-region-row input { flex: 0 0 50px; width: 50px; height: 22px; font-size: 10px; padding: 0 4px; background: var(--surface-sunken); color: var(--text); border: 1px solid var(--border); }
-.vr-thumb-cell { flex: 0 0 140px; display: flex; align-items: center; min-width: 0; overflow: hidden; }
-/* A preview is a state, not an absence: a fresh install has taken none, and an empty column
-   reads as a broken panel rather than as "press Preview". */
-.vr-nopreview {
-  font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+
+/* OCR Card Grid: 2-column responsive layout */
+.ocr-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* OCR Card Row: styled like .ec-card-row */
+.vision-region-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--surface-panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  transition: border-color 0.12s, background 0.12s, transform 0.12s, box-shadow 0.12s;
+  user-select: none;
+  min-width: 0;
+  box-sizing: border-box;
+  min-height: 56px;
+}
+.vision-region-row:hover {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+  border-left-color: var(--accent);
+  background: var(--surface-raised);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+/* Thumbnail preview wrapper in card */
+.vision-region-row .vr-thumb-cell {
+  width: 68px;
+  height: 42px;
+  border: 1px solid var(--border);
+  background: var(--surface-sunken);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+}
+.vision-region-row .vr-thumb {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  display: block;
+}
+.vision-region-row .vr-nopreview {
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
+  text-align: center;
+  line-height: 1.1;
+  padding: 0 2px;
+}
+
+/* Card details / info block */
+.vr-card-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  justify-content: center;
+  overflow: hidden;
+}
+.vr-card-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.vr-card-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.01em;
+}
+.vr-flag {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.vr-badge--default {
+  background: var(--surface-sunken);
+  color: var(--text-faint);
+  border: 1px solid var(--border);
+}
+.vr-badge--edited {
+  background: rgba(139, 92, 246, 0.15);
+  color: #c4b5fd;
+  border: 1px solid rgba(139, 92, 246, 0.4);
+}
+
+/* Live OCR readout line */
+.vr-card-read-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  font-size: 10px;
+  line-height: 1.2;
+}
+.vr-read-lbl {
+  font-weight: 700;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+.vision-region-row .vr-read {
+  font-family: var(--font-mono);
+  color: var(--teal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+  font-size: 10px;
+}
+.vision-region-row .vr-read:empty::before {
+  content: "—";
   color: var(--text-faint);
 }
-/* What the box actually cut out of the game, at native pixels — scaling a 20px-tall crop
-   to fit smears the glyphs the read depends on. */
-.vr-thumb {
-  max-height: 26px; max-width: 100%; object-fit: contain; object-position: left center;
-  background: var(--surface-panel); border: 1px solid var(--border); flex-shrink: 0;
-  image-rendering: pixelated;
+
+/* Coordinate inputs bar */
+.vr-coords-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
 }
-.vr-read { flex: 1 1 auto; min-width: 0; font-size: 10px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vr-coord-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  padding: 1px 4px;
+  transition: border-color 0.12s;
+  cursor: text;
+}
+.vr-coord-lbl {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  user-select: none;
+}
+.vr-coord-item input {
+  width: 36px;
+  height: 18px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  padding: 0 2px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  text-align: right;
+  outline: none;
+  -moz-appearance: textfield;
+}
+.vr-coord-item input::-webkit-outer-spin-button,
+.vr-coord-item input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.vr-coord-item:focus-within {
+  border-color: var(--accent);
+}
+
+/* Set button */
+.vr-btn-set {
+  flex-shrink: 0;
+  height: 28px;
+  padding: 0 10px;
+  font-size: 11px;
+}
+
+/* Group section tag badge variants */
+.tag-ocr-panel {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: #c4b5fd;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.tag-ocr-dialog {
+  background: rgba(59, 130, 246, 0.15);
+  color: #93c5fd;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+}
+.tag-ocr-config {
+  background: rgba(234, 179, 8, 0.15);
+  color: #fde047;
+  border: 1px solid rgba(234, 179, 8, 0.35);
+}
+.tag-ocr-stage {
+  background: rgba(16, 185, 129, 0.15);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
 .status-action { font-size: 18px; font-weight: 700; color: var(--text); }
 .status-row {
   display: flex; align-items: center; justify-content: space-between;

@@ -1221,6 +1221,10 @@
       inputs[1].value = ocrRegionRect.y;
       inputs[2].value = ocrRegionRect.w;
       inputs[3].value = ocrRegionRect.h;
+      const flag = row.querySelector(".vr-flag");
+      if (flag) {
+        flag.innerHTML = '<span class="ec-card-badge ec-card-badge--ok" data-tip="Your measurement, not the shipped box">edited</span>';
+      }
       // Save
       if (window.pywebview && pywebview.api) {
         pywebview.api.set_vision_region(ocrRegionKey, [ocrRegionRect.x, ocrRegionRect.y, ocrRegionRect.w, ocrRegionRect.h]);
@@ -1304,35 +1308,80 @@
       if (!g) { g = { key: s.group, label: s.groupLabel, where: s.groupWhere, rows: [] }; groups.push(g); }
       g.rows.push(s);
     });
-    list.innerHTML = groups.map(g => `
-      <div class="vr-group">
-        <div class="vr-group-head">
-          <span class="vr-group-title">${g.label}</span>
-          <span class="vr-group-note">${g.where}</span>
-          <button class="btn btn--sm" data-vr-preview-group="${g.key}" data-tip="Grab the game now and refresh every preview in this section.&#10;${g.where}">Preview</button>
-          <button class="btn btn--sm" data-vr-test-group="${g.key}" data-tip="Grab the game and OCR every box in this section.&#10;${g.where}">Test Section</button>
+    const groupMeta = {
+      challenge: { tag: "PANEL", tagClass: "tag-ocr-panel" },
+      teams: { tag: "DIALOG", tagClass: "tag-ocr-dialog" },
+      autoplay: { tag: "CONFIG", tagClass: "tag-ocr-config" },
+      match: { tag: "STAGE", tagClass: "tag-ocr-stage" },
+    };
+
+    list.innerHTML = groups.map(g => {
+      const meta = groupMeta[g.key] || { tag: "OCR", tagClass: "tag-ocr-panel" };
+      const editedCount = g.rows.filter(s => !!overrides[s.key]).length;
+
+      return `
+      <div class="card-gamemode-section vr-group" data-vr-group="${g.key}">
+        <div class="card-section-header">
+          <span class="card-section-tag ${meta.tagClass}">${meta.tag}</span>
+          <span class="card-section-label">${g.label}</span>
+          <span class="card-section-desc">${g.where}</span>
+          <div class="card-section-header-controls">
+            <button class="btn btn--sm" data-vr-preview-group="${g.key}" data-tip="Grab the game now and refresh every preview in this section.&#10;${g.where}">Preview</button>
+            <button class="btn btn--sm" data-vr-test-group="${g.key}" data-tip="Grab the game and OCR every box in this section.&#10;${g.where}">Test Section</button>
+            <span class="card-section-count" data-vr-group-count="${g.key}">${editedCount}/${g.rows.length} edited</span>
+          </div>
         </div>
-        ${g.rows.map(s => {
-          const val = overrides[s.key] || s.default;
-          const edited = !!overrides[s.key];
-          return `<div class="vision-region-row">
-            <span class="vr-label">${s.label}</span>
-            <span class="vr-flag">${edited
-              ? '<span class="vr-default vr-edited" data-tip="Your measurement, not the shipped box">edited</span>'
-              : '<span class="vr-default" data-tip="The shipped box — press Set to measure your own">default</span>'}</span>
-            <input type="number" value="${val[0]}" data-vr-key="${s.key}" data-vr-idx="0" data-tip="X">
-            <input type="number" value="${val[1]}" data-vr-key="${s.key}" data-vr-idx="1" data-tip="Y">
-            <input type="number" value="${val[2]}" data-vr-key="${s.key}" data-vr-idx="2" data-tip="Width">
-            <input type="number" value="${val[3]}" data-vr-key="${s.key}" data-vr-idx="3" data-tip="Height">
-            <button class="btn btn--sm" data-vr-set="${s.key}" data-tip="Draw this box on a screenshot">Set</button>
-            <span class="vr-thumb-cell">
-              <img class="vr-thumb" data-vr-thumb="${s.key}" alt="" hidden>
-              <span class="vr-nopreview" data-vr-none="${s.key}">no preview</span>
-            </span>
-            <span class="vr-read" data-vr-read="${s.key}"></span>
-          </div>`;
-        }).join("")}
-      </div>`).join("");
+        <div class="card-section-body">
+          <div class="card-section-hint">
+            Each section reads a different screen — put ${g.where} before you Set or Test it.
+          </div>
+          <div class="ocr-card-grid">
+            ${g.rows.map(s => {
+              const val = overrides[s.key] || s.default;
+              const edited = !!overrides[s.key];
+              return `
+              <div class="vision-region-row ec-card-row" data-vr-row="${s.key}">
+                <div class="vr-thumb-cell" data-tip="Preview crop">
+                  <img class="vr-thumb" data-vr-thumb="${s.key}" alt="" hidden>
+                  <span class="vr-nopreview" data-vr-none="${s.key}">no preview</span>
+                </div>
+                <div class="vr-card-info">
+                  <div class="vr-card-top">
+                    <span class="vr-card-name" title="${s.label}">${s.label}</span>
+                    <span class="vr-flag">${edited
+                      ? '<span class="ec-card-badge ec-card-badge--ok" data-tip="Your measurement, not the shipped box">edited</span>'
+                      : '<span class="ec-card-badge vr-badge--default" data-tip="The shipped box — press Set to measure your own">default</span>'}</span>
+                  </div>
+                  <div class="vr-card-read-row">
+                    <span class="vr-read-lbl">OCR:</span>
+                    <span class="vr-read" data-vr-read="${s.key}"></span>
+                  </div>
+                  <div class="vr-coords-bar">
+                    <label class="vr-coord-item" data-tip="X position">
+                      <span class="vr-coord-lbl">X</span>
+                      <input type="number" value="${val[0]}" data-vr-key="${s.key}" data-vr-idx="0">
+                    </label>
+                    <label class="vr-coord-item" data-tip="Y position">
+                      <span class="vr-coord-lbl">Y</span>
+                      <input type="number" value="${val[1]}" data-vr-key="${s.key}" data-vr-idx="1">
+                    </label>
+                    <label class="vr-coord-item" data-tip="Width">
+                      <span class="vr-coord-lbl">W</span>
+                      <input type="number" value="${val[2]}" data-vr-key="${s.key}" data-vr-idx="2">
+                    </label>
+                    <label class="vr-coord-item" data-tip="Height">
+                      <span class="vr-coord-lbl">H</span>
+                      <input type="number" value="${val[3]}" data-vr-key="${s.key}" data-vr-idx="3">
+                    </label>
+                  </div>
+                </div>
+                <button class="btn btn--sm vr-btn-set" data-vr-set="${s.key}" data-tip="Draw this box on a screenshot">Set</button>
+              </div>`;
+            }).join("")}
+          </div>
+        </div>
+      </div>`;
+    }).join("");
     Object.entries(previews).forEach(([key, uri]) => setRegionThumb(key, uri));
     list.querySelectorAll("[data-vr-preview-group]").forEach(btn => {
       btn.addEventListener("click", async () => {
@@ -1367,6 +1416,10 @@
         const box = [parseInt(inputs[0].value), parseInt(inputs[1].value), parseInt(inputs[2].value), parseInt(inputs[3].value)];
         pywebview.api.set_vision_region(key, box);
         saveRegionPreview(key, box);
+        const flag = row.querySelector(".vr-flag");
+        if (flag) {
+          flag.innerHTML = '<span class="ec-card-badge ec-card-badge--ok" data-tip="Your measurement, not the shipped box">edited</span>';
+        }
       });
     });
     // Set buttons — capture Roblox + draw region to set coords
@@ -2184,6 +2237,9 @@
     catButtons.forEach((btn) => btn.classList.toggle("active", btn.dataset.cat === cat));
     if (cat === "cards" || cat === "all") {
       loadEclipseCards();
+    }
+    if (cat === "debug" || cat === "all") {
+      loadVisionRegions();
     }
   }
 

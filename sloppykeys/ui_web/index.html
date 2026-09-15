@@ -502,7 +502,6 @@
         <button class="settings-nav-btn" data-cat="delays">Delays</button>
         <button class="settings-nav-btn" data-cat="webhook">Webhook</button>
         <button class="settings-nav-btn" data-cat="debug">Debug</button>
-        <button class="settings-nav-btn" data-cat="vision">OCR</button>
       </nav>
       <div class="settings-content" id="settings-content">
         <!-- General -->
@@ -666,6 +665,20 @@
             </div>
           </div>
 
+          <!-- OCR Regions -->
+          <div class="page-header" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+            <div>
+              <span class="page-title">OCR Regions</span>
+              <span class="page-subtitle" style="margin-top:2px; font-size:11px; color:var(--text-faint);">Crop boxes the macro reads text from, in 1152×756 client space</span>
+            </div>
+            <div>
+              <button class="btn btn--sm" id="btn-vision-reset">Reset to Defaults</button>
+            </div>
+          </div>
+          <div class="cards-container">
+            <div id="vision-regions-list" class="vision-regions"></div>
+          </div>
+
           <!-- Click points live here rather than under OCR Regions: they are coordinates
                measured against the game, not text the macro reads. -->
           <div class="page-header"><span class="page-title">Click Points</span></div>
@@ -678,22 +691,6 @@
               <div id="vision-points-list" class="vision-regions"></div>
             </div>
           </div>
-        </div>
-
-        <!-- Vision (OCR regions) -->
-        <div class="settings-category" data-cat="vision">
-          <div class="page-header"><span class="page-title">OCR Regions</span></div>
-          <div class="setting-group">
-            <div class="setting-row" style="flex-direction:column; align-items:flex-start; gap:6px;">
-              <div class="setting-info">
-                <span class="setting-name">Text Regions</span>
-                <span class="setting-desc">Crop boxes the macro reads text from, in 1152×756 client space. Each section reads a different screen — put that screen up in Roblox before you Set or Test it.</span>
-              </div>
-              <div id="vision-regions-list" class="vision-regions"></div>
-              <button class="btn btn--sm" id="btn-vision-reset">Reset to Defaults</button>
-            </div>
-          </div>
-
         </div>
       </div>
     </div>
