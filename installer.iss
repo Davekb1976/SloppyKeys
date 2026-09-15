@@ -115,6 +115,12 @@ Filename: "{app}\{#AppExe}"; Description: "Launch {#AppName}"; Flags: nowait pos
 ; silent-only counterpart of the line above, so exactly one instance comes back.
 Filename: "{app}\{#AppExe}"; Flags: nowait; Check: WizardSilent
 
+[InstallDelete]
+; Clean up retired event assets and default walk paths removed in newer versions
+Type: filesandordirs; Name: "{app}\assets\events\Villian Invasion"
+Type: filesandordirs; Name: "{app}\assets\reference\Events\Villian Invasion"
+Type: files; Name: "{app}\paths\defaults\Villian Invasion Act 1.json"
+
 [UninstallDelete]
 ; Written at runtime, so Inno doesn't know about them and would leave them behind. These
 ; are logs, not data — removed without asking.

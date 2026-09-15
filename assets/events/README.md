@@ -5,7 +5,7 @@ event is binning a folder:
 
 ```
 assets/events/<Event>/<Act>_<n>.png
-assets/events/Villian Invasion/Main_1.png
+assets/events/Sample Event/Main_1.png
 ```
 
 That layout is `nav_routes.step_image(map, act, index)`, and both name segments go through

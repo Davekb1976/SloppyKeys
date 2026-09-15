@@ -135,4 +135,29 @@ with tempfile.TemporaryDirectory() as root:
         handle.write("{not json")
     assert RouteStore(root).merge_shipped() == []
 
+# Retired routes purge (e.g. obsolete Villian Invasion)
+with tempfile.TemporaryDirectory() as root:
+    # Simulate old routes.json containing Villian Invasion
+    routes_path = os.path.join(root, ROUTES_FILE)
+    with open(routes_path, "w", encoding="utf-8") as handle:
+        json.dump({"Schema": 1, "Maps": {"Villian Invasion": {"Acts": ["Act 1"], "Routes": {}}, "Other Event": {"Acts": ["Act 1"], "Routes": {}}}}, handle)
+    # Simulate old asset folders and path files
+    fake_asset = os.path.join(root, "assets", "events", "Villian Invasion")
+    os.makedirs(fake_asset, exist_ok=True)
+    fake_ref = os.path.join(root, "assets", "reference", "Events", "Villian Invasion")
+    os.makedirs(fake_ref, exist_ok=True)
+    fake_path = os.path.join(root, "paths", "defaults")
+    os.makedirs(fake_path, exist_ok=True)
+    fake_path_file = os.path.join(fake_path, "Villian Invasion Act 1.json")
+    with open(fake_path_file, "w", encoding="utf-8") as handle:
+        handle.write("{}")
+
+    # Initializing RouteStore triggers _purge_retired
+    store = RouteStore(root)
+    assert "Villian Invasion" not in store.maps(), store.maps()
+    assert "Other Event" in store.maps(), store.maps()
+    assert not os.path.exists(fake_asset), "assets/events/Villian Invasion should be purged"
+    assert not os.path.exists(fake_ref), "assets/reference/Events/Villian Invasion should be purged"
+    assert not os.path.exists(fake_path_file), "Villian Invasion Act 1.json should be purged"
+
 print("shipped routes: OK")

@@ -32,6 +32,7 @@ path segments: `assets/events/<Event>/` for the step templates and
 from __future__ import annotations
 
 import os
+import shutil
 
 from sloppykeys.content.nav_images import events_templates_dir
 from sloppykeys.content.nav_route import NavStep
@@ -51,6 +52,7 @@ SHIPPED_FILE = "routes.default.json"
 SCHEMA_VERSION = 1
 DEFAULT_ACT = "Main"
 NAME_MAX = 40
+RETIRED_ROUTES = ("Villian Invasion", "Villain Invasion")
 
 
 def clean_name(value: str) -> str:
@@ -100,7 +102,39 @@ def _reimage(step: dict, old_map: str, new_map: str, old_act: str, new_act: str)
 
 class RouteStore:
     def __init__(self, app_root: str) -> None:
+        self._app_root = app_root
         self._path = os.path.join(app_root, ROUTES_FILE)
+        self._purge_retired()
+
+    def _purge_retired(self) -> None:
+        """Purge retired/obsolete shipped routes and assets from previous versions."""
+        if not os.path.isfile(self._path):
+            return
+        payload = read_json(self._path)
+        maps = payload.get("Maps")
+        if isinstance(maps, dict) and any(r in maps for r in RETIRED_ROUTES):
+            def mutate(d: dict) -> None:
+                m = d.get("Maps")
+                if isinstance(m, dict):
+                    for r in RETIRED_ROUTES:
+                        m.pop(r, None)
+                    d["Maps"] = m
+            update_json(self._path, mutate)
+
+        for r in RETIRED_ROUTES:
+            for sub in ("assets/events", "assets/reference/Events"):
+                folder = os.path.join(self._app_root, sub, r)
+                if os.path.isdir(folder):
+                    try:
+                        shutil.rmtree(folder)
+                    except OSError:
+                        pass
+            def_path = os.path.join(self._app_root, "paths", "defaults", f"{r} Act 1.json")
+            if os.path.isfile(def_path):
+                try:
+                    os.remove(def_path)
+                except OSError:
+                    pass
 
     # # Reads
     def _payload(self) -> dict:

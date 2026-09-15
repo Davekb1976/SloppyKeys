@@ -1625,7 +1625,7 @@ class Api:
     def get_map_image(self, category: str, name: str) -> dict:
         """Base64 data URI of a map image for the position picker.
 
-        `name` can carry separators — "Villian Invasion/Act 1" for a per-act backdrop — so
+        `name` can carry separators — "Sample Event/Act 1" for a per-act backdrop — so
         it goes through `_template_path`, which is what keeps a `..` in either argument from
         reading a PNG anywhere on disk. Both come from the page, so both are untrusted.
         """

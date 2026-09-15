@@ -283,6 +283,8 @@ def sanitize_task(task: dict) -> dict:
         task["search"] = ""
     if not (mode == "Story" and task.get("stage") == "Infinite"):
         task["leave_at_wave"] = 0
+    if task.get("map") in ("Villian Invasion", "Villain Invasion"):
+        task["map"] = ""
     if (mode in ("Events", "Story")) and (task.get("map") in EVENT_NAMES or task.get("stage") in EVENT_NAMES):
         if task.get("map") not in EVENT_NAMES:
             task["map"] = task.get("stage") or "Eclipse"
