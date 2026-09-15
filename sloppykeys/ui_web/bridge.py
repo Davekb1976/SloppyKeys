@@ -909,11 +909,21 @@ class Api:
     # screen the boxes live on, which is the one thing a tester has to get right before a
     # read means anything. Add a table here and the OCR tab grows a section for it.
     _REGION_GROUPS = (
-        ("challenge", "Challenge Panel", "the Challenge panel must be open"),
-        ("teams", "Unit Teams", "the Unit Teams dialog must be open"),
-        ("autoplay", "Autoplay Settings", "the Auto Play Settings panel must be open"),
-        ("match", "In Match", "a stage must be running"),
+        ("challenge", "Challenge Panel", "the Challenge panel must be open", ("challenge",)),
+        (
+            "in_game",
+            "In-Game Panels & Overlays",
+            "the relevant dialog, panel or match must be open",
+            ("teams", "autoplay", "match"),
+        ),
     )
+
+    _SUBGROUP_META = {
+        "teams": ("DIALOG", "tag-ocr-dialog", "the Unit Teams dialog must be open"),
+        "autoplay": ("CONFIG", "tag-ocr-config", "the Auto Play Settings panel must be open"),
+        "match": ("STAGE", "tag-ocr-stage", "a stage must be running"),
+        "challenge": ("PANEL", "tag-ocr-panel", "the Challenge panel must be open"),
+    }
 
     @staticmethod
     def _region_tables():
@@ -933,16 +943,24 @@ class Api:
         """Every editable OCR box, tagged with the group whose screen it belongs to."""
         tables = self._region_tables()
         out = []
-        for group, label, where in self._REGION_GROUPS:
-            for key, spec_label, default in tables[group].region_specs():
-                out.append({
-                    "key": key,
-                    "label": spec_label,
-                    "default": list(default),
-                    "group": group,
-                    "groupLabel": label,
-                    "groupWhere": where,
-                })
+        for group, label, where, table_keys in self._REGION_GROUPS:
+            for t_key in table_keys:
+                tag, tag_class, sub_where = self._SUBGROUP_META.get(
+                    t_key, ("OCR", "tag-ocr-panel", where)
+                )
+                for key, spec_label, default in tables[t_key].region_specs():
+                    out.append({
+                        "key": key,
+                        "label": spec_label,
+                        "default": list(default),
+                        "group": group,
+                        "groupLabel": label,
+                        "groupWhere": where,
+                        "subGroup": t_key,
+                        "subTag": tag,
+                        "subTagClass": tag_class,
+                        "subWhere": sub_where,
+                    })
         return out
 
     def get_vision_regions(self) -> dict:

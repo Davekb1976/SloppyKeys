@@ -1278,8 +1278,8 @@
     const snap = await pywebview.api.get_roblox_snapshot();
     if (!snap.ok) { window.addLog("[OCR] Recapture failed."); return; }
     ocrCachedSnapshot = snap.data_uri;
-    // The retake belongs to whichever group we're editing, not the one last captured.
-    ocrCachedGroup = (ocrRegionSpecs.find(s => s.key === ocrRegionKey) || {}).group || null;
+    const spec = ocrRegionSpecs.find(s => s.key === ocrRegionKey);
+    ocrCachedGroup = spec ? (spec.subGroup || spec.group) : null;
     openRegionPicker(ocrRegionKey, ocrCachedSnapshot);
   });
 
@@ -1364,6 +1364,7 @@
     });
     const groupMeta = {
       challenge: { tag: "PANEL", tagClass: "tag-ocr-panel" },
+      in_game: { tag: "OVERLAYS", tagClass: "tag-ocr-stage" },
       teams: { tag: "DIALOG", tagClass: "tag-ocr-dialog" },
       autoplay: { tag: "CONFIG", tagClass: "tag-ocr-config" },
       match: { tag: "STAGE", tagClass: "tag-ocr-stage" },
@@ -1393,6 +1394,9 @@
             ${g.rows.map(s => {
               const val = overrides[s.key] || s.default;
               const edited = !!overrides[s.key];
+              const subTagHtml = (s.subTag && g.key === "in_game")
+                ? `<span class="card-section-tag ${s.subTagClass}" style="font-size:8px; padding:1px 5px; margin-right:6px; flex-shrink:0;">${s.subTag}</span>`
+                : "";
               return `
               <div class="vision-region-row ec-card-row" data-vr-row="${s.key}">
                 <div class="vr-thumb-cell" data-tip="Click to enlarge preview">
@@ -1401,7 +1405,10 @@
                 </div>
                 <div class="vr-card-info">
                   <div class="vr-card-top">
-                    <span class="vr-card-name" title="${s.label}">${s.label}</span>
+                    <div style="display:flex; align-items:center; min-width:0; overflow:hidden;">
+                      ${subTagHtml}
+                      <span class="vr-card-name" title="${s.label} (${s.subWhere || s.groupWhere})">${s.label}</span>
+                    </div>
                     <span class="vr-flag">${edited
                       ? '<span class="ec-card-badge ec-card-badge--ok" data-tip="Your measurement, not the shipped box">edited</span>'
                       : '<span class="ec-card-badge vr-badge--default" data-tip="The shipped box — press Set to measure your own">default</span>'}</span>
@@ -1503,9 +1510,10 @@
       btn.addEventListener("click", async () => {
         if (!window.pywebview || !pywebview.api) return;
         const key = btn.dataset.vrSet;
-        const group = btn.closest(".vr-group")?.querySelector("[data-vr-test-group]")?.dataset.vrTestGroup || null;
+        const spec = ocrRegionSpecs.find(s => s.key === key);
+        const screenKey = spec ? (spec.subGroup || spec.group) : key;
         // Reuse the shot only if it was taken for this same screen.
-        if (ocrCachedSnapshot && ocrCachedGroup === group) {
+        if (ocrCachedSnapshot && ocrCachedGroup === screenKey) {
           openRegionPicker(key, ocrCachedSnapshot);
           return;
         }
@@ -1514,7 +1522,7 @@
         btn.textContent = "Set";
         if (!snap.ok) { window.addLog("[OCR] Capture failed — is Roblox running?"); return; }
         ocrCachedSnapshot = snap.data_uri;
-        ocrCachedGroup = group;
+        ocrCachedGroup = screenKey;
         openRegionPicker(key, ocrCachedSnapshot);
       });
     });
