@@ -916,6 +916,9 @@ class MacroController:
     def _ensure_autoplay_preset(self, task: dict | None = None) -> bool:
         """Select the in-match Autoplay preset if specified in task and not already active."""
         t = task or getattr(self, "_current_task", None) or {}
+        if t.get("mode") == "Expedition":
+            self._log("  Autoplay preset: skipped — Expedition mode has no in-game Auto Play feature.")
+            return True
         raw_preset = str(t.get("autoplay_preset") or "").strip()
         if not raw_preset:
             return True
@@ -1767,6 +1770,11 @@ class MacroController:
         template matched, so that click would be a fixed coordinate, and nothing would verify
         the toggle flipped.
         """
+        current_mode = (getattr(self, "_current_task", None) or {}).get("mode")
+        if current_mode == "Expedition":
+            self._log("    [block] autoplay: skipped — Expedition mode has no in-game Auto Play button")
+            return True
+
         if not hasattr(self, "_autoplay_state"):
             self._autoplay_state = {}
         state = self._autoplay_state.setdefault(id(block), {"clicks": 0, "next_look": 0.0})

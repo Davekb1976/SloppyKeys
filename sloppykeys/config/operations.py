@@ -37,7 +37,7 @@ def _resolve(app_root: str, name: str) -> str:
             try:
                 with open(path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                if data.get("name") == name:
+                if isinstance(data, dict) and data.get("name") == name:
                     return path
             except (OSError, json.JSONDecodeError):
                 continue
@@ -57,10 +57,35 @@ def list_operations(app_root: str) -> list[str]:
         try:
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            names.append(data.get("name") or fname[:-5])
+            name_val = data.get("name") if isinstance(data, dict) else None
+            names.append(name_val or fname[:-5])
         except (OSError, json.JSONDecodeError):
             names.append(fname[:-5])
     return sorted(set(names))
+
+
+def operation_has_autoplay(app_root: str, name: str) -> bool:
+    """Check whether a macro operation contains any autoplay block or is an auto play macro."""
+    clean = (name or "").strip()
+    if not clean:
+        return False
+    if clean.lower() in ("auto play", "autoplay"):
+        return True
+    data = load_operation(app_root, clean)
+    phases = data.get("phases", {})
+    if isinstance(phases, dict):
+        for blocks in phases.values():
+            if isinstance(blocks, list):
+                for b in blocks:
+                    if isinstance(b, dict) and b.get("type") == "autoplay":
+                        return True
+    return False
+
+
+def list_operations_with_autoplay(app_root: str) -> list[str]:
+    """Names of all saved operations that contain an autoplay block or autoplay name."""
+    ops = list_operations(app_root)
+    return [name for name in ops if operation_has_autoplay(app_root, name)]
 
 
 def load_operation(app_root: str, name: str) -> dict:
@@ -70,6 +95,8 @@ def load_operation(app_root: str, name: str) -> dict:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
     except (OSError, json.JSONDecodeError):
+        data = {}
+    if not isinstance(data, dict):
         data = {}
     phases = data.get("phases")
     if not isinstance(phases, dict):

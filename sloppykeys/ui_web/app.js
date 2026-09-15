@@ -454,6 +454,7 @@
   // for every card, not just the selected task, and it cannot change while the app runs — it
   // is derived from the `content/` tables.
   let modeFields = {};
+  let autoplayOperations = new Set();
 
   async function loadModeFields() {
     if (!window.pywebview || !pywebview.api) return;
@@ -536,6 +537,8 @@
           badge = `<span class="task-card-badge task-card-badge--warn" data-tip="${reason} — configure in Task Builder.">Incomplete</span>`;
         } else if (!t.macro) {
           badge = `<span class="task-card-badge task-card-badge--warn" data-tip="No macro operation assigned.&#10;Character will not walk and units will not be placed.">No Macro</span>`;
+        } else if (t.mode === "Expedition" && autoplayOperations.has(t.macro)) {
+          badge = `<span class="task-card-badge task-card-badge--warn" data-tip="Expedition has no in-game Auto Play feature.&#10;This macro contains Auto Play blocks.">No Autoplay</span>`;
         }
       }
       const sel = t.id === selectedTaskId ? " selected" : "";
@@ -557,10 +560,15 @@
   function updateMacroWarning() {
     const isChallenge = tbMode.value === "Challenge";
     const noMacro = !isChallenge && !tbMacro.value;
+    const isExpeditionAutoplay = !isChallenge && tbMode.value === "Expedition" && !!tbMacro.value && autoplayOperations.has(tbMacro.value);
     const warnEl = document.getElementById("tb-macro-warn");
     const tagEl = document.getElementById("tb-no-macro-tag");
+    const apWarnEl = document.getElementById("tb-macro-autoplay-warn");
+    const apTagEl = document.getElementById("tb-macro-autoplay-tag");
     if (warnEl) warnEl.style.display = noMacro ? "" : "none";
     if (tagEl) tagEl.style.display = noMacro ? "" : "none";
+    if (apWarnEl) apWarnEl.style.display = isExpeditionAutoplay ? "" : "none";
+    if (apTagEl) apTagEl.style.display = isExpeditionAutoplay ? "" : "none";
   }
 
   function updateQueueReadiness() {
@@ -604,6 +612,10 @@
           }
           if (!t.macro) {
             queueIssue = `Task ${i + 1}: No macro`;
+            break;
+          }
+          if (t.mode === "Expedition" && autoplayOperations.has(t.macro)) {
+            queueIssue = `Task ${i + 1}: Expedition has no Auto Play`;
             break;
           }
         }
@@ -876,6 +888,7 @@
     if (tbMacroRow) tbMacroRow.style.display = isChallenge ? "none" : "";
     document.getElementById("tb-challenge-fields").style.display = isChallenge ? "block" : "none";
     updateMacroWarning();
+    checkExpeditionAutoplayPopup(tbMacro.value);
     if (isChallenge) {
       updateLeaveWaveVisibility(tbMode.value, "");
       renderChallengeMapGrid();
@@ -911,8 +924,36 @@
   tbLeaveWave.addEventListener("change", saveCurrentTask);
   tbMacro.addEventListener("change", () => {
     updateMacroWarning();
+    checkExpeditionAutoplayPopup(tbMacro.value);
     saveCurrentTask();
   });
+
+  const expAutoplayModal = document.getElementById("expedition-autoplay-modal");
+  const expAutoplayClose = document.getElementById("expedition-autoplay-close");
+  const expAutoplayOk = document.getElementById("expedition-autoplay-ok");
+
+  function openExpeditionAutoplayModal(macroName) {
+    if (!expAutoplayModal) return;
+    setGameVisible(false);
+    const nameEl = document.getElementById("expedition-autoplay-macro-name");
+    if (nameEl) nameEl.textContent = `"${macroName}"`;
+    expAutoplayModal.style.display = "flex";
+  }
+
+  function closeExpeditionAutoplayModal() {
+    if (!expAutoplayModal) return;
+    expAutoplayModal.style.display = "none";
+    restoreGameIfDashboard();
+  }
+
+  if (expAutoplayClose) expAutoplayClose.addEventListener("click", closeExpeditionAutoplayModal);
+  if (expAutoplayOk) expAutoplayOk.addEventListener("click", closeExpeditionAutoplayModal);
+
+  function checkExpeditionAutoplayPopup(macroName) {
+    if (tbMode.value === "Expedition" && macroName && autoplayOperations.has(macroName)) {
+      openExpeditionAutoplayModal(macroName);
+    }
+  }
   // `change` fires on blur for a text input, which is the same contract every other row
   // here has — no keystroke-by-keystroke writes to settings.json.
   tbSearch.addEventListener("change", saveCurrentTask);
@@ -2223,6 +2264,10 @@
   async function loadOperationList() {
     if (!window.pywebview || !pywebview.api) return;
     const names = await pywebview.api.list_operations();
+    if (pywebview.api.get_operations_with_autoplay) {
+      const apNames = await pywebview.api.get_operations_with_autoplay();
+      autoplayOperations = new Set(apNames || []);
+    }
     opLoad.innerHTML = '<option value="">Load...</option>' + names.map((n) => `<option value="${n}">${n}</option>`).join("");
     // Also populate the task builder's macro dropdown
     const curTask = tasks.find((t) => t.id === selectedTaskId);

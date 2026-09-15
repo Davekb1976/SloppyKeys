@@ -1566,6 +1566,14 @@ class Api:
 
         return list_operations(self._app_root)
 
+    def get_operations_with_autoplay(self) -> list:
+        """Names of all macro operations that contain autoplay blocks."""
+        if not self._app_root:
+            return []
+        from sloppykeys.config.operations import list_operations_with_autoplay
+
+        return list_operations_with_autoplay(self._app_root)
+
     def load_operation(self, name: str) -> dict:
         """Load a macro operation by name."""
         if not self._app_root:
