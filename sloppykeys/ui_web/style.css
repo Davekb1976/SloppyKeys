@@ -517,11 +517,12 @@ input:focus, select:focus {
   color: var(--text-faint);
 }
 
-/* Coordinate inputs bar: 4-column equal grid for strict alignment across cards */
+/* Coordinate inputs bar: unified segmented strip for strict alignment across cards */
 .vr-coords-bar {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 4px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
   width: 100%;
   box-sizing: border-box;
 }
@@ -529,12 +530,14 @@ input:focus, select:focus {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: var(--surface-sunken);
-  border: 1px solid var(--border);
-  padding: 1px 4px;
-  transition: border-color 0.12s;
+  padding: 1px 5px;
+  border-right: 1px solid var(--border);
+  transition: background 0.12s;
   cursor: text;
   box-sizing: border-box;
+}
+.vr-coord-item:last-child {
+  border-right: none;
 }
 .vr-coord-lbl {
   font-size: 9px;
@@ -565,8 +568,9 @@ input:focus, select:focus {
   margin: 0;
 }
 .vr-coord-item:focus-within {
-  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface-sunken));
 }
+
 
 /* Set button */
 .vr-btn-set {
@@ -647,10 +651,7 @@ input:focus, select:focus {
 .vp-point-coords {
   display: flex;
   align-items: center;
-  gap: 4px;
-  background: var(--surface-sunken);
-  border: 1px solid var(--border);
-  padding: 2px 6px;
+  gap: 6px;
   font-family: var(--font-mono);
   font-size: 10px;
   color: var(--text);

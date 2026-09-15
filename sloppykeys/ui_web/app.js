@@ -1423,7 +1423,7 @@
                     </div>
                     <span class="vr-flag">${edited
                       ? '<span class="ec-card-badge ec-card-badge--ok" data-tip="Your measurement, not the shipped box">edited</span>'
-                      : '<span class="ec-card-badge vr-badge--default" data-tip="The shipped box — press Set to measure your own">default</span>'}</span>
+                      : ''}</span>
                   </div>
                   <div class="vr-card-read-row">
                     <span class="vr-read-lbl">OCR:</span>
@@ -1591,7 +1591,7 @@
             <div class="vp-point-card${p.edited ? " on" : ""}">
               <div class="vp-point-info">
                 <span class="vp-point-name" title="${p.label}">${p.label}</span>
-                <span class="ec-card-badge ${p.edited ? "ec-card-badge--ok" : "vr-badge--default"}">${p.edited ? "Measured" : "Default"}</span>
+                ${p.edited ? '<span class="ec-card-badge ec-card-badge--ok">Measured</span>' : ''}
               </div>
               <div class="vp-point-coords" title="Screen coordinates (X, Y)">
                 <span class="vp-coord-axis">X:</span><span class="vp-coord-val">${p.x}</span>
@@ -2843,7 +2843,7 @@
         : `<span class="ec-card-thumb-placeholder">🎴</span>`;
       const badgeHtml = c.missing
         ? `<span class="ec-card-badge ec-card-badge--warn">Missing Template</span>`
-        : `<span class="ec-card-badge ec-card-badge--ok">Active</span>`;
+        : "";
 
       return `
         <div class="ec-card-row${isOff ? " disabled" : ""}" data-idx="${idx}" draggable="true">
