@@ -1771,3 +1771,122 @@ button.vp-chip { cursor: pointer; }
   pointer-events: none;
   box-sizing: border-box;
 }
+
+/* ---- About Settings Category ---- */
+.about-prose {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.about-p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.about-p strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.about-p code,
+.about-mono {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--surface-panel);
+  border: 1px solid var(--border);
+  padding: 1px 5px;
+  color: var(--text);
+}
+
+.about-callout {
+  padding: 10px 14px;
+  background: var(--surface-panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-sizing: border-box;
+}
+
+.about-callout--warn {
+  border-left-color: var(--amber);
+  background: color-mix(in srgb, var(--amber) 5%, var(--surface-panel));
+  border-color: color-mix(in srgb, var(--amber) 30%, var(--border));
+}
+
+.about-callout-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.about-callout--warn .about-callout-title {
+  color: var(--amber);
+}
+
+.about-list {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.about-list li strong {
+  color: var(--text);
+}
+
+.about-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.about-badge {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-faint);
+  background: var(--surface-panel);
+  border: 1px solid var(--border);
+  padding: 3px 8px;
+}
+.about-badge strong {
+  color: var(--text-muted);
+}
+
+.tag-about-arch {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: #c4b5fd;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.tag-about-warning {
+  background: color-mix(in srgb, var(--amber) 18%, transparent);
+  color: var(--amber);
+  border: 1px solid color-mix(in srgb, var(--amber) 40%, transparent);
+}
+
+.tag-about-legal {
+  background: color-mix(in srgb, var(--teal) 18%, transparent);
+  color: #6ee7b7;
+  border: 1px solid color-mix(in srgb, var(--teal) 40%, transparent);
+}
+
+.tag-about-oss {
+  background: var(--surface-raised);
+  color: var(--text-muted);
+  border: 1px solid var(--border-strong);
+}
+

@@ -502,6 +502,7 @@
         <button class="settings-nav-btn" data-cat="delays">Delays</button>
         <button class="settings-nav-btn" data-cat="webhook">Webhook</button>
         <button class="settings-nav-btn" data-cat="debug">Debug</button>
+        <button class="settings-nav-btn" data-cat="about">About</button>
       </nav>
       <div class="settings-content" id="settings-content">
         <!-- General -->
@@ -688,6 +689,125 @@
           </div>
           <div class="cards-container">
             <div id="vision-points-list" class="vision-regions"></div>
+          </div>
+        </div>
+
+        <!-- About -->
+        <div class="settings-category" data-cat="about">
+          <div class="page-header" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+            <div>
+              <span class="page-title">About SloppyKeys</span>
+              <span class="page-subtitle" style="margin-top:2px; font-size:11px; color:var(--text-faint);">Project information, architecture, and legal disclaimers</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="card-section-count" id="about-version-badge">v1.1.6</span>
+              <button class="btn btn--sm" id="btn-about-github">View GitHub</button>
+            </div>
+          </div>
+
+          <div class="cards-container">
+            <!-- Overview & Architecture -->
+            <div class="card-gamemode-section">
+              <div class="card-section-header">
+                <span class="card-section-tag tag-about-arch">System</span>
+                <span class="card-section-label">Overview & Architecture</span>
+                <span class="card-section-desc">External desktop companion for Anime Expedition</span>
+              </div>
+              <div class="card-section-body about-prose">
+                <p class="about-p">
+                  <strong>SloppyKeys</strong> is an open-source desktop automation companion built specifically for the Roblox game <em>Anime Expedition</em>. It automates lobby navigation, stage selection, unit placement, challenge scanning, card upgrade priorities, and failure recovery.
+                </p>
+                <div class="about-callout">
+                  <div class="about-callout-title">Architecture & The Ban Surface Boundary</div>
+                  <p class="about-p">
+                    SloppyKeys operates entirely from the outside using <strong>pure external screen capture</strong> (MSS and OpenCV pattern matching) and sends ordinary Windows input through <strong>AutoHotkey v2</strong>.
+                  </p>
+                  <ul class="about-list">
+                    <li><strong>No Code or DLL Injection:</strong> Never loads, injects, or executes code inside the Roblox client process.</li>
+                    <li><strong>No Memory Reading or Writing:</strong> Never inspects or tampers with Roblox process memory or virtual address space.</li>
+                    <li><strong>No System Hooks or Detours:</strong> Never intercepts Windows API calls, network sockets, or Direct3D pipelines.</li>
+                    <li><strong>No Account Credential Access:</strong> Never reads, stores, or accesses cookies (including <code>.ROBLOSECURITY</code>), authentication tokens, or web session data.</li>
+                  </ul>
+                </div>
+                <div class="about-badges">
+                  <span class="about-badge"><strong>Platform:</strong> Windows 10/11</span>
+                  <span class="about-badge"><strong>Python:</strong> 3.14 + pywebview (WebView2)</span>
+                  <span class="about-badge"><strong>Input Engine:</strong> AutoHotkey v2</span>
+                  <span class="about-badge"><strong>Vision:</strong> OpenCV + MSS</span>
+                  <span class="about-badge"><strong>Text Engine:</strong> RapidOCR</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Terms of Service & Account Risk -->
+            <div class="card-gamemode-section">
+              <div class="card-section-header">
+                <span class="card-section-tag tag-about-warning">Warning</span>
+                <span class="card-section-label">Roblox Terms of Service & Account Risk</span>
+                <span class="card-section-desc">Automation policies, developer enforcement, and user responsibility</span>
+              </div>
+              <div class="card-section-body about-prose">
+                <div class="about-callout about-callout--warn">
+                  <div class="about-callout-title">&#9888; Macroing & Automation Policy Notice</div>
+                  <p class="about-p">
+                    <strong>Is macroing allowed on Roblox?</strong> No. Under <strong>Section 6(b) of the Roblox Terms of Use</strong> and the <strong>Roblox Community Standards</strong>, using cheats, automation software, bots, hacks, or any unauthorized third-party software designed to modify or automate the platform experience, farm rewards or currencies, or bypass inactivity/idle (AFK) disconnect timers is explicitly prohibited.
+                  </p>
+                  <p class="about-p">
+                    <strong>Developer Enforcement:</strong> In addition to Roblox platform moderation, the game developers of <em>Anime Expedition</em> (<strong>Expeditions Entertainment</strong>) have full authority and discretion to monitor gameplay and enforce experience-specific penalties. This may include progress rollbacks, stat wipes, or temporary and permanent game bans if automation or unattended play is suspected.
+                  </p>
+                </div>
+                <p class="about-p">
+                  <strong>Assumption of Risk:</strong> While SloppyKeys runs purely as an external program without memory hooks or injection, no macro or automation tool is guaranteed undetectable. Behavioral pattern detection, telemetry analysis, or server-side checks can result in enforcement action against your Roblox account.
+                </p>
+                <p class="about-p">
+                  <strong>Disclaimer of Liability:</strong> SloppyKeys is provided "as is", without warranty of any kind, express or implied. By using this software, you acknowledge and agree that you do so entirely at your own risk. The developers, contributors, and maintainers of SloppyKeys accept no liability or responsibility for any account warnings, suspensions, rollbacks, bans, or other punitive measures taken against your account by Roblox Corporation or Expeditions Entertainment.
+                </p>
+              </div>
+            </div>
+
+            <!-- Non-Affiliation Notice -->
+            <div class="card-gamemode-section">
+              <div class="card-section-header">
+                <span class="card-section-tag tag-about-legal">Legal</span>
+                <span class="card-section-label">Non-Affiliation Notice</span>
+                <span class="card-section-desc">Independent open-source community software</span>
+              </div>
+              <div class="card-section-body about-prose">
+                <p class="about-p">
+                  <strong>SloppyKeys is an independent open-source project.</strong> This software is <strong>not affiliated with, associated with, authorized by, endorsed by, sponsored by, or in any way officially connected</strong> with <strong>Roblox Corporation</strong>, <strong>Expeditions Entertainment</strong>, or any of their parent companies, subsidiaries, or affiliates.
+                </p>
+                <p class="about-p">
+                  The official Roblox website is located at <span class="about-mono">https://www.roblox.com</span>. The names <em>Roblox</em>, <em>Anime Expedition</em>, and <em>Expeditions Entertainment</em>, as well as related names, marks, logos, and images, are registered trademarks and property of their respective trademark holders.
+                </p>
+                <p class="about-p">
+                  Any reference to trademarked names, game titles, or intellectual property is strictly for identification, reference, and informational purposes under nominative fair use and does not imply any endorsement, sponsorship, or association.
+                </p>
+              </div>
+            </div>
+
+            <!-- License & Privacy -->
+            <div class="card-gamemode-section">
+              <div class="card-section-header">
+                <span class="card-section-tag tag-about-oss">Open Source</span>
+                <span class="card-section-label">License & Privacy</span>
+                <span class="card-section-desc">MIT License and zero-telemetry guarantee</span>
+              </div>
+              <div class="card-section-body about-prose">
+                <p class="about-p">
+                  <strong>Free & Open Source:</strong> SloppyKeys is published under the <strong>MIT License</strong>. The full source code is public and open for audit, contribution, and inspection on GitHub.
+                </p>
+                <p class="about-p">
+                  <strong>Strict Privacy Guarantee:</strong> SloppyKeys contains zero telemetry, zero analytics tracking, zero fingerprinting, and zero advertising. The only outbound network requests ever initiated are:
+                </p>
+                <ul class="about-list">
+                  <li><strong>Discord Webhook:</strong> Sends match statistics and notifications exclusively to the user's custom webhook URL, when enabled.</li>
+                  <li><strong>GitHub Release Check:</strong> Checks for software updates once at startup against the official GitHub releases API, when enabled.</li>
+                </ul>
+                <p class="about-p" style="margin-top: 2px;">
+                  Both network destinations are strictly host-allowlisted in code. Private server links and webhook credentials remain stored locally on your machine in <code>settings.json</code> and are never transmitted elsewhere.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </div>

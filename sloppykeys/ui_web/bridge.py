@@ -69,6 +69,7 @@ from sloppykeys.config.settings import (
 from sloppykeys.config.unified import UnifiedSettings
 from sloppykeys.core.updates import (
     RELEASES_URL,
+    REPO_URL,
     Release,
     clear_downloads,
     download,
@@ -678,6 +679,14 @@ class Api:
             os.startfile(release.page_url if release else RELEASES_URL)
         except OSError as exc:
             return {"ok": False, "reason": f"Failed to open the release page: {exc}"}
+        return {"ok": True}
+
+    def open_github(self) -> dict:
+        """Open the GitHub repository in the default browser."""
+        try:
+            os.startfile(REPO_URL)
+        except OSError as exc:
+            return {"ok": False, "reason": f"Failed to open GitHub: {exc}"}
         return {"ok": True}
 
     def _push_js(self, handler: str, payload) -> None:
@@ -2761,6 +2770,8 @@ def main() -> None:
         window.evaluate_js(
             'document.getElementById("version-badge").textContent = '
             f'"v{api.get_version()}";'
+            'var ab = document.getElementById("about-version-badge"); '
+            f'if (ab) ab.textContent = "v{api.get_version()}";'
         )
         # Signal JS that the backend is ready (app_root set, controller built).
         window.evaluate_js("window.onBackendReady && window.onBackendReady();")

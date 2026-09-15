@@ -4179,4 +4179,14 @@
       }
     });
   }
+
+  // Open GitHub repository from About tab
+  const btnAboutGithub = document.getElementById("btn-about-github");
+  if (btnAboutGithub) {
+    btnAboutGithub.addEventListener("click", () => {
+      if (window.pywebview && pywebview.api && pywebview.api.open_github) {
+        pywebview.api.open_github();
+      }
+    });
+  }
 })();
