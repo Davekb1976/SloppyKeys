@@ -93,7 +93,14 @@ from sloppykeys.core.image_search import (
 
 from sloppykeys.config.keybinds import sanitize_search_text
 
-from .input_scripts import move_script, nudge_click_script, scroll_script, type_text_script
+from .input_scripts import (
+    SPREAD_TIGHT,
+    SPREAD_WIDE,
+    move_script,
+    nudge_click_script,
+    scroll_script,
+    type_text_script,
+)
 
 # screen-rect provider -> (x, y, w, h) of the Roblox client area, or None.
 RectProvider = Callable[[], "tuple[int, int, int, int] | None"]
@@ -831,6 +838,7 @@ class LobbyNavigator:
         button: str = "left",
         count: int = 1,
         park: bool = True,
+        spread: int = SPREAD_WIDE,
     ) -> tuple[bool, str]:
         if not self._ahk.available():
             return (False, "AutoHotkey v2 not found")
@@ -845,6 +853,7 @@ class LobbyNavigator:
                 rect[1] + coord[1],
                 button=button,
                 count=count,
+                spread=spread,
                 # Park from the rect we already have rather than re-reading it.
                 park=park_point,
             ),
@@ -1524,17 +1533,18 @@ class LobbyNavigator:
         if rect is None:
             return (False, "Roblox not found")
         # Click without parking: moving the cursor to (8, 8) right after clicking can break
-        # or cancel text box focus in Roblox.
-        ok, message = self._click_client(rect, field, park=False)
+        # or cancel text box focus in Roblox. Use tight spread to stay inside the box.
+        ok, message = self._click_client(rect, field, park=False, spread=SPREAD_TIGHT)
         if not ok:
             return (False, f"search field click failed: {message}")
         if not self._ahk.available():
             return (False, "AutoHotkey v2 not found")
-        # Settle to ensure the field has acquired focus, then clear existing text, type,
-        # and press Enter to commit the search filter and release focus.
+        # Settle to ensure the field has acquired focus, then clear existing text and type.
+        # Deliberately enter=False: pressing Enter in a dialog commits the modal's default action,
+        # which activates whatever portal was preselected before slot 1 is clicked.
         time.sleep(self.click_settle)
         ok, message = self._ahk.run(
-            type_text_script(wanted, clear=True, enter=True),
+            type_text_script(wanted, clear=True, enter=False),
             wait=True,
             timeout=10.0 + len(wanted) * 0.1,
         )
@@ -1564,20 +1574,25 @@ class LobbyNavigator:
         rect = self._rect()
         if rect is None:
             return (False, f"{trail}, then Roblox went away")
-        # The grid needs a moment to filter down to the typed name before the tile at slot 1 is
-        # the portal that was asked for. Same reasoning as `fade_wait` on an arriving control:
+        # The grid needs time to filter and render down to the typed name before the tile at slot 1
+        # is the portal that was asked for. Same reasoning as `fade_wait` on an arriving control:
         # no threshold can see a list mid-refilter, and clicking early takes whatever was there.
-        time.sleep(self.panel_fade_wait)
-        ok, message = self._click_client(rect, coord)
+        time.sleep(max(1.0, self.panel_fade_wait))
+        # Click slot 1 with SPREAD_TIGHT and park=False so we don't scroll/drag the ScrollingFrame
+        # or cancel the tile click with a retreat.
+        ok, message = self._click_client(rect, coord, park=False, spread=SPREAD_TIGHT)
         if not ok:
             return (False, f"{trail}, but the result slot click failed: {message}")
         trail += " → slot 1"
+
+        # Give the game client state a moment to process the tile selection and update the
+        # detail panel before confirming.
+        time.sleep(max(0.6, self.click_settle))
 
         ok, message = self._find_click(
             confirm_path,
             confirm_label,
             timeout=self.search_timeout,
-            fade_wait=self.panel_fade_wait,
         )
         if not ok:
             return (False, f"{trail}, but {message}")
