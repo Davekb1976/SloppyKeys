@@ -695,9 +695,12 @@
         <!-- About -->
         <div class="settings-category" data-cat="about">
           <div class="page-header" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
-            <div>
-              <span class="page-title">About SloppyKeys</span>
-              <span class="page-subtitle" style="margin-top:2px; font-size:11px; color:var(--text-faint);">Overview, policies, and legal disclaimers</span>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <img src="logo.png" alt="SloppyKeys" class="about-logo">
+              <div>
+                <span class="page-title">About SloppyKeys</span>
+                <span class="page-subtitle" style="margin-top:2px; font-size:11px; color:var(--text-faint);">Overview, policies, and legal disclaimers</span>
+              </div>
             </div>
             <div style="display:flex; align-items:center; gap:8px;">
               <span class="card-section-count" id="about-version-badge">v1.1.6</span>
@@ -757,17 +760,23 @@
               </div>
             </div>
 
-            <!-- License & Privacy -->
+            <!-- License & Credits -->
             <div class="card-gamemode-section">
               <div class="card-section-header">
-                <span class="card-section-tag tag-about-oss">Open Source</span>
-                <span class="card-section-label">License & Privacy</span>
-                <span class="card-section-desc">MIT License and zero telemetry</span>
+                <span class="card-section-tag tag-about-oss">Credits</span>
+                <span class="card-section-label">License & Acknowledgements</span>
+                <span class="card-section-desc">MIT open source attribution and prior art</span>
               </div>
               <div class="card-section-body about-prose">
                 <p class="about-p">
                   Free and open source under the <strong>MIT License</strong>. Zero telemetry, tracking, or ads. Outbound network traffic is limited strictly to your own Discord webhook and GitHub update checks.
                 </p>
+                <div class="about-callout">
+                  <div class="about-callout-title">Acknowledgements & Prior Art</div>
+                  <p class="about-p">
+                    Credit and thanks to <strong>Cweamy</strong> (<em>Anime-Expeditions-Creams-Macro</em>, MIT), whose prior open-source macro established several features adapted here—such as the task queue, walk path recordings, and match block plans. SloppyKeys implements these capabilities through its own independent architecture (external AutoHotkey v2 input, topmost window follow, and offline RapidOCR).
+                  </p>
+                </div>
               </div>
             </div>
           </div>

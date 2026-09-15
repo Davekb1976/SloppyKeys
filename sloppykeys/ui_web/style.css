@@ -1773,6 +1773,16 @@ button.vp-chip { cursor: pointer; }
 }
 
 /* ---- About Settings Category ---- */
+.about-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  background: var(--surface-panel);
+  flex-shrink: 0;
+}
+
 .about-prose {
   display: flex;
   flex-direction: column;
