@@ -900,7 +900,6 @@
     if (tbMacroRow) tbMacroRow.style.display = isChallenge ? "none" : "";
     document.getElementById("tb-challenge-fields").style.display = isChallenge ? "block" : "none";
     updateMacroWarning();
-    checkExpeditionAutoplayPopup(tbMacro.value);
     if (isChallenge) {
       updateLeaveWaveVisibility(tbMode.value, "");
       renderChallengeMapGrid();
@@ -936,41 +935,8 @@
   tbLeaveWave.addEventListener("change", saveCurrentTask);
   tbMacro.addEventListener("change", () => {
     updateMacroWarning();
-    checkExpeditionAutoplayPopup(tbMacro.value);
     saveCurrentTask();
   });
-
-  const expAutoplayModal = document.getElementById("expedition-autoplay-modal");
-  const expAutoplayClose = document.getElementById("expedition-autoplay-close");
-  const expAutoplayOk = document.getElementById("expedition-autoplay-ok");
-
-  function openExpeditionAutoplayModal(macroName) {
-    if (!expAutoplayModal) return;
-    setGameVisible(false);
-    const nameEl = document.getElementById("expedition-autoplay-macro-name");
-    if (nameEl) nameEl.textContent = `"${macroName}"`;
-    expAutoplayModal.style.display = "flex";
-  }
-
-  function closeExpeditionAutoplayModal() {
-    if (!expAutoplayModal) return;
-    expAutoplayModal.style.display = "none";
-    restoreGameIfDashboard();
-  }
-
-  if (expAutoplayClose) expAutoplayClose.addEventListener("click", closeExpeditionAutoplayModal);
-  if (expAutoplayOk) expAutoplayOk.addEventListener("click", closeExpeditionAutoplayModal);
-  if (expAutoplayModal) {
-    expAutoplayModal.addEventListener("click", (e) => {
-      if (e.target === expAutoplayModal) closeExpeditionAutoplayModal();
-    });
-  }
-
-  function checkExpeditionAutoplayPopup(macroName) {
-    if (tbMode.value === "Expedition" && macroName && autoplayOperations.has(macroName)) {
-      openExpeditionAutoplayModal(macroName);
-    }
-  }
   // `change` fires on blur for a text input, which is the same contract every other row
   // here has — no keystroke-by-keystroke writes to settings.json.
   tbSearch.addEventListener("change", saveCurrentTask);

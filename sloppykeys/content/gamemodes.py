@@ -357,6 +357,10 @@ def validate_task(task: dict, app_root: Path | str | None = None) -> str | None:
         op_path = Path(app_root) / "operations" / f"{macro_name}.json"
         if not op_path.is_file():
             return f"macro operation '{macro_name}' not found"
+        if mode == "Expedition":
+            from sloppykeys.config.operations import operation_has_autoplay
+            if operation_has_autoplay(str(app_root), macro_name):
+                return "Expedition has no in-game Auto Play — choose a manual macro"
 
     return None
 

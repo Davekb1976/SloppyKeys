@@ -96,7 +96,36 @@ def test_controller_skips_in_expedition() -> None:
     print("OK: test_controller_skips_in_expedition")
 
 
+def test_validate_task_rejects_expedition_autoplay() -> None:
+    from sloppykeys.content.gamemodes import validate_task
+    tmp_dir = tempfile.mkdtemp()
+    try:
+        ops_dir = os.path.join(tmp_dir, "operations")
+        os.makedirs(ops_dir, exist_ok=True)
+        with open(os.path.join(ops_dir, "op_ap.json"), "w") as f:
+            json.dump({"name": "op_ap", "phases": {"battle": [{"type": "autoplay"}]}}, f)
+        with open(os.path.join(ops_dir, "op_manual.json"), "w") as f:
+            json.dump({"name": "op_manual", "phases": {"battle": []}}, f)
+
+        # Autoplay macro on Expedition -> rejected
+        err = validate_task({"mode": "Expedition", "map": "School Grounds", "macro": "op_ap"}, app_root=tmp_dir)
+        assert err == "Expedition has no in-game Auto Play — choose a manual macro", f"Got: {err}"
+
+        # Manual macro on Expedition -> allowed
+        err_manual = validate_task({"mode": "Expedition", "map": "School Grounds", "macro": "op_manual"}, app_root=tmp_dir)
+        assert err_manual is None, f"Got: {err_manual}"
+
+        # Autoplay macro on Story -> allowed
+        err_story = validate_task({"mode": "Story", "map": "School Grounds", "stage": "Act 1", "macro": "op_ap"}, app_root=tmp_dir)
+        assert err_story is None, f"Got: {err_story}"
+
+        print("OK: test_validate_task_rejects_expedition_autoplay")
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
 if __name__ == "__main__":
     test_operation_autoplay_detection()
     test_controller_skips_in_expedition()
+    test_validate_task_rejects_expedition_autoplay()
     print("ALL EXPEDITION AUTOPLAY CHECKS PASSED")
