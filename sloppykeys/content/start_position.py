@@ -98,11 +98,6 @@ PRESETS: dict[str, list[tuple[str, int]]] = {
     "Raid/Spirit City/Act 2": [("s", 1000), ("d", 1000), ("s", 1000)],
     # Act 3 is straight to the right of the spawn.
     "Raid/Spirit City/Act 3": [("d", 2500)],
-    # Villian Invasion drops you short of the placement points: 2s forward. Promoted from
-    # the user's `settings.json` override into a preset so a fresh install walks correctly
-    # without anyone re-measuring it. An Events preset is only stable while the event is in
-    # rotation — when it rotates out, this key stops matching anything and costs nothing.
-    "Events/Villian Invasion/Act 1": [("w", 2000)],
 }
 
 

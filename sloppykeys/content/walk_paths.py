@@ -23,10 +23,6 @@ DEFAULT_WALK_PATHS: dict[str, str] = {
     "Raid/Spirit City/Act 2": "Spirit City Act 2",
     # Act 3 is straight to the right of the spawn.
     "Raid/Spirit City/Act 3": "Spirit City Act 3",
-    # Villian Invasion drops you short of the placement points: forward for 2s. Only stable
-    # while the event is in rotation — when it rotates out the key stops matching and costs
-    # nothing.
-    "Events/Villian Invasion/Act 1": "Villian Invasion Act 1",
     # East Town spawns right of the placement points: back once, then left five times. Keyed
     # at map level because Story's acts share one playfield (no `per_act_reference`), so every
     # act including Infinite and Mastery walks the same route. Expedition's East Town is a
