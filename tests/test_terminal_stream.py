@@ -26,17 +26,23 @@ def test_terminal_buffer_append_and_get():
     assert e3["id"] == 3
     assert e3["is_err"]  # Keyword detection
 
+    # RapidOCR [INFO] logging to stderr should NOT be marked as error and ANSI codes stripped
+    e4 = buf.append("\x1b[32m[INFO] Using engine_name: onnxruntime\x1b[0m", stream="stderr")
+    assert e4["id"] == 4
+    assert e4["text"] == "[INFO] Using engine_name: onnxruntime"
+    assert not e4["is_err"]
+
     # Test get_lines
     res = buf.get_lines(after_id=0)
     assert res["ok"]
-    assert len(res["lines"]) == 3
-    assert res["latest_id"] == 3
-    assert res["total"] == 3
+    assert len(res["lines"]) == 4
+    assert res["latest_id"] == 4
+    assert res["total"] == 4
 
     # Test delta get_lines
-    delta = buf.get_lines(after_id=2)
+    delta = buf.get_lines(after_id=3)
     assert len(delta["lines"]) == 1
-    assert delta["lines"][0]["id"] == 3
+    assert delta["lines"][0]["id"] == 4
 
 
 def test_terminal_buffer_bounding():

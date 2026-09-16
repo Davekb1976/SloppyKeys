@@ -11,12 +11,15 @@ from __future__ import annotations
 import collections
 from datetime import datetime
 import io
+import re
 import sys
 import threading
 from typing import Any
 
 MAX_TERMINAL_LINES = 1000
 
+_ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
+_INFO_KEYWORDS = ("[info]", "[debug]", "[notice]")
 _ERROR_KEYWORDS = (
     "error",
     "exception",
@@ -40,13 +43,16 @@ class TerminalBuffer:
 
     def append(self, text: str, stream: str = "stdout", is_err: bool | None = None) -> dict[str, Any]:
         """Record one line of text."""
-        clean = text.rstrip("\r\n")
+        clean = _ANSI_ESCAPE.sub("", text).rstrip("\r\n")
         if not clean:
             return {}
 
         if is_err is None:
             lower = clean.lower()
-            is_err = (stream == "stderr") or any(kw in lower for kw in _ERROR_KEYWORDS)
+            if any(kw in lower for kw in _INFO_KEYWORDS):
+                is_err = False
+            else:
+                is_err = (stream == "stderr") or any(kw in lower for kw in _ERROR_KEYWORDS)
 
         now = datetime.now().strftime("%H:%M:%S")
         with self._lock:
