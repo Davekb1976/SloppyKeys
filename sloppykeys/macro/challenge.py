@@ -393,21 +393,17 @@ class ChallengeTracker:
         run of each of the three per rotation, so replaying it instead of moving to the
         next row is a wasted run either way. Cleared by `note_time` when the maps change.
 
-        When `spent` is True (the match was entered and completed), decrements the shared
-        daily allowance across all slots and flags the played slot exhausted for this rotation
-        so the UI reflects the result immediately without waiting for the next scan.
+        When `spent` is True (the match was entered and completed), decrements this slot's
+        daily allowance and flags it exhausted for this rotation so the UI reflects the
+        result immediately without waiting for the next scan.
         """
         self._skipped.add(int(slot))
         read = self.reads.get(int(slot))
         if read is not None:
             read.played = True
             read.state = STATE_EXHAUSTED
-        if spent:
-            for r in self.reads.values():
-                if r.runs_remaining is not None and r.runs_remaining > 0:
-                    r.runs_remaining -= 1
-                    if r.runs_remaining == 0:
-                        r.state = STATE_EXHAUSTED
+            if spent and read.runs_remaining is not None and read.runs_remaining > 0:
+                read.runs_remaining -= 1
 
     def is_skipped(self, slot: int) -> bool:
         return slot in self._skipped
