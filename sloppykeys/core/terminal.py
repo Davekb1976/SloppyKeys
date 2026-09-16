@@ -51,6 +51,8 @@ class TerminalBuffer:
             lower = clean.lower()
             if any(kw in lower for kw in _INFO_KEYWORDS):
                 is_err = False
+                if stream == "stderr":
+                    stream = "info"
             else:
                 is_err = (stream == "stderr") or any(kw in lower for kw in _ERROR_KEYWORDS)
 

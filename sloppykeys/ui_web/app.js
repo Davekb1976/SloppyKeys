@@ -1633,20 +1633,30 @@
 
     const frag = document.createDocumentFragment();
     for (const l of lines) {
+      const isInfo = l.stream === "info" || (!l.is_err && l.text && l.text.startsWith("[INFO]"));
       const row = document.createElement("div");
-      row.className = "terminal-line" + (l.is_err ? " terminal-line--err" : "");
+      row.className = "terminal-line" + (l.is_err ? " terminal-line--err" : (isInfo ? " terminal-line--info" : ""));
 
       const ts = document.createElement("span");
       ts.className = "terminal-ts";
       ts.textContent = l.ts || "";
 
       const badge = document.createElement("span");
-      badge.className = "terminal-stream-badge";
+      badge.className = "terminal-stream-badge" + (isInfo ? " terminal-stream-badge--info" : "");
       badge.textContent = l.stream || "stdout";
 
       const text = document.createElement("span");
       text.className = "terminal-text";
-      text.textContent = l.text || "";
+      if (l.text && l.text.startsWith("[INFO]")) {
+        const tag = document.createElement("span");
+        tag.style.color = "var(--teal)";
+        tag.style.fontWeight = "600";
+        tag.textContent = "[INFO]";
+        text.appendChild(tag);
+        text.appendChild(document.createTextNode(l.text.slice(6)));
+      } else {
+        text.textContent = l.text || "";
+      }
 
       row.appendChild(ts);
       row.appendChild(badge);

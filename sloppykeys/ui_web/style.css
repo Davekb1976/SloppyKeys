@@ -2202,6 +2202,13 @@ button.vp-chip { cursor: pointer; }
   border-color: rgba(224, 86, 86, 0.35);
 }
 
+.terminal-line--info .terminal-stream-badge,
+.terminal-stream-badge--info {
+  color: var(--teal);
+  border-color: rgba(76, 175, 114, 0.4);
+  background: rgba(76, 175, 114, 0.08);
+}
+
 .terminal-ts {
   color: var(--text-faint);
   font-size: 10px;

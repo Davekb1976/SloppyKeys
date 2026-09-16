@@ -30,6 +30,7 @@ def test_terminal_buffer_append_and_get():
     e4 = buf.append("\x1b[32m[INFO] Using engine_name: onnxruntime\x1b[0m", stream="stderr")
     assert e4["id"] == 4
     assert e4["text"] == "[INFO] Using engine_name: onnxruntime"
+    assert e4["stream"] == "info"
     assert not e4["is_err"]
 
     # Test get_lines
