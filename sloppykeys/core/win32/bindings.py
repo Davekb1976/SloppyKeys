@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import ctypes
 from ctypes import wintypes
+import time
 
 # # Process / window access
 PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
@@ -148,3 +149,73 @@ def get_cursor_pos() -> tuple[int, int] | None:
     if not user32.GetCursorPos(ctypes.byref(point)):
         return None
     return (int(point.x), int(point.y))
+
+
+# # Clipboard
+CF_UNICODETEXT = 13
+GMEM_MOVEABLE = 0x0002
+
+_set_sig(user32.OpenClipboard, wintypes.BOOL, wintypes.HWND)
+_set_sig(user32.CloseClipboard, wintypes.BOOL)
+_set_sig(user32.EmptyClipboard, wintypes.BOOL)
+_set_sig(user32.SetClipboardData, wintypes.HANDLE, wintypes.UINT, wintypes.HANDLE)
+_set_sig(user32.GetClipboardData, wintypes.HANDLE, wintypes.UINT)
+
+_set_sig(kernel32.GlobalAlloc, wintypes.HGLOBAL, wintypes.UINT, ctypes.c_size_t)
+_set_sig(kernel32.GlobalLock, wintypes.LPVOID, wintypes.HGLOBAL)
+_set_sig(kernel32.GlobalUnlock, wintypes.BOOL, wintypes.HGLOBAL)
+_set_sig(kernel32.GlobalFree, wintypes.HGLOBAL, wintypes.HGLOBAL)
+
+
+def set_clipboard_text(text: str) -> bool:
+    """Set unicode text directly on the Windows clipboard."""
+    for _ in range(5):
+        if user32.OpenClipboard(None):
+            break
+        time.sleep(0.01)
+    else:
+        return False
+    try:
+        user32.EmptyClipboard()
+        if not text:
+            return True
+        data = text.encode("utf-16le") + b"\x00\x00"
+        h_mem = kernel32.GlobalAlloc(GMEM_MOVEABLE, len(data))
+        if not h_mem:
+            return False
+        p_mem = kernel32.GlobalLock(h_mem)
+        if not p_mem:
+            kernel32.GlobalFree(h_mem)
+            return False
+        ctypes.memmove(p_mem, data, len(data))
+        kernel32.GlobalUnlock(h_mem)
+        if not user32.SetClipboardData(CF_UNICODETEXT, h_mem):
+            kernel32.GlobalFree(h_mem)
+            return False
+        return True
+    finally:
+        user32.CloseClipboard()
+
+
+def get_clipboard_text() -> str | None:
+    """Read unicode text from the Windows clipboard, or None if empty/unavailable."""
+    for _ in range(5):
+        if user32.OpenClipboard(None):
+            break
+        time.sleep(0.01)
+    else:
+        return None
+    try:
+        h_data = user32.GetClipboardData(CF_UNICODETEXT)
+        if not h_data:
+            return None
+        p_data = kernel32.GlobalLock(h_data)
+        if not p_data:
+            return None
+        try:
+            return ctypes.wstring_at(p_data)
+        finally:
+            kernel32.GlobalUnlock(h_data)
+    finally:
+        user32.CloseClipboard()
+

@@ -7,6 +7,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sloppykeys.core.terminal import TerminalBuffer, TeeStream
+from sloppykeys.core.win32.bindings import get_clipboard_text, set_clipboard_text
 
 
 def test_terminal_buffer_append_and_get():
@@ -99,6 +100,13 @@ def test_tee_stream_line_buffering():
     assert mock_orig.getvalue() == "Hello world!\nLine A\nLine B\nLine C"
 
 
+def test_win32_clipboard_copy():
+    test_str = "SloppyKeys test clipboard string \u2713"
+    assert set_clipboard_text(test_str)
+    read_back = get_clipboard_text()
+    assert read_back == test_str
+
+
 if __name__ == "__main__":
     test_terminal_buffer_append_and_get()
     print("test_terminal_buffer_append_and_get ok")
@@ -108,4 +116,6 @@ if __name__ == "__main__":
     print("test_terminal_buffer_text_and_clear ok")
     test_tee_stream_line_buffering()
     print("test_tee_stream_line_buffering ok")
+    test_win32_clipboard_copy()
+    print("test_win32_clipboard_copy ok")
     print("All terminal stream tests passed!")

@@ -38,6 +38,7 @@ from sloppykeys.core.win32.bindings import (
     VK_LBUTTON,
     get_cursor_pos,
     is_key_down,
+    set_clipboard_text,
     user32,
 )
 from sloppykeys.core.win32.frameless import (
@@ -913,8 +914,12 @@ class Api:
         return get_terminal_buffer().get_lines(after_id=after_id)
 
     def copy_terminal_logs(self, errors_only: bool = False) -> dict:
-        """Return formatted text of the terminal buffer for clipboard copy."""
-        return {"ok": True, "text": get_terminal_buffer().get_text(errors_only=errors_only)}
+        """Copy formatted text of the terminal buffer to clipboard and return status."""
+        text = get_terminal_buffer().get_text(errors_only=errors_only)
+        if not text:
+            return {"ok": True, "count": 0, "text": ""}
+        copied = set_clipboard_text(text)
+        return {"ok": bool(copied), "count": len(text.splitlines()), "text": text}
 
     def clear_terminal_logs(self) -> dict:
         """Clear the in-memory terminal buffer."""

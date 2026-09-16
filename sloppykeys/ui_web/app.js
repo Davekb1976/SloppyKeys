@@ -1702,45 +1702,18 @@
     });
   }
 
-  async function copyToClipboard(text) {
-    if (!text) return false;
-    if (navigator.clipboard && window.isSecureContext) {
-      try {
-        await navigator.clipboard.writeText(text);
-        return true;
-      } catch (_) {}
-    }
-    try {
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      ta.style.position = "fixed";
-      ta.style.left = "-999999px";
-      document.body.appendChild(ta);
-      ta.focus();
-      ta.select();
-      const ok = document.execCommand("copy");
-      ta.remove();
-      return ok;
-    } catch (_) {
-      return false;
-    }
-  }
-
   if (btnTerminalCopy) {
     btnTerminalCopy.addEventListener("click", async () => {
       if (!window.pywebview || !pywebview.api || !pywebview.api.copy_terminal_logs) return;
       try {
         const res = await pywebview.api.copy_terminal_logs(false);
-        if (res && res.text) {
-          const ok = await copyToClipboard(res.text);
-          const oldText = btnTerminalCopy.textContent;
-          btnTerminalCopy.textContent = ok ? "Copied!" : "Failed";
-          setTimeout(() => { btnTerminalCopy.textContent = oldText; }, 1500);
+        const oldText = btnTerminalCopy.textContent;
+        if (res && res.count > 0) {
+          btnTerminalCopy.textContent = res.ok ? "Copied!" : "Failed";
         } else {
-          const oldText = btnTerminalCopy.textContent;
           btnTerminalCopy.textContent = "No Logs";
-          setTimeout(() => { btnTerminalCopy.textContent = oldText; }, 1500);
         }
+        setTimeout(() => { btnTerminalCopy.textContent = oldText; }, 1500);
       } catch (_) {}
     });
   }
@@ -1750,16 +1723,13 @@
       if (!window.pywebview || !pywebview.api || !pywebview.api.copy_terminal_logs) return;
       try {
         const res = await pywebview.api.copy_terminal_logs(true);
-        if (res && res.text) {
-          const ok = await copyToClipboard(res.text);
-          const oldText = btnTerminalCopyErrors.textContent;
-          btnTerminalCopyErrors.textContent = ok ? "Copied!" : "Failed";
-          setTimeout(() => { btnTerminalCopyErrors.textContent = oldText; }, 1500);
+        const oldText = btnTerminalCopyErrors.textContent;
+        if (res && res.count > 0) {
+          btnTerminalCopyErrors.textContent = res.ok ? "Copied!" : "Failed";
         } else {
-          const oldText = btnTerminalCopyErrors.textContent;
           btnTerminalCopyErrors.textContent = "No Errors";
-          setTimeout(() => { btnTerminalCopyErrors.textContent = oldText; }, 1500);
         }
+        setTimeout(() => { btnTerminalCopyErrors.textContent = oldText; }, 1500);
       } catch (_) {}
     });
   }
